@@ -256,11 +256,11 @@ app.post('/api/admin/login', async (req, res) => {
     // Set token in HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Use secure in production
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'strict'
+      secure: true, // Required for SameSite: 'None'
+      sameSite: 'None', // Allows cross-site cookie
+      maxAge: 24 * 60 * 60 * 1000
     });
-
+    
     // Return user data
     res.json({
       message: 'Login successful',

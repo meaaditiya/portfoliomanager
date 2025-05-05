@@ -94,7 +94,7 @@ const Login = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/login', {
+      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/login', {
         email: loginData.email,
         password: loginData.password
       }, {
@@ -129,7 +129,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/forgot-password', { 
+      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/forgot-password', { 
         email: forgotEmail
       });
 
@@ -166,7 +166,7 @@ const Login = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/reset-password', {
+      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/reset-password', {
         email: resetData.email,
         otp: resetData.otp,
         newPassword: resetData.newPassword
