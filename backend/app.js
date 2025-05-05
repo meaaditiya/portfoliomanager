@@ -21,11 +21,12 @@ if (process.env.SENDGRID_API_KEY) {
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174','https://connectwithaaditiya.onrender.com'],// Your React app's URL
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true, // If you're using cookies or authentication headers
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -256,14 +257,16 @@ app.post('/api/admin/login', async (req, res) => {
     // Set token in HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true, // Required for SameSite: 'None'
-      sameSite: 'None', // Allows cross-site cookie
-      maxAge: 24 * 60 * 60 * 1000
+      secure: true,
+      sameSite: 'None',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/' // Ensure cookie is sent with all requests
     });
     
-    // Return user data
+    // 3. Also add the token to the response body as a fallback
     res.json({
       message: 'Login successful',
+      token: token, // Add this line
       admin: {
         id: admin._id,
         name: admin.name,
