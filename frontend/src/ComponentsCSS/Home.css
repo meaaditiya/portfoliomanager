@@ -1,0 +1,141 @@
+/* Home.css */
+
+/* Reset and base styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body, html {
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  /* Main container for the home page */
+  .home-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    background-color: #f8f9fa;
+  }
+  
+  /* Content box styling */
+  .home-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 600px;
+    width: 100%;
+    padding: 40px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: center;
+  }
+  
+  /* Logo styling */
+  .home-logo {
+    margin-bottom: 24px;
+  }
+  
+  .home-logo img {
+    max-width: 150px;
+    height: auto;
+  }
+  
+  /* Title styling */
+  .home-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 16px;
+  }
+  
+  /* Description styling */
+  .home-description {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #666;
+    margin-bottom: 32px;
+  }
+  
+  /* Action buttons container */
+  .home-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+  }
+  
+  /* Button styles */
+  .btn {
+    display: inline-block;
+    text-decoration: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  
+  .btn-primary {
+    background-color: #4361ee;
+    color: white;
+    border: none;
+  }
+  
+  .btn-primary:hover {
+    background-color: #3a56d4;
+    transform: translateY(-2px);
+  }
+  
+  .btn-secondary {
+    background-color: transparent;
+    color: #4361ee;
+    border: 2px solid #4361ee;
+  }
+  
+  .btn-secondary:hover {
+    background-color: rgba(67, 97, 238, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .home-content {
+      padding: 30px 20px;
+    }
+    
+    .home-title {
+      font-size: 24px;
+    }
+    
+    .home-description {
+      font-size: 14px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .home-actions {
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    .btn {
+      width: 100%;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    
+    .home-logo img {
+      max-width: 120px;
+    }
+    
+    .home-title {
+      font-size: 22px;
+    }
+  }
