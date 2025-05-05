@@ -18,14 +18,21 @@ if (process.env.SENDGRID_API_KEY) {
 }
 
 // Middleware
-app.use(express.json());
-app.use(cookieParser());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: function(origin, callback) {
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com'];
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 
 
 // MongoDB Connection
@@ -64,14 +71,22 @@ const BlacklistedToken = mongoose.model('BlacklistedToken', blacklistedTokenSche
 
 // Authentication middleware
 const authenticateToken = async (req, res, next) => {
-  // Check for token in cookies first, then in Authorization header
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-
   try {
+    // Get token from cookies first
+    let token = req.cookies.token;
+    
+    // If no token in cookies, check Authorization header (Bearer token)
+    if (!token && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     // Check if token is blacklisted
     const isBlacklisted = await BlacklistedToken.findOne({ token });
     if (isBlacklisted) {
@@ -83,9 +98,11 @@ const authenticateToken = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
+    console.error('Auth error:', error.message);
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 };
+
 
 // Helper function to generate OTP
 const generateOTP = () => {
@@ -254,19 +271,22 @@ app.post('/api/admin/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // Set token in HTTP-only cookie
+    // Set cookie options based on environment
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Set token in HTTP-only cookie with appropriate settings
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'None',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/' // Ensure cookie is sent with all requests
+      secure: isProduction, // Only use secure in production
+      sameSite: isProduction ? 'None' : 'Lax', // Use 'None' for cross-site in production
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/'
     });
     
-    // 3. Also add the token to the response body as a fallback
+    // Also add the token to the response body as a fallback
     res.json({
       message: 'Login successful',
-      token: token, // Add this line
+      token: token, 
       admin: {
         id: admin._id,
         name: admin.name,
@@ -371,8 +391,14 @@ app.post('/api/admin/logout', authenticateToken, async (req, res) => {
       await blacklistedToken.save();
     }
     
-    // Clear cookie
-    res.clearCookie('token');
+    // Clear cookie with matching settings
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'None' : 'Lax',
+      path: '/'
+    });
     
     res.json({ message: 'Logout successful' });
   } catch (error) {

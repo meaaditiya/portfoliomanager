@@ -100,7 +100,9 @@ const Login = () => {
       }, {
         withCredentials: true // Important for handling cookies
       });
-
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
       // Navigate to success page
       navigate('/mainsection');
     } catch (error) {

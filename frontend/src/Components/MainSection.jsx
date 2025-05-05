@@ -39,26 +39,34 @@ const PortfolioSiteManager = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   // Check authentication status on mount
+ 
   useEffect(() => {
     const verifyToken = async () => {
       try {
-        // Send request to verify token (assumes token is in cookies)
-        await axios.get('http://localhost:5000/api/admin/verify', {
-          withCredentials: true,
-        });
+        const token = localStorage.getItem('token');
+        
+        // Make request with Authorization header
+        const response = await axios.get(
+          'https://connectwithaaditiyamg.onrender.com/api/admin/verify',
+          {
+            withCredentials: true, // Still try to send cookies
+            headers: {
+              Authorization: token ? `Bearer ${token}` : '' // Also send token in header
+            }
+          }
+        );
+        
         setIsAuthenticated(true);
       } catch (err) {
         console.error('Authentication failed:', err);
-        setError('Please log in to access the Portfolio Site Manager.');
         setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }
     };
-
+  
     verifyToken();
   }, []);
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -68,7 +76,7 @@ const PortfolioSiteManager = () => {
 
       // Call logout API
       await axios.post(
-        'http://localhost:5000/api/admin/logout',
+        'https://connectwithaaditiyamg.onrender.com/api/admin/logout',
         {},
         { withCredentials: true }
       );

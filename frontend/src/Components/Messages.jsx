@@ -30,7 +30,7 @@ const Messages = () => {
     try {
       setLoading(true);
      
-      const response = await axios.get('http://localhost:5000/api/admin/messages', {
+      const response = await axios.get('https://connectwithaaditiyamg.onrender.com/api/admin/messages', {
         withCredentials: true
       });
       setMessages(response.data);
@@ -44,7 +44,7 @@ const Messages = () => {
   const fetchMessageStats = async () => {
     try {
       
-      const response = await axios.get('http://localhost:5000/api/admin/message-stats',  {
+      const response = await axios.get('https://connectwithaaditiyamg.onrender.com/api/admin/message-stats',  {
         withCredentials: true
       });
       setMessageStats(response.data);
@@ -56,7 +56,7 @@ const Messages = () => {
   const viewMessage = async (messageId) => {
     try {
       
-      const response = await axios.get(`http://localhost:5000/api/admin/messages/${messageId}`,  {
+      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/admin/messages/${messageId}`,  {
         withCredentials: true
       });
       
@@ -92,7 +92,7 @@ const Messages = () => {
      
       
       await axios.post(
-        `http://localhost:5000/api/admin/messages/${currentMessage._id}/reply`, 
+        `https://connectwithaaditiyamg.onrender.com/api/admin/messages/${currentMessage._id}/reply`, 
         { replyContent }, 
         {
             withCredentials: true
@@ -131,7 +131,7 @@ const Messages = () => {
     
     try {
       
-      await axios.delete(`http://localhost:5000/api/admin/messages/${messageId}`,  {
+      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/admin/messages/${messageId}`,  {
         withCredentials: true
       });
       
