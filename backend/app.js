@@ -7,7 +7,8 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const sgMail = require('@sendgrid/mail');
 require('dotenv').config();
-
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
