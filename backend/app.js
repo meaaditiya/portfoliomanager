@@ -28,7 +28,7 @@ app.use(cors({
   }));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/portfolio_admin')
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connection to Database Successful, MongoDB connected!'))
   .catch(err => console.error('MongoDB connection error:', err));
 
