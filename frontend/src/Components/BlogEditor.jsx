@@ -151,7 +151,7 @@ const BlogManagementPanel = () => {
         setSuccessMessage('Blog post updated successfully!');
       } else {
         // Create new blog
-        response = await axios.post('http://localhost:5000/api/blogs', blogData, {
+        response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
           withCredentials: true
         });
         setSuccessMessage('Blog post created successfully!');
