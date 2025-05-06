@@ -23,7 +23,7 @@ if (process.env.SENDGRID_API_KEY) {
 // Middleware
 app.use(cors({
   origin: function(origin, callback) {
-    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com'];
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com','https://connectwithaaditiyaadmin.onrender.com'];
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
