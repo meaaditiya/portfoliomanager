@@ -39,11 +39,11 @@ const BlogAnalytics = ({ blogId }) => {
     setError(null);
     
     try {
-      // Fetch reactions
+     
       const token = localStorage.getItem('token');
       const reactionsResponse = await axios.get(
        
-        `http://localhost:5000/api/admin/blogs/${blogId}/reactions`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/blogs/${blogId}/reactions`,
         {
             withCredentials: true, // Still try to send cookies
             headers: {
@@ -74,7 +74,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
         const token = localStorage.getItem('token');
       const commentsResponse = await axios.get(
-        `http://localhost:5000/api/admin/blogs/${blogId}/comments`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/blogs/${blogId}/comments`,
         { 
           params: { status, page, limit: 10 },
           withCredentials: true ,
@@ -119,7 +119,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
         const token = localStorage.getItem('token');
       await axios.patch(
-        `http://localhost:5000/api/admin/comments/${commentId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/comments/${commentId}`,
         { status: newStatus },
         {
             withCredentials: true, // Still try to send cookies
@@ -149,7 +149,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
         const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:5000/api/admin/comments/${commentId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/comments/${commentId}`,
         {
             withCredentials: true, // Still try to send cookies
             headers: {

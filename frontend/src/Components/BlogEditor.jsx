@@ -518,7 +518,7 @@ const BlogManagementPanel = () => {
           </div>
         )}
         
-        {/* Blog analytics */}
+      
         {viewMode === 'analytics' && analyticsId && (
           <div className="blog-analytics-section">
             <div className="section-actions">
@@ -619,6 +619,7 @@ const BlogManagementPanel = () => {
                             ))}
                           </div>
                         )}
+                        
                         <div className="card-footer">
                           <div className="author-info">
                             {blog.author?.name || 'Unknown Author'}
