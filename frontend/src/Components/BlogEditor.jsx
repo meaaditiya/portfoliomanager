@@ -44,7 +44,7 @@ const BlogManagementPanel = () => {
         ...filters
       });
 
-      const response = await axios.get(`http://localhost:5000/api/blogs?${params.toString()}`, {
+      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/blogs?${params.toString()}`, {
         withCredentials: true
       });
 
@@ -145,7 +145,7 @@ const BlogManagementPanel = () => {
       
       if (selectedBlog) {
         // Update existing blog
-        response = await axios.put(`http://localhost:5000/api/blogs/${selectedBlog._id}`, blogData, {
+        response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
           withCredentials: true
         });
         setSuccessMessage('Blog post updated successfully!');
@@ -183,7 +183,7 @@ const BlogManagementPanel = () => {
     
     try {
       setLoading(true);
-      await axios.delete(`http://localhost:5000/api/blogs/${blogId}`, {
+      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}`, {
         withCredentials: true
       });
       
