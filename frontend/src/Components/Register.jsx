@@ -102,7 +102,7 @@ const Register = () => {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/register', {
+      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/register', {
         name: registerData.name,
         email: registerData.email,
         password: registerData.password
@@ -131,7 +131,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/admin/verify-otp', {
+      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/verify-otp', {
         email: otpData.email,
         otp: otpData.otp
       });
