@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../ComponentsCSS/blogeditor.css';
-
+import BlogAnalytics from './BlogAnaLytics';
 const BlogManagementPanel = () => {
   // State for blog list and pagination
   const [blogs, setBlogs] = useState([]);
@@ -33,7 +33,8 @@ const BlogManagementPanel = () => {
     featuredImage: ''
   });
   const [successMessage, setSuccessMessage] = useState('');
-  
+  const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
+  const [analyticsId, setAnalyticsId] = useState(null);
   // Fetch blogs from API
   const fetchBlogs = async () => {
     try {
@@ -205,45 +206,10 @@ const BlogManagementPanel = () => {
   };
   
   // Edit blog post
-  const handleEdit = async (blog) => {
-    setEditMode(true);
-    setSelectedBlog(blog);
-    setFormData({
-      title: blog.title,
-      content: blog.content,
-      summary: blog.summary,
-      tags: blog.tags.join(', '),
-      status: blog.status,
-      featuredImage: blog.featuredImage || ''
-    });
-    
-    // Scroll to top for better UX
-    window.scrollTo(0, 0);
-  };
   
   // Start creating new blog
-  const handleNew = () => {
-    setEditMode(true);
-    setSelectedBlog(null);
-    setFormData({
-      title: '',
-      content: '',
-      summary: '',
-      tags: '',
-      status: 'draft',
-      featuredImage: ''
-    });
-    
-    // Scroll to top for better UX
-    window.scrollTo(0, 0);
-  };
+ 
   
-  // Cancel editing
-  const handleCancel = () => {
-    setEditMode(false);
-    setSelectedBlog(null);
-    setSuccessMessage('');
-  };
   
   // Format text in editor
   const formatText = (e, formatting) => {
@@ -295,20 +261,76 @@ const BlogManagementPanel = () => {
       textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
     }, 0);
   };
-
+  const handleViewAnalytics = (blog) => {
+    setViewMode('analytics');
+    setAnalyticsId(blog._id);
+    // Scroll to top for better UX
+    window.scrollTo(0, 0);
+  };
+  
+  // Modify cancel function
+  const handleCancel = () => {
+    setViewMode('list');
+    setEditMode(false);
+    setSelectedBlog(null);
+    setAnalyticsId(null);
+    setSuccessMessage('');
+  };
+  const handleEdit = async (blog) => {
+    setViewMode('edit');
+    setEditMode(true);
+    setSelectedBlog(blog);
+    setFormData({
+      title: blog.title,
+      content: blog.content,
+      summary: blog.summary,
+      tags: blog.tags.join(', '),
+      status: blog.status,
+      featuredImage: blog.featuredImage || ''
+    });
+    
+    // Scroll to top for better UX
+    window.scrollTo(0, 0);
+  };
+  const handleNew = () => {
+    setViewMode('edit');
+    setEditMode(true);
+    setSelectedBlog(null);
+    setFormData({
+      title: '',
+      content: '',
+      summary: '',
+      tags: '',
+      status: 'draft',
+      featuredImage: ''
+    });
+    
+    // Scroll to top for better UX
+    window.scrollTo(0, 0);
+  };
   return (
     <div className="blog-management-panel">
       <div className="container">
         {/* Header with title and create new button */}
         <div className="panel-header">
-          <h1>{editMode ? (selectedBlog ? 'Edit Blog Post' : 'Create New Blog Post') : 'Blog Management'}</h1>
-          {!editMode && (
-            <button 
-              className="btn btn-primary"
-              onClick={handleNew}
-            >
-              Add New Post
-            </button>
+          {viewMode === 'list' && (
+            <>
+              <h1>Blog Management</h1>
+              <button 
+                className="btn btn-primary"
+                onClick={handleNew}
+              >
+                Add New Post
+              </button>
+            </>
+          )}
+          
+          {viewMode === 'edit' && (
+            <h1>{selectedBlog ? 'Edit Blog Post' : 'Create New Blog Post'}</h1>
+          )}
+          
+          {viewMode === 'analytics' && (
+            <h1>Blog Analytics</h1>
           )}
         </div>
         
@@ -327,7 +349,7 @@ const BlogManagementPanel = () => {
         )}
         
         {/* Blog editor */}
-        {editMode ? (
+        {viewMode === 'edit' && (
           <div className="blog-editor-section">
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -494,8 +516,25 @@ const BlogManagementPanel = () => {
               </div>
             </form>
           </div>
-        ) : (
-          /* Blog list */
+        )}
+        
+        {/* Blog analytics */}
+        {viewMode === 'analytics' && analyticsId && (
+          <div className="blog-analytics-section">
+            <div className="section-actions">
+              <button 
+                className="btn btn-secondary"
+                onClick={handleCancel}
+              >
+                Back to Blog List
+              </button>
+            </div>
+            <BlogAnalytics blogId={analyticsId} />
+          </div>
+        )}
+        
+        {/* Blog list */}
+        {viewMode === 'list' && (
           <div className="blog-list-section">
             {/* Filters */}
             <div className="filters-section">
@@ -586,17 +625,42 @@ const BlogManagementPanel = () => {
                           </div>
                           <div className="card-actions">
                             <button 
+                              onClick={() => handleViewAnalytics(blog)}
+                              className="btn btn-analytics"
+                              title="View blog analytics"
+                            >
+                              Analytics
+                            </button>
+                            <button 
                               onClick={() => handleEdit(blog)}
                               className="btn btn-edit"
+                              title="Edit blog post"
                             >
                               Edit
                             </button>
                             <button 
                               onClick={() => handleDelete(blog._id)}
                               className="btn btn-delete"
+                              title="Delete blog post"
                             >
                               Delete
                             </button>
+                          </div>
+                        </div>
+                        
+                        {/* Display reaction and comment counts if available */}
+                        <div className="card-stats">
+                          <div className="stat-item">
+                            <span className="stat-icon">👍</span>
+                            <span className="stat-value">{blog.reactionCounts?.likes || 0}</span>
+                          </div>
+                          <div className="stat-item">
+                            <span className="stat-icon">👎</span>
+                            <span className="stat-value">{blog.reactionCounts?.dislikes || 0}</span>
+                          </div>
+                          <div className="stat-item">
+                            <span className="stat-icon">💬</span>
+                            <span className="stat-value">{blog.commentsCount || 0}</span>
                           </div>
                         </div>
                       </div>

@@ -1,0 +1,341 @@
+/* Instagram-inspired styling for BlogAnalytics component */
+.blog-analytics {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Tabs styling */
+  .analytics-tabs {
+    display: flex;
+    border-bottom: 1px solid #dbdbdb;
+    margin-bottom: 20px;
+  }
+  
+  .tab-btn {
+    flex: 1;
+    padding: 12px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    color: #8e8e8e;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .tab-btn.active {
+    color: #262626;
+    border-bottom: 2px solid #0095f6;
+  }
+  
+  /* Loading state */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px;
+  }
+  
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #0095f6;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* Error message */
+  .error-message {
+    color: #ed4956;
+    text-align: center;
+    padding: 20px;
+    background: #fff1f2;
+    border-radius: 8px;
+  }
+  
+  /* Reactions analytics */
+  .reactions-analytics {
+    padding: 20px 0;
+  }
+  
+  .analytics-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .summary-card {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 12px;
+    transition: transform 0.2s ease;
+  }
+  
+  .summary-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .summary-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-right: 12px;
+  }
+  
+  .like-icon {
+    background: #ffe6e6;
+    color: #ed4956;
+  }
+  
+  .dislike-icon {
+    background: #e6e6ff;
+    color: #405de6;
+  }
+  
+  .total-icon {
+    background: #e6f3ff;
+    color: #0095f6;
+  }
+  
+  .summary-data h3 {
+    margin: 0;
+    font-size: 24px;
+    color: #262626;
+  }
+  
+  .summary-data p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: #8e8e8e;
+  }
+  
+  /* Reactions table */
+  .reactions-table-container {
+    overflow-x: auto;
+  }
+  
+  .reactions-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .reactions-table th,
+  .reactions-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #dbdbdb;
+  }
+  
+  .reactions-table th {
+    background: #fafafa;
+    font-weight: 600;
+    color: #262626;
+  }
+  
+  .reaction-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 14px;
+  }
+  
+  .reaction-badge.like {
+    background: #ffe6e6;
+    color: #ed4956;
+  }
+  
+  .reaction-badge.dislike {
+    background: #e6e6ff;
+    color: #405de6;
+  }
+  
+  .reaction-badge svg {
+    margin-right: 6px;
+  }
+  
+  /* Comments analytics */
+  .comments-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .comment-tab-btn {
+    padding: 8px 16px;
+    background: #fafafa;
+    border: 1px solid #dbdbdb;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8e8e8e;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .comment-tab-btn.active {
+    background: #0095f6;
+    color: #fff;
+    border-color: #0095f6;
+  }
+  
+  .comment-tab-btn svg {
+    margin-right: 6px;
+  }
+  
+  /* Comment cards */
+  .comment-card {
+    background: #fafafa;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    transition: transform 0.2s ease;
+  }
+  
+  .comment-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .comment-user-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .comment-user-info strong {
+    color: #262626;
+  }
+  
+  .comment-user-info a {
+    color: #0095f6;
+    text-decoration: none;
+  }
+  
+  .comment-date {
+    font-size: 12px;
+    color: #8e8e8e;
+  }
+  
+  .comment-content {
+    color: #262626;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  
+  .comment-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  .btn-approve {
+    background: #00d084;
+    color: #fff;
+  }
+  
+  .btn-pending {
+    background: #ffd666;
+    color: #262626;
+  }
+  
+  .btn-reject {
+    background: #ed4956;
+    color: #fff;
+  }
+  
+  .btn-delete {
+    background: #dbdbdb;
+    color: #262626;
+  }
+  
+  .btn:hover {
+    opacity: 0.9;
+  }
+  
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  
+  .pagination-btn {
+    padding: 8px 12px;
+    background: #fafafa;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #262626;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .pagination-btn.active,
+  .pagination-btn:hover:not(:disabled) {
+    background: #0095f6;
+    color: #fff;
+    border-color: #0095f6;
+  }
+  
+  .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #8e8e8e;
+  }
+  
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .analytics-summary {
+      grid-template-columns: 1fr;
+    }
+  
+    .reactions-table th,
+    .reactions-table td {
+      padding: 8px;
+      font-size: 14px;
+    }
+  
+    .comment-actions {
+      flex-wrap: wrap;
+    }
+  }

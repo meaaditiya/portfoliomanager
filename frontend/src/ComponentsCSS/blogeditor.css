@@ -436,3 +436,114 @@
     padding: 16px;
   }
 }
+/* Blog Card Footer and Actions */
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.author-info {
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-analytics {
+  background-color: #4a6fa5;
+  color: white;
+}
+
+.btn-analytics:hover {
+  background-color: #3a5a89;
+}
+
+.btn-edit {
+  background-color: #4caf50;
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #3d8b40;
+}
+
+.btn-delete {
+  background-color: #f44336;
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #d32f2f;
+}
+
+/* Blog Card Stats */
+.card-stats {
+  display: flex;
+  margin-top: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #f0f0f0;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stat-icon {
+  font-size: 16px;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .btn {
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+}
+
+/* Hover effect for blog cards */
+.blog-card:hover .card-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Optional: Animation for buttons on hover */
+.btn:active {
+  transform: scale(0.95);
+}
