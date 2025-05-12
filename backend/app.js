@@ -1438,7 +1438,27 @@ const blogSchema = new mongoose.Schema({
     }
   });
 
-// Start server
+const keepAlive = () => {
+  setInterval(() => {
+    console.log('Keep-alive ping sent at:', new Date().toISOString());
+    // Self-ping the server to prevent it from going to sleep
+    fetch(`https://${process.env.APP_URL || 'connectwithaaditiya.onrender.com'}/api/ping`)
+      .then(res => {
+        console.log('Keep-alive response status:', res.status);
+      })
+      .catch(err => {
+        console.error('Keep-alive ping failed:', err.message);
+      });
+  }, 14 * 60 * 1000); 
+};
+
+
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ message: 'Server is alive!', timestamp: new Date().toISOString() });
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  keepAlive();
 });
