@@ -1437,28 +1437,96 @@ const blogSchema = new mongoose.Schema({
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   });
+// Add these packages at the top if not already present
+const axios = require('axios');
+const https = require('https');
 
+// Enhanced keep-alive function
 const keepAlive = () => {
-  setInterval(() => {
-    console.log('Keep-alive ping sent at:', new Date().toISOString());
-    // Self-ping the server to prevent it from going to sleep
-    fetch(`https://${process.env.APP_URL || 'connectwithaaditiya.onrender.com'}/api/ping`)
-      .then(res => {
-        console.log('Keep-alive response status:', res.status);
-      })
-      .catch(err => {
-        console.error('Keep-alive ping failed:', err.message);
-      });
-  }, 14 * 60 * 1000); 
+  const PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  const appUrl = process.env.APP_URL || 'connectwithaaditiya.onrender.com';
+  const urls = [
+    `https://${appUrl}/api/ping`,
+    // Add any other URLs you want to ping, like:
+    `https://${appUrl}/api/blogs?limit=1`,
+  ];
+  
+  console.log(`Setting up keep-alive pings every ${PING_INTERVAL/60000} minutes to prevent sleep`);
+
+  // Create an interval that rotates through different endpoints
+  setInterval(async () => {
+    const timestamp = new Date().toISOString();
+    console.log(`\n[${timestamp}] Sending keep-alive pings...`);
+    
+    // Internal ping - won't go out to the network but keeps the process active
+    const internalRes = await axios.get(`http://localhost:${PORT}/api/ping`, {
+      headers: { 'Connection': 'keep-alive' }
+    }).catch(err => {
+      console.error('Internal ping failed:', err.message);
+      return { status: 'error' };
+    });
+    
+    console.log(`Internal ping status: ${internalRes.status || 'failed'}`);
+    
+    // External ping using multiple strategies
+    for (const url of urls) {
+      try {
+        // Strategy 1: Using axios
+        const res = await axios.get(url, {
+          headers: { 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
+          timeout: 10000 // 10 second timeout
+        });
+        console.log(`Ping to ${url} succeeded with status ${res.status}`);
+      } catch (err) {
+        console.error(`Axios ping to ${url} failed:`, err.message);
+        
+        // Strategy 2: Fallback to native https request
+        try {
+          await new Promise((resolve, reject) => {
+            const req = https.get(url, {
+              headers: { 'User-Agent': 'KeepAliveBot/1.0', 'Connection': 'keep-alive' },
+              timeout: 10000
+            }, (res) => {
+              console.log(`Native ping to ${url} succeeded with status ${res.statusCode}`);
+              res.on('data', () => {}); // Drain the response
+              res.on('end', resolve);
+            });
+            
+            req.on('error', (e) => {
+              console.error(`Native ping to ${url} failed:`, e.message);
+              reject(e);
+            });
+            
+            req.on('timeout', () => {
+              req.destroy();
+              reject(new Error('Timeout'));
+            });
+          });
+        } catch (e) {
+          console.error(`All ping strategies to ${url} failed`);
+        }
+      }
+    }
+  }, PING_INTERVAL);
+  
+  // Also add an immediate ping to wake up right away
+  setTimeout(() => {
+    console.log('Sending initial wake-up ping...');
+    axios.get(`https://${appUrl}/api/ping`).catch(err => {
+      console.log('Initial ping failed, but process will continue');
+    });
+  }, 5000); // Wait 5 seconds after server start
 };
 
-
+// Add a ping endpoint
 app.get('/api/ping', (req, res) => {
-  res.status(200).json({ message: 'Server is alive!', timestamp: new Date().toISOString() });
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Ping received from ${req.ip}`);
+  res.status(200).json({ message: 'Server is alive!', timestamp });
 });
 
-
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  keepAlive();
+  keepAlive(); // Start the enhanced keep-alive mechanism
 });
