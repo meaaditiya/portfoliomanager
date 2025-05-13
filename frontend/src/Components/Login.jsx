@@ -268,9 +268,7 @@ const Login = () => {
             >
               Forgot Password?
             </span>
-            <Link to="/register" className="text-link">
-              Create Account
-            </Link>
+           
           </div>
         </div>
       </form>

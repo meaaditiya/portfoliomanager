@@ -1524,6 +1524,695 @@ app.get('/api/ping', (req, res) => {
   console.log(`[${timestamp}] Ping received from ${req.ip}`);
   res.status(200).json({ message: 'Server is alive!', timestamp });
 });
+// Add these at the top of your app.js file
+const multer = require('multer');
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
+
+// Image Post Schema
+const imagePostSchema = new mongoose.Schema({
+  caption: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  image: {
+    data: Buffer,
+    contentType: String
+  },
+  author: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    required: true
+  },
+  hideReactionCount: {
+    type: Boolean,
+    default: false
+  },
+  reactionCount: {
+    type: Number,
+    default: 0
+  },
+  commentCount: {
+    type: Number,
+    default: 0
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Image Post Reaction Schema
+const imageReactionSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ImagePost',
+    required: true
+  },
+  user: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    },
+    deviceId: {
+      type: String,
+      required: true
+    }
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Compound index to prevent multiple reactions from the same user/device on the same post
+imageReactionSchema.index({ post: 1, 'user.email': 1 }, { unique: true });
+imageReactionSchema.index({ post: 1, 'user.deviceId': 1 }, { unique: true });
+
+// Image Post Comment Schema
+const imageCommentSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ImagePost',
+    required: true
+  },
+  user: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    },
+    deviceId: {
+      type: String,
+      required: true
+    }
+  },
+  content: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 500
+  },
+  status: {
+    type: String,
+    enum: ['active', 'hidden'],
+    default: 'active'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Create models
+const ImagePost = mongoose.model('ImagePost', imagePostSchema);
+const ImageReaction = mongoose.model('ImageReaction', imageReactionSchema);
+const ImageComment = mongoose.model('ImageComment', imageCommentSchema);
+
+// Helper middleware to extract device ID
+const extractDeviceId = (req, res, next) => {
+  // Use user-agent and IP as a simple device identifier
+  // In production, you might use a more sophisticated approach
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  
+  // Create a hash of these values to use as device ID
+  const deviceId = require('crypto')
+    .createHash('md5')
+    .update(userAgent + ip)
+    .digest('hex');
+  
+  req.deviceId = deviceId;
+  next();
+};
+
+// ADMIN ROUTES
+// Create a new image post (admin only)
+app.post('/api/admin/image-posts', authenticateToken, upload.single('image'), async (req, res) => {
+  try {
+    const { caption, hideReactionCount } = req.body;
+    
+    // Validate image is provided
+    if (!req.file) {
+      return res.status(400).json({ message: 'Image is required' });
+    }
+    
+    // Create new image post
+    const newImagePost = new ImagePost({
+      caption,
+      image: {
+        data: req.file.buffer,
+        contentType: req.file.mimetype
+      },
+      author: req.user.admin_id,
+      hideReactionCount: hideReactionCount === 'true' || hideReactionCount === true
+    });
+    
+    await newImagePost.save();
+    
+    res.status(201).json({
+      message: 'Image post created successfully',
+      post: {
+        id: newImagePost._id,
+        caption: newImagePost.caption,
+        hideReactionCount: newImagePost.hideReactionCount,
+        createdAt: newImagePost.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error creating image post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update an image post (admin only)
+app.put('/api/admin/image-posts/:id', authenticateToken, upload.single('image'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { caption, hideReactionCount } = req.body;
+    
+    // Find post
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Check if user is authorized (author or admin)
+    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update this post' });
+    }
+    
+    // Update fields
+    if (caption) post.caption = caption;
+    if (hideReactionCount !== undefined) {
+      post.hideReactionCount = hideReactionCount === 'true' || hideReactionCount === true;
+    }
+    
+    // Update image if provided
+    if (req.file) {
+      post.image = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype
+      };
+    }
+    
+    post.updatedAt = new Date();
+    await post.save();
+    
+    res.json({
+      message: 'Image post updated successfully',
+      post: {
+        id: post._id,
+        caption: post.caption,
+        hideReactionCount: post.hideReactionCount,
+        updatedAt: post.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error updating image post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete an image post (admin only)
+app.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find post
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Check if user is authorized (author or admin)
+    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete this post' });
+    }
+    
+    // Delete post and associated reactions and comments
+    await ImageReaction.deleteMany({ post: id });
+    await ImageComment.deleteMany({ post: id });
+    await ImagePost.findByIdAndDelete(id);
+    
+    res.json({ message: 'Image post and associated data deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting image post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all image posts for admin dashboard
+app.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get posts with reaction and comment counts
+    const posts = await ImagePost.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('-image.data') // Exclude binary data for listing
+      .populate('author', 'name email');
+    
+    const total = await ImagePost.countDocuments();
+    
+    res.json({
+      posts,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching image posts for admin:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get single image post with admin details
+app.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const post = await ImagePost.findById(id)
+      .populate('author', 'name email');
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Convert Buffer to Base64 for easy display
+    const imageData = post.image.data
+      ? `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`
+      : null;
+    
+    // Get reactions and comments
+    const reactions = await ImageReaction.find({ post: id }).countDocuments();
+    const comments = await ImageComment.find({ post: id }).sort({ createdAt: -1 });
+    
+    res.json({
+      post: {
+        ...post._doc,
+        image: imageData
+      },
+      reactions,
+      comments
+    });
+  } catch (error) {
+    console.error('Error fetching image post details for admin:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Admin manage comments
+app.patch('/api/admin/image-comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { status } = req.body;
+    
+    if (!['active', 'hidden'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+    
+    const comment = await ImageComment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    comment.status = status;
+    await comment.save();
+    
+    // Update the post's comment count if comment is hidden
+    if (status === 'hidden' && comment.status === 'active') {
+      await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: -1 } });
+    } else if (status === 'active' && comment.status === 'hidden') {
+      await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: 1 } });
+    }
+    
+    res.json({
+      message: 'Comment status updated successfully',
+      comment
+    });
+  } catch (error) {
+    console.error('Error updating comment status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Admin delete comment
+app.delete('/api/admin/image-comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await ImageComment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    // Update post's comment count if comment is active
+    if (comment.status === 'active') {
+      await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: -1 } });
+    }
+    
+    await ImageComment.findByIdAndDelete(commentId);
+    
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// PUBLIC ROUTES
+// Get all published image posts (public)
+app.get('/api/image-posts', async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get posts for public view
+    const posts = await ImagePost.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('-image.data') // Exclude binary data for listing
+      .lean();
+    
+    const total = await ImagePost.countDocuments();
+    
+    res.json({
+      posts: posts.map(post => ({
+        ...post,
+        // Only include reaction count if not hidden
+        reactionCount: post.hideReactionCount ? null : post.reactionCount
+      })),
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching public image posts:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get single image post (public)
+app.get('/api/image-posts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Convert Buffer to Base64 for easy display
+    const imageData = post.image.data
+      ? `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`
+      : null;
+    
+    // Get active comments
+    const comments = await ImageComment.find({ 
+      post: id,
+      status: 'active'
+    }).sort({ createdAt: -1 });
+    
+    res.json({
+      post: {
+        id: post._id,
+        caption: post.caption,
+        image: imageData,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        // Only include reaction count if not hidden
+        reactionCount: post.hideReactionCount ? null : post.reactionCount,
+        commentCount: post.commentCount
+      },
+      comments
+    });
+  } catch (error) {
+    console.error('Error fetching public image post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Like an image post (public)
+app.post('/api/image-posts/:id/react', extractDeviceId, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email } = req.body;
+    const deviceId = req.deviceId;
+    
+    // Validate inputs
+    if (!name || !email) {
+      return res.status(400).json({ message: 'Name and email are required' });
+    }
+    
+    // Check if post exists
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Check if user already reacted
+    const existingReaction = await ImageReaction.findOne({
+      post: id,
+      $or: [
+        { 'user.email': email },
+        { 'user.deviceId': deviceId }
+      ]
+    });
+    
+    if (existingReaction) {
+      // Remove reaction (toggle off)
+      await ImageReaction.findByIdAndDelete(existingReaction._id);
+      await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: -1 } });
+      
+      return res.json({
+        message: 'Reaction removed successfully',
+        hasReacted: false
+      });
+    }
+    
+    // Create new reaction
+    const newReaction = new ImageReaction({
+      post: id,
+      user: {
+        name,
+        email,
+        deviceId
+      }
+    });
+    
+    await newReaction.save();
+    await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: 1 } });
+    
+    res.status(201).json({
+      message: 'Reaction added successfully',
+      hasReacted: true
+    });
+  } catch (error) {
+    console.error('Error adding reaction:', error);
+    
+    // Handle duplicate key error specifically
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'You have already reacted to this post' });
+    }
+    
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Check if user has reacted to a post
+app.get('/api/image-posts/:id/has-reacted', extractDeviceId, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email } = req.query;
+    const deviceId = req.deviceId;
+    
+    // Need email or deviceId
+    if (!email && !deviceId) {
+      return res.status(400).json({ message: 'Email or device identification required' });
+    }
+    
+    // Build query
+    const query = { post: id };
+    
+    if (email) {
+      query['user.email'] = email;
+    } else {
+      query['user.deviceId'] = deviceId;
+    }
+    
+    // Check if reaction exists
+    const reaction = await ImageReaction.findOne(query);
+    
+    res.json({
+      hasReacted: !!reaction
+    });
+  } catch (error) {
+    console.error('Error checking reaction status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Add a comment to an image post (public)
+app.post('/api/image-posts/:id/comments', extractDeviceId, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, content } = req.body;
+    const deviceId = req.deviceId;
+    
+    // Validate inputs
+    if (!name || !email || !content) {
+      return res.status(400).json({ message: 'Name, email, and content are required' });
+    }
+    
+    if (content.length > 500) {
+      return res.status(400).json({ message: 'Comment cannot exceed 500 characters' });
+    }
+    
+    // Check if post exists
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    // Create new comment
+    const newComment = new ImageComment({
+      post: id,
+      user: {
+        name,
+        email,
+        deviceId
+      },
+      content
+    });
+    
+    await newComment.save();
+    await ImagePost.findByIdAndUpdate(id, { $inc: { commentCount: 1 } });
+    
+    res.status(201).json({
+      message: 'Comment added successfully',
+      comment: newComment
+    });
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete own comment (public)
+app.delete('/api/image-posts/comments/:commentId', extractDeviceId, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { email } = req.body;
+    const deviceId = req.deviceId;
+    
+    // Validate inputs
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    // Find the comment
+    const comment = await ImageComment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    // Verify ownership (device ID or email)
+    if (comment.user.email !== email && comment.user.deviceId !== deviceId) {
+      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+    }
+    
+    // Update post's comment count if comment is active
+    if (comment.status === 'active') {
+      await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: -1 } });
+    }
+    
+    await ImageComment.findByIdAndDelete(commentId);
+    
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting own comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get comments for an image post (public)
+app.get('/api/image-posts/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get active comments only
+    const comments = await ImageComment.find({
+      post: id,
+      status: 'active'
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+    
+    const total = await ImageComment.countDocuments({
+      post: id,
+      status: 'active'
+    });
+    
+    res.json({
+      comments,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 // Start server
 app.listen(PORT, () => {

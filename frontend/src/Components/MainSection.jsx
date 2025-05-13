@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import BlogEditor from '../Components/BlogEditor';
 import Messages from '../Components/Messages';
 import '../ComponentsCSS/mainsection.css';
+import  Adminpost from '../Components/Adminpost';
 
 // Placeholder component for Snippets
 const Snippets = () => (
@@ -108,6 +109,9 @@ const PortfolioSiteManager = () => {
         return <BlogEditor />;
       case 'message':
         return <Messages />;
+      case 'adminpost':
+        return<Adminpost/>;
+     
       case 'snippets':
       default:
         return <Snippets />;
@@ -169,6 +173,13 @@ const PortfolioSiteManager = () => {
           >
             Messages
           </button>
+           <button
+            className={`nav-btn ${activeSection === 'adminpost' ? 'active' : ''}`}
+            onClick={() => setActiveSection('adminpost')}
+          >
+            Posts
+          </button>
+           
           <button className="nav-btn btn-logout" onClick={handleLogout}>
             Logout
           </button>

@@ -20,7 +20,7 @@ const Home = () => {
         </p>
         <div className="home-actions">
           <Link to="/login" className="btn btn-primary">Login</Link>
-          <Link to="/register" className="btn btn-secondary">Register</Link>
+        
         </div>
       </div>
     </div>
