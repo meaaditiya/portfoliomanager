@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../ComponentsCSS/blogeditor.css';
 import BlogAnalytics from './BlogAnaLytics';
+
 const BlogManagementPanel = () => {
   // State for blog list and pagination
   const [blogs, setBlogs] = useState([]);
@@ -35,6 +36,7 @@ const BlogManagementPanel = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
   const [analyticsId, setAnalyticsId] = useState(null);
+  
   // Fetch blogs from API
   const fetchBlogs = async () => {
     try {
@@ -205,12 +207,6 @@ const BlogManagementPanel = () => {
     }
   };
   
-  // Edit blog post
-  
-  // Start creating new blog
- 
-  
-  
   // Format text in editor
   const formatText = (e, formatting) => {
     e.preventDefault();
@@ -261,6 +257,7 @@ const BlogManagementPanel = () => {
       textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
     }, 0);
   };
+  
   const handleViewAnalytics = (blog) => {
     setViewMode('analytics');
     setAnalyticsId(blog._id);
@@ -276,6 +273,7 @@ const BlogManagementPanel = () => {
     setAnalyticsId(null);
     setSuccessMessage('');
   };
+  
   const handleEdit = async (blog) => {
     setViewMode('edit');
     setEditMode(true);
@@ -292,6 +290,7 @@ const BlogManagementPanel = () => {
     // Scroll to top for better UX
     window.scrollTo(0, 0);
   };
+  
   const handleNew = () => {
     setViewMode('edit');
     setEditMode(true);
@@ -308,6 +307,7 @@ const BlogManagementPanel = () => {
     // Scroll to top for better UX
     window.scrollTo(0, 0);
   };
+  
   return (
     <div className="blog-management-panel">
       <div className="container">
@@ -389,7 +389,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="Heading"
                   >
-                    H1
+                    <strong>H1</strong>
                   </button>
                   <button 
                     type="button" 
@@ -397,7 +397,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="Subheading"
                   >
-                    H2
+                    <strong>H2</strong>
                   </button>
                   <button 
                     type="button" 
@@ -405,7 +405,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="Bold"
                   >
-                    B
+                    <strong>B</strong>
                   </button>
                   <button 
                     type="button" 
@@ -413,7 +413,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="Italic"
                   >
-                    I
+                    <em>I</em>
                   </button>
                   <button 
                     type="button" 
@@ -421,7 +421,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="List"
                   >
-                    • List
+                    <span>• List</span>
                   </button>
                   <button 
                     type="button" 
@@ -429,7 +429,7 @@ const BlogManagementPanel = () => {
                     className="toolbar-btn"
                     title="Insert Link"
                   >
-                    🔗 Link
+                    <span>🔗 Link</span>
                   </button>
                 </div>
                 <textarea
@@ -518,7 +518,6 @@ const BlogManagementPanel = () => {
           </div>
         )}
         
-      
         {viewMode === 'analytics' && analyticsId && (
           <div className="blog-analytics-section">
             <div className="section-actions">
