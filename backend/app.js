@@ -809,7 +809,7 @@ const blogSchema = new mongoose.Schema({
   
   // Contact Routes to add to your app.js
   // Submit a new contact message
-  app.post('/api/contact', async (req, res) => {
+ app.post('/api/contact', async (req, res) => {
     try {
       const { name, email, message } = req.body;
       
@@ -835,29 +835,200 @@ const blogSchema = new mongoose.Schema({
       
       // Send confirmation email to user
       const confirmationEmail = `
-        <h1>Thank You for Contacting Us</h1>
-        <p>Hello ${name},</p>
-        <p>We have received your message and will get back to you as soon as possible.</p>
-        <p>Your message:</p>
-        <blockquote>${message}</blockquote>
-        <p>Best regards,<br/>Aditya Tyagi</p>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Thank You for Reaching Out</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #f8f9fa;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #007bff;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              color: #007bff;
+              margin: 0;
+              font-size: 28px;
+              font-weight: 600;
+            }
+            .greeting {
+              font-size: 18px;
+              color: #495057;
+              margin-bottom: 20px;
+            }
+            .message-content {
+              background-color: #f8f9fa;
+              padding: 20px;
+              border-left: 4px solid #007bff;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #dee2e6;
+              text-align: center;
+              color: #6c757d;
+            }
+            .signature {
+              margin-top: 25px;
+              font-weight: 500;
+              color: #495057;
+            }
+            .icon {
+              display: inline-block;
+              width: 20px;
+              height: 20px;
+              margin-right: 8px;
+              vertical-align: middle;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✨ Thank You for Reaching Out!</h1>
+            </div>
+            
+            <div class="greeting">
+              Hello <strong>${name}</strong>,
+            </div>
+            
+            <p>Thank you for taking the time to contact me! I truly appreciate you reaching out and I'm excited to connect with you.</p>
+            
+            <p>I have successfully received your message and I will get back to you very soon. I make it a priority to respond to all inquiries within 24-48 hours.</p>
+            
+            <div class="message-content">
+              <p><strong>📝 Your Message:</strong></p>
+              <p><em>${message}</em></p>
+            </div>
+            
+            <p>In the meantime, feel free to explore more of my work or connect with me on social media. I look forward to our conversation!</p>
+            
+            <div class="footer">
+              <p>This is an automated confirmation. Please do not reply to this email.</p>
+              <div class="signature">
+                <p>Best regards,<br/>
+                <strong>Aditya Tyagi</strong><br/>
+                <em>Looking forward to connecting with you!</em></p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
       `;
       
-      await sendEmail(email, 'Thank You for Your Message', confirmationEmail);
+      await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
       
       // Send notification to admin
       const adminNotification = `
-        <h1>New Contact Message</h1>
-        <p><strong>From:</strong> ${name} (${email})</p>
-        <p><strong>Message:</strong></p>
-        <blockquote>${message}</blockquote>
-        <p>Please log in to the admin panel to respond.</p>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>New Contact Message</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #f8f9fa;
+            }
+            .container {
+              background: white;
+              padding: 30px;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              background: linear-gradient(135deg, #28a745, #20c997);
+              color: white;
+              padding: 20px;
+              border-radius: 8px;
+              text-align: center;
+              margin-bottom: 25px;
+            }
+            .contact-info {
+              background-color: #f8f9fa;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 15px 0;
+            }
+            .message-box {
+              background-color: #fff3cd;
+              border: 1px solid #ffeaa7;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+            }
+            .label {
+              font-weight: 600;
+              color: #495057;
+              margin-bottom: 5px;
+            }
+            .action-note {
+              background-color: #d1ecf1;
+              border: 1px solid #bee5eb;
+              padding: 15px;
+              border-radius: 6px;
+              margin-top: 20px;
+              text-align: center;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h2>🔔 New Contact Message Received</h2>
+            </div>
+            
+            <div class="contact-info">
+              <div class="label">👤 From:</div>
+              <p><strong>${name}</strong></p>
+              
+              <div class="label">📧 Email:</div>
+              <p><strong>${email}</strong></p>
+            </div>
+            
+            <div class="message-box">
+              <div class="label">💬 Message:</div>
+              <p>${message}</p>
+            </div>
+            
+            <div class="action-note">
+              <p><strong>Action Required:</strong> Please log in to the admin panel to respond to this message.</p>
+            </div>
+          </div>
+        </body>
+        </html>
       `;
       
       // Find admin email - assuming first admin or use a dedicated notifications email
       const admin = await Admin.findOne();
       if (admin) {
-        await sendEmail(admin.email, 'New Contact Message Received', adminNotification);
+        await sendEmail(admin.email, '🔔 New Contact Message Received', adminNotification);
       }
       
       res.status(201).json({ 
@@ -933,20 +1104,107 @@ const blogSchema = new mongoose.Schema({
       message.replied = true;
       await message.save();
       
-      // Send reply email to user
+      // Send reply email to user - ONLY the reply content
       const replyEmail = `
-        <h1>Response to Your Inquiry</h1>
-        <p>Hello ${message.name},</p>
-        <p>Thank you for reaching out. Here is our response to your message:</p>
-        <p><strong>Your original message:</strong></p>
-        <blockquote>${message.message}</blockquote>
-        <p><strong>Our response:</strong></p>
-        <div>${replyContent}</div>
-        <p>If you have any further questions, please don't hesitate to contact us again.</p>
-        <p>Best regards,<br/>Aditya Tyagi</p>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Response from Aditya Tyagi</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #f8f9fa;
+            }
+            .container {
+              background: white;
+              padding: 40px;
+              border-radius: 12px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #007bff;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              color: #007bff;
+              margin: 0;
+              font-size: 24px;
+              font-weight: 600;
+            }
+            .greeting {
+              font-size: 18px;
+              color: #495057;
+              margin-bottom: 25px;
+            }
+            .reply-content {
+              background-color: #f8f9fa;
+              padding: 25px;
+              border-left: 4px solid #007bff;
+              margin: 25px 0;
+              border-radius: 6px;
+              font-size: 16px;
+              line-height: 1.7;
+            }
+            .footer {
+              margin-top: 35px;
+              padding-top: 25px;
+              border-top: 1px solid #dee2e6;
+              text-align: center;
+            }
+            .signature {
+              color: #495057;
+              font-weight: 500;
+            }
+            .contact-info {
+              background-color: #e7f3ff;
+              padding: 20px;
+              border-radius: 8px;
+              margin-top: 25px;
+              text-align: center;
+              font-size: 14px;
+              color: #6c757d;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>📧 Response from Aditya Tyagi</h1>
+            </div>
+            
+            <div class="greeting">
+              Hello <strong>${message.name}</strong>,
+            </div>
+            
+            <div class="reply-content">
+              ${replyContent}
+            </div>
+            
+            <div class="footer">
+              <div class="signature">
+                <p>Best regards,<br/>
+                <strong>Aditya Tyagi</strong></p>
+              </div>
+              
+              <div class="contact-info">
+                <p>If you have any further questions, feel free to reach out again. I'm always happy to help!</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
       `;
       
-      await sendEmail(message.email, 'Response to Your Inquiry', replyEmail);
+      await sendEmail(message.email, 'Response from Aditya Tyagi', replyEmail);
       
       res.json({ 
         success: true, 
