@@ -423,11 +423,7 @@ const Login = () => {
     <div className="auth-container">
       <div className="auth-box">
         <div className="logo-container">
-          <img 
-            src="/logo.svg" 
-            alt="Portfolio Admin" 
-            className="logo"
-          />
+         
           <div className="app-title">Portfolio Admin</div>
         </div>
         {renderCurrentView()}

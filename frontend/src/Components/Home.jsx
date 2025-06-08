@@ -6,13 +6,7 @@ const Home = () => {
   return (
     <div className="home-container">
       <div className="home-content">
-        <div className="home-logo">
-          <img 
-            src="/logo.svg" 
-            alt="Logo" 
-            
-          />
-        </div>
+       
         <h1 className="home-title">Portfolio Admin Panel</h1>
         <p className="home-description">
           Welcome to your portfolio website administration panel. 
