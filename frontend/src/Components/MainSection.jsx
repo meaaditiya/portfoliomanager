@@ -5,6 +5,7 @@ import BlogEditor from '../Components/BlogEditor';
 import Messages from '../Components/Messages';
 import '../ComponentsCSS/mainsection.css';
 import  Adminpost from '../Components/Adminpost';
+import Socialpost from '../Components/SocialPost';
 
 // Placeholder component for Snippets
 const Snippets = () => (
@@ -111,7 +112,8 @@ const PortfolioSiteManager = () => {
         return <Messages />;
       case 'adminpost':
         return<Adminpost/>;
-     
+     case 'socialpost':
+      return<Socialpost/>
       case 'snippets':
       default:
         return <Snippets />;
@@ -178,6 +180,12 @@ const PortfolioSiteManager = () => {
             onClick={() => setActiveSection('adminpost')}
           >
             Posts
+          </button>
+           <button
+            className={`nav-btn ${activeSection === 'socialpost' ? 'active' : ''}`}
+            onClick={() => setActiveSection('socialpost')}
+          >
+            Social Posts
           </button>
            
           <button className="nav-btn btn-logout" onClick={handleLogout}>
