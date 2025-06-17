@@ -6,7 +6,7 @@ import Messages from '../Components/Messages';
 import '../ComponentsCSS/mainsection.css';
 import  Adminpost from '../Components/Adminpost';
 import Socialpost from '../Components/SocialPost';
-
+import Project from '../Components/Project';
 // Placeholder component for Snippets
 const Snippets = () => (
   <div className="content-section">
@@ -114,6 +114,8 @@ const PortfolioSiteManager = () => {
         return<Adminpost/>;
      case 'socialpost':
       return<Socialpost/>
+     case 'project':
+       return<Project/>
       case 'snippets':
       default:
         return <Snippets />;
@@ -187,7 +189,12 @@ const PortfolioSiteManager = () => {
           >
             Social Posts
           </button>
-           
+            <button
+            className={`nav-btn ${activeSection === 'project' ? 'active' : ''}`}
+            onClick={() => setActiveSection('project')}
+          >
+            Project Requests
+          </button>
           <button className="nav-btn btn-logout" onClick={handleLogout}>
             Logout
           </button>

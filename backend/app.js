@@ -2840,6 +2840,185 @@ app.get('/api/social-embeds/platform/:platform', async (req, res) => {
   }
 });
 
+// Project Request Schema
+const projectRequestSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address']
+  },
+  projectType: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  budget: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  timeline: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  description: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  features: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  techPreferences: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  additionalInfo: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  image: {
+    type: Buffer,
+    default: null
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'acknowledged'],
+    default: 'pending'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
+
+// Routes
+// Submit project request (accessible to anyone)
+app.post('/api/project/submit', upload.single('image'), async (req, res) => {
+  try {
+    const { name, email, projectType, description, budget, timeline, features, techPreferences, additionalInfo } = req.body;
+
+    // Validate required inputs
+    if (!name || !email || !projectType || !description) {
+      return res.status(400).json({ message: 'Name, email, project type, and description are required' });
+    }
+
+    // Create new project request
+    const newRequest = new ProjectRequest({
+      name,
+      email,
+      projectType,
+      description,
+      budget: budget || null,
+      timeline: timeline || null,
+      features: features || null,
+      techPreferences: techPreferences || null,
+      additionalInfo: additionalInfo || null,
+      image: req.file ? req.file.buffer : null
+    });
+
+    await newRequest.save();
+
+    // Send confirmation email to user
+    const confirmationEmail = `
+      <h1>Project Request Received</h1>
+      <p>Hello ${name},</p>
+      <p>Your project request of type "${projectType}" has been received.</p>
+      <p>We will review your request and get back to you soon.</p>
+    `;
+
+    await sendEmail(email, 'Project Request Confirmation', confirmationEmail);
+
+    res.status(201).json({
+      message: 'Project request submitted successfully. Check your email for confirmation.'
+    });
+  } catch (error) {
+    console.error('Project submission error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all project requests (admin only)
+app.get('/api/admin/project/requests', authenticateToken, async (req, res) => {
+  try {
+    const requests = await ProjectRequest.find()
+      .sort({ createdAt: -1 })
+      .select('-image'); // Exclude image data for list view
+
+    res.json({ requests });
+  } catch (error) {
+    console.error('Error fetching project requests:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get single project request with image (admin only)
+app.get('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const request = await ProjectRequest.findById(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Project request not found' });
+    }
+
+    res.json({ request });
+  } catch (error) {
+    console.error('Error fetching project request details:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Acknowledge project request (admin only)
+app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const request = await ProjectRequest.findById(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Project request not found' });
+    }
+
+    if (request.status === 'acknowledged') {
+      return res.status(400).json({ message: 'Request already acknowledged' });
+    }
+
+    request.status = 'acknowledged';
+    await request.save();
+
+    // Send acknowledgment email to user
+    const acknowledgmentEmail = `
+      <h1>Project Request Acknowledged</h1>
+      <p>Hello ${request.name},</p>
+      <p>Your project request of type "${request.projectType}" has been acknowledged.</p>
+      <p>Thank you for your submission!</p>
+    `;
+
+    await sendEmail(request.email, 'Project Request Acknowledged', acknowledgmentEmail);
+
+    res.json({
+      message: 'Project request acknowledged successfully',
+      request
+    });
+  } catch (error) {
+    console.error('Acknowledge project request error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

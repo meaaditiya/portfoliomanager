@@ -31,7 +31,7 @@ const Login = () => {
   const [passwordStrength, setPasswordStrength] = useState(0);
   
   // Use the direct site key
-  const siteKey = import.meta.env.VITE_SITE_KEY
+  const siteKey = '0x4AAAAAABUex35iY9OmXSBB'
   const handleLoginChange = (e) => {
     setLoginData({
       ...loginData,
