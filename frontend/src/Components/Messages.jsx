@@ -1,4 +1,3 @@
-// src/admin/pages/Messages.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
@@ -12,20 +11,19 @@ import {
   FaPaperPlane, 
   FaCircle,
   FaEyeSlash,
-  FaCheckCircle,
-  FaTimesCircle,
   FaUser,
   FaCalendarAlt,
   FaClock,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaTimes
 } from 'react-icons/fa';
-import '../ComponentsCSS/Message.css'
+import '../ComponentsCSS/Message.css';
 
 const Messages = () => {
-  const [conversations, setConversations] = useState([]); // Grouped conversations
+  const [conversations, setConversations] = useState([]);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [currentMessages, setCurrentMessages] = useState([]);
-  const [replies, setReplies] = useState([]);
+  const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,10 +39,8 @@ const Messages = () => {
     replied: 0
   });
 
-  // API Base URL
   const API_BASE = 'https://connectwithaaditiyamg.onrender.com';
 
-  // Fetch conversations on component mount
   useEffect(() => {
     fetchConversations();
     fetchMessageStats();
@@ -57,11 +53,11 @@ const Messages = () => {
         withCredentials: true
       });
       setConversations(response.data.data || []);
-      setLoading(false);
     } catch (err) {
       setError('Failed to fetch conversations');
-      setLoading(false);
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,29 +84,33 @@ const Messages = () => {
         withCredentials: true
       });
       
-      const conversationData = response.data;
       setCurrentConversation({
-        email: conversationData.email,
-        name: conversationData.name,
-        totalMessages: conversationData.totalMessages,
-        unreadCount: conversationData.unreadCount,
-        readCount: conversationData.readCount,
-        repliedCount: conversationData.repliedCount
+        email: response.data.email,
+        name: response.data.name,
+        totalMessages: response.data.totalMessages,
+        unreadCount: response.data.unreadCount,
+        readCount: response.data.readCount,
+        repliedCount: response.data.repliedCount
       });
       
-      setCurrentMessages(conversationData.messages || []);
+      setCurrentMessages(response.data.messages || []);
       setIsChatView(true);
-      setLoading(false);
+      setSelectedMessage(null);
       
-      // Refresh conversations and stats
+      // Automatically mark conversation as read if it has unread messages
+      if (response.data.unreadCount > 0) {
+        await markConversationAsRead(email);
+      }
+      
       setTimeout(() => {
         fetchConversations();
         fetchMessageStats();
       }, 500);
     } catch (err) {
       setError('Failed to load conversation');
-      setLoading(false);
       showNotification('error', 'Failed to load conversation details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -122,35 +122,27 @@ const Messages = () => {
       return;
     }
     
-    // Find the original message to reply to (first message in conversation)
-    const originalMessage = currentMessages.find(msg => !msg.replies || msg.replies.length === 0) || currentMessages[0];
-    
-    if (!originalMessage) {
-      showNotification('error', 'No message found to reply to');
-      return;
-    }
-    
     try {
       setReplyLoading(true);
-      
       await axios.post(
-        `${API_BASE}/api/admin/messages/${originalMessage._id}/reply`, 
-        { replyContent }, 
+        `${API_BASE}/api/admin/messages/${selectedMessage?._id || currentMessages[0]._id}/reply`, 
+        { 
+          replyContent,
+          replyingTo: selectedMessage?._id || currentMessages[0]._id
+        }, 
         { withCredentials: true }
       );
       
       setReplyContent('');
-      setReplyLoading(false);
-      
+      setSelectedMessage(null);
       showNotification('success', 'Reply sent successfully');
-      
-      // Refresh conversation
       viewConversation(currentConversation.email);
       fetchConversations();
       fetchMessageStats();
     } catch (err) {
-      setReplyLoading(false);
       showNotification('error', 'Failed to send reply');
+    } finally {
+      setReplyLoading(false);
     }
   };
 
@@ -162,20 +154,16 @@ const Messages = () => {
       });
       
       showNotification('success', 'Conversation marked as read');
-      
-      // Refresh data
       fetchConversations();
       fetchMessageStats();
       
-      // Update current conversation if viewing
       if (isChatView && currentConversation?.email === email) {
         viewConversation(email);
       }
-      
-      setActionLoading(null);
     } catch (err) {
-      setActionLoading(null);
       showNotification('error', 'Failed to mark conversation as read');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -187,25 +175,21 @@ const Messages = () => {
       });
       
       showNotification('success', 'Conversation marked as unread');
-      
-      // Refresh data
       fetchConversations();
       fetchMessageStats();
       
-      // Update current conversation if viewing
       if (isChatView && currentConversation?.email === email) {
         viewConversation(email);
       }
-      
-      setActionLoading(null);
     } catch (err) {
-      setActionLoading(null);
       showNotification('error', 'Failed to mark conversation as unread');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const deleteConversation = async (email) => {
-    if (!window.confirm(`Are you sure you want to delete all messages from ${email}? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to delete all messages from ${email}?`)) {
       return;
     }
     
@@ -215,20 +199,17 @@ const Messages = () => {
         withCredentials: true
       });
       
-      // If currently viewing this conversation, go back to list
       if (isChatView && currentConversation?.email === email) {
         goBackToConversations();
       }
       
       showNotification('success', 'Conversation deleted successfully');
-      
-      // Refresh data
       fetchConversations();
       fetchMessageStats();
-      setActionLoading(null);
     } catch (err) {
-      setActionLoading(null);
       showNotification('error', 'Failed to delete conversation');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -243,12 +224,9 @@ const Messages = () => {
       });
       
       showNotification('success', 'Message deleted successfully');
-      
-      // Refresh current conversation
       if (currentConversation) {
         viewConversation(currentConversation.email);
       }
-      
       fetchConversations();
       fetchMessageStats();
     } catch (err) {
@@ -260,7 +238,7 @@ const Messages = () => {
     setIsChatView(false);
     setCurrentConversation(null);
     setCurrentMessages([]);
-    setReplies([]);
+    setSelectedMessage(null);
     setReplyContent('');
   };
 
@@ -268,12 +246,6 @@ const Messages = () => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 3000);
   };
-
-  // Filter conversations based on active tab
-  const filteredConversations = conversations.filter(conversation => {
-    if (activeTab === 'all') return true;
-    return conversation.overallStatus === activeTab;
-  });
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -287,16 +259,16 @@ const Messages = () => {
     
     return date.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
   const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
+    return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: true
     });
   };
 
@@ -313,7 +285,6 @@ const Messages = () => {
     }
   };
 
-  // Chat view for individual conversation
   if (isChatView && currentConversation) {
     return (
       <div className="insta-messages-main-wrapper">
@@ -326,12 +297,10 @@ const Messages = () => {
         <div className="insta-chat-container">
           <div className="insta-chat-header">
             <button className="insta-back-button" onClick={goBackToConversations}>
-              <FaArrowLeft />
+              <FaArrowLeft /> Back
             </button>
             <div className="insta-chat-user-info">
-              <div className="insta-chat-avatar">
-                {getInitials(currentConversation.name)}
-              </div>
+              <div className="insta-chat-avatar">{getInitials(currentConversation.name)}</div>
               <div className="insta-chat-user-details">
                 <h3 className="insta-chat-username">{currentConversation.name}</h3>
                 <span className="insta-chat-user-email">{currentConversation.email}</span>
@@ -390,7 +359,10 @@ const Messages = () => {
           <div className="insta-chat-messages-area">
             {currentMessages.map(message => (
               <div key={message._id} className="insta-message-group">
-                <div className="insta-original-message">
+                <div 
+                  className={`insta-original-message ${selectedMessage?._id === message._id ? 'selected' : ''}`}
+                  onClick={() => setSelectedMessage(message)}
+                >
                   <div className="insta-message-bubble insta-received-message">
                     <div className="insta-message-header">
                       <span className={`insta-status-badge ${message.status}`}>
@@ -401,7 +373,10 @@ const Messages = () => {
                       </span>
                       <button 
                         className="insta-delete-message-btn"
-                        onClick={() => deleteMessage(message._id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMessage(message._id);
+                        }}
                         title="Delete this message"
                       >
                         <FaTrash />
@@ -432,6 +407,24 @@ const Messages = () => {
           </div>
 
           <div className="insta-chat-input-area">
+            {selectedMessage && (
+              <div className="insta-selected-message-preview">
+                <div className="insta-selected-message-header">
+                  <span>Replying to:</span>
+                  <button 
+                    className="insta-clear-selection"
+                    onClick={() => setSelectedMessage(null)}
+                    title="Clear selection"
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+                <div className="insta-selected-message-content">
+                  <p>{selectedMessage.message.substring(0, 100)}{selectedMessage.message.length > 100 ? '...' : ''}</p>
+                  <span>{formatDate(selectedMessage.createdAt)}</span>
+                </div>
+              </div>
+            )}
             <form onSubmit={sendReply} className="insta-message-form">
               <div className="insta-input-wrapper">
                 <textarea
@@ -466,7 +459,10 @@ const Messages = () => {
     );
   }
 
-  // Main conversations list view
+  const filteredConversations = conversations.filter(conversation => 
+    activeTab === 'all' ? true : conversation.overallStatus === activeTab
+  );
+
   return (
     <div className="insta-messages-main-wrapper">
       <div className="insta-messages-header">
@@ -482,35 +478,22 @@ const Messages = () => {
       )}
       
       <div className="insta-stats-tabs-container">
-        <div 
-          className={`insta-stat-tab ${activeTab === 'all' ? 'insta-active-tab' : ''}`}
-          onClick={() => setActiveTab('all')}
-        >
-          <span className="insta-stat-number">{messageStats.total}</span>
-          <span className="insta-stat-label">All</span>
-        </div>
-        <div 
-          className={`insta-stat-tab ${activeTab === 'unread' ? 'insta-active-tab' : ''}`}
-          onClick={() => setActiveTab('unread')}
-        >
-          <span className="insta-stat-number">{messageStats.unread}</span>
-          <span className="insta-stat-label">Unread</span>
-          {messageStats.unread > 0 && <FaCircle className="insta-unread-dot" />}
-        </div>
-        <div 
-          className={`insta-stat-tab ${activeTab === 'read' ? 'insta-active-tab' : ''}`}
-          onClick={() => setActiveTab('read')}
-        >
-          <span className="insta-stat-number">{messageStats.read}</span>
-          <span className="insta-stat-label">Read</span>
-        </div>
-        <div 
-          className={`insta-stat-tab ${activeTab === 'replied' ? 'insta-active-tab' : ''}`}
-          onClick={() => setActiveTab('replied')}
-        >
-          <span className="insta-stat-number">{messageStats.replied}</span>
-          <span className="insta-stat-label">Replied</span>
-        </div>
+        {[
+          { key: 'all', label: 'All', count: messageStats.total },
+          { key: 'unread', label: 'Unread', count: messageStats.unread },
+          { key: 'read', label: 'Read', count: messageStats.read },
+          { key: 'replied', label: 'Replied', count: messageStats.replied }
+        ].map(tab => (
+          <div 
+            key={tab.key}
+            className={`insta-stat-tab ${activeTab === tab.key ? 'insta-active-tab' : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            <span className="insta-stat-number">{tab.count}</span>
+            <span className="insta-stat-label">{tab.label}</span>
+            {tab.key === 'unread' && tab.count > 0 && <FaCircle className="insta-unread-dot" />}
+          </div>
+        ))}
       </div>
       
       <div className="insta-messages-list-container">
