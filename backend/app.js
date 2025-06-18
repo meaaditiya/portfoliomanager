@@ -1527,20 +1527,19 @@ repliedCount: {
   }
 },
 // Overall status priority: unread > read > replied
+// Replace the $switch block in the aggregation pipeline
 overallStatus: {
-  $switch: {
-    branches: [
-      {
-        case: { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
-        then: 'unread'
-      },
-      {
-        case: { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
-        then: 'read'
-      }
-    ],
-    default: 'replied'
-  }
+  $cond: [
+    { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
+    'unread',
+    {
+      $cond: [
+        { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
+        'read',
+        'replied'
+      ]
+    }
+  ]
 }
             }
           },
