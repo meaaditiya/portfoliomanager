@@ -1511,35 +1511,37 @@ const MessageSchema = new mongoose.Schema({
               totalMessages: { $sum: 1 },
               latestMessage: { $first: '$createdAt' },
               firstMessage: { $last: '$createdAt' },
-              unreadCount: {
-                $sum: {
-                  $cond: [{ $eq: ['$status', 'unread'] }, 1, 0]
-                }
-              },
-              readCount: {
-                $sum: {
-                  $cond: [{ $eq: ['$status', 'read'] }, 1, 0]
-                }
-              },
-              repliedCount: {
-                $sum: {
-                  $cond: [{ $eq: ['$status', 'replied'] }, 1, 0]
-                }
-              },
-              // Overall status priority: unread > read > replied
-              overallStatus: {
-                $cond: [
-                  { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
-                  'unread',
-                  {
-                    $cond: [
-                      { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
-                      'read',
-                      'replied'
-                    ]
-                  }
-                ]
-              }
+             unreadCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'unread'] }, 1, 0]
+  }
+},
+readCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'read'] }, 1, 0]
+  }
+},
+repliedCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'replied'] }, 1, 0]
+  }
+},
+// Overall status priority: unread > read > replied
+overallStatus: {
+  $switch: {
+    branches: [
+      {
+        case: { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
+        then: 'unread'
+      },
+      {
+        case: { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
+        then: 'read'
+      }
+    ],
+    default: 'replied'
+  }
+}
             }
           },
           {
