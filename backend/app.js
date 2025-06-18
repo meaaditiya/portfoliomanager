@@ -1487,84 +1487,67 @@ const MessageSchema = new mongoose.Schema({
   app.get('/api/admin/messages', authenticateToken, async (req, res) => {
     try {
       const { grouped = false, email } = req.query;
-      
       if (grouped === 'true') {
-        // Group messages by email with enhanced aggregation
-        const messages = await Message.aggregate([
-          {
-            $sort: { createdAt: -1 }
-          },
-          {
-            $group: {
-              _id: '$email',
-              name: { $first: '$name' },
-              email: { $first: '$email' },
-              messages: {
-                $push: {
-                  _id: '$_id',
-                  message: '$message',
-                  createdAt: '$createdAt',
-                  status: '$status',
-                  replied: '$replied'
-                }
-              },
-              totalMessages: { $sum: 1 },
-              latestMessage: { $first: '$createdAt' },
-              firstMessage: { $last: '$createdAt' },
-             unreadCount: {
-  $sum: {
-    $cond: [{ $eq: ['$status', 'unread'] }, 1, 0]
-  }
-},
-readCount: {
-  $sum: {
-    $cond: [{ $eq: ['$status', 'read'] }, 1, 0]
-  }
-},
-repliedCount: {
-  $sum: {
-    $cond: [{ $eq: ['$status', 'replied'] }, 1, 0]
-  }
-},
-// Overall status priority: unread > read > replied
-// Replace the $switch block in the aggregation pipeline
-overallStatus: {
-  $cond: [
-    { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
-    'unread',
-    {
-      $cond: [
-        { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
-        'read',
-        'replied'
-      ]
+  // Fetch all messages and group them in JavaScript
+  const messages = await Message.find().sort({ createdAt: -1 }).lean();
+  
+  // Group messages by email manually
+  const groupedMessages = messages.reduce((acc, msg) => {
+    const { email, name, _id, message, createdAt, status, replied } = msg;
+    
+    if (!acc[email]) {
+      acc[email] = {
+        _id: email,
+        name,
+        email,
+        messages: [],
+        totalMessages: 0,
+        latestMessage: createdAt,
+        firstMessage: createdAt,
+        unreadCount: 0,
+        readCount: 0,
+        repliedCount: 0,
+        overallStatus: 'replied', // Default
+        priority: 3 // Default for replied
+      };
     }
-  ]
+    
+    // Update group data
+    acc[email].messages.push({ _id, message, createdAt, status, replied });
+    acc[email].totalMessages += 1;
+    acc[email].latestMessage = new Date(acc[email].latestMessage) > new Date(createdAt) ? acc[email].latestMessage : createdAt;
+    acc[email].firstMessage = new Date(acc[email].firstMessage) < new Date(createdAt) ? acc[email].firstMessage : createdAt;
+    
+    // Update status counts
+    if (status === 'unread') acc[email].unreadCount += 1;
+    if (status === 'read') acc[email].readCount += 1;
+    if (status === 'replied') acc[email].repliedCount += 1;
+    
+    // Determine overallStatus and priority
+    if (acc[email].unreadCount > 0) {
+      acc[email].overallStatus = 'unread';
+      acc[email].priority = 1;
+    } else if (acc[email].readCount > 0) {
+      acc[email].overallStatus = 'read';
+      acc[email].priority = 2;
+    }
+    
+    return acc;
+  }, {});
+  
+  // Convert to array and sort by priority and latestMessage
+  const sortedMessages = Object.values(groupedMessages).sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    return new Date(b.latestMessage) - new Date(a.latestMessage);
+  });
+  
+  res.json({
+    success: true,
+    data: sortedMessages,
+    totalGroups: sortedMessages.length
+  });
 }
-            }
-          },
-          {
-            $addFields: {
-              // Add priority for sorting (unread first)
-              priority: {
-                $cond: [
-                  { $eq: ['$overallStatus', 'unread'] }, 1,
-                  { $cond: [{ $eq: ['$overallStatus', 'read'] }, 2, 3] }
-                ]
-              }
-            }
-          },
-          {
-            $sort: { priority: 1, latestMessage: -1 }
-          }
-        ]);
-        
-        res.json({
-          success: true,
-          data: messages,
-          totalGroups: messages.length
-        });
-      } else if (email) {
+     else if (email) {
         // Get all messages from specific email
         const messages = await Message.find({ email }).sort({ createdAt: -1 });
         res.json({
@@ -2014,84 +1997,103 @@ overallStatus: {
   });
   
   // NEW: Get message analytics (for admin dashboard)
-  app.get('/api/admin/message-analytics', authenticateToken, async (req, res) => {
-    try {
-      const { period = '7' } = req.query; // Default to 7 days
-      const days = parseInt(period);
+ app.get('/api/admin/message-analytics', authenticateToken, async (req, res) => {
+  try {
+    const { period = '7' } = req.query; // Default to 7 days
+    const days = parseInt(period);
+    
+    if (isNaN(days) || days < 1 || days > 365) {
+      return res.status(400).json({ message: 'Invalid period. Must be between 1 and 365 days' });
+    }
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Fetch messages within the period
+    const messages = await Message.find({ createdAt: { $gte: startDate } }).lean();
+    
+    // Daily stats
+    const dailyStats = messages.reduce((acc, msg) => {
+      const date = new Date(msg.createdAt);
+      const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
       
-      if (isNaN(days) || days < 1 || days > 365) {
-        return res.status(400).json({ message: 'Invalid period. Must be between 1 and 365 days' });
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          _id: { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() },
+          count: 0,
+          unread: 0,
+          read: 0,
+          replied: 0
+        };
       }
       
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      startDate.setHours(0, 0, 0, 0);
+      acc[dateKey].count += 1;
+      if (msg.status === 'unread') acc[dateKey].unread += 1;
+      if (msg.status === 'read') acc[dateKey].read += 1;
+      if (msg.status === 'replied') acc[dateKey].replied += 1;
       
-      // Daily message counts
-      const dailyStats = await Message.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' },
-              day: { $dayOfMonth: '$createdAt' }
-            },
-            count: { $sum: 1 },
-            unread: { $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } },
-            read: { $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } },
-            replied: { $sum: { $cond: [{ $eq: ['$status', 'replied'] }, 1, 0] } }
-          }
-        },
-        {
-          $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
-        }
-      ]);
+      return acc;
+    }, {});
+    
+    // Convert to array and sort by date
+    const sortedDailyStats = Object.values(dailyStats).sort((a, b) => {
+      const dateA = new Date(a._id.year, a._id.month - 1, a._id.day);
+      const dateB = new Date(b._id.year, b._id.month - 1, b._id.day);
+      return dateA - dateB;
+    });
+    
+    // Top senders
+    const senderStats = messages.reduce((acc, msg) => {
+      const { email, name, createdAt, status } = msg;
       
-      // Top email senders
-      const topSenders = await Message.aggregate([
-        {
-          $group: {
-            _id: '$email',
-            name: { $first: '$name' },
-            count: { $sum: 1 },
-            latestMessage: { $max: '$createdAt' },
-            unreadCount: { $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }
-          }
-        },
-        {
-          $sort: { count: -1 }
-        },
-        {
-          $limit: 10
-        }
-      ]);
+      if (!acc[email]) {
+        acc[email] = {
+          _id: email,
+          name,
+          count: 0,
+          latestMessage: createdAt,
+          unreadCount: 0
+        };
+      }
       
-      // Response rate calculation
-      const totalMessages = await Message.countDocuments();
-      const repliedMessages = await Message.countDocuments({ status: 'replied' });
-      const responseRate = totalMessages > 0 ? Math.round((repliedMessages / totalMessages) * 100) : 0;
+      acc[email].count += 1;
+      acc[email].latestMessage = new Date(acc[email].latestMessage) > new Date(createdAt) ? acc[email].latestMessage : createdAt;
+      if (status === 'unread') acc[email].unreadCount += 1;
       
-      res.json({
-        success: true,
-        period: `${days} days`,
-        dailyStats,
-        topSenders,
-        responseRate,
-        summary: {
-          totalInPeriod: dailyStats.reduce((sum, day) => sum + day.count, 0),
-          avgPerDay: dailyStats.length > 0 ? Math.round(dailyStats.reduce((sum, day) => sum + day.count, 0) / days * 10) / 10 : 0
-        }
-      });
-    } catch (error) {
-      console.error('Message analytics error:', error);
-      res.status(500).json({ message: error.message });
-    }
-  });
+      return acc;
+    }, {});
+    
+    // Convert to array, sort by count, and limit to 10
+    const topSenders = Object.values(senderStats)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    // Response rate
+    const totalMessages = await Message.countDocuments();
+    const repliedMessages = await Message.countDocuments({ status: 'replied' });
+    const responseRate = totalMessages > 0 ? Math.round((repliedMessages / totalMessages) * 100) : 0;
+    
+    // Summary
+    const totalInPeriod = messages.length;
+    const avgPerDay = days > 0 ? Math.round((totalInPeriod / days) * 10) / 10 : 0;
+    
+    res.json({
+      success: true,
+      period: `${days} days`,
+      dailyStats: sortedDailyStats,
+      topSenders,
+      responseRate,
+      summary: {
+        totalInPeriod,
+        avgPerDay
+      }
+    });
+  } catch (error) {
+    console.error('Message analytics error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
   
   // NEW: Bulk operations for messages (for admin)
   app.post('/api/admin/messages/bulk-action', authenticateToken, async (req, res) => {
