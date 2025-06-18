@@ -777,12 +777,12 @@ const MessageSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     }
-  });
-  
-  const Message = mongoose.model('Message', mongoose.models.Message || MessageSchema);
-  
-  // Reply Schema
-  const ReplySchema = new mongoose.Schema({
+});
+
+const Message = mongoose.model('Message', mongoose.models.Message || MessageSchema);
+
+// Reply Schema
+const ReplySchema = new mongoose.Schema({
     messageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Message',
@@ -801,12 +801,12 @@ const MessageSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     }
-  });
-  
-  const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
-  
-  // Enhanced Email Templates
-  const getConfirmationEmailTemplate = (name, message) => {
+});
+
+const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
+
+// Enhanced Email Templates
+const getConfirmationEmailTemplate = (name, message) => {
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -982,26 +982,14 @@ const MessageSchema = new mongoose.Schema({
                 <h4>Quick Response</h4>
                 <p>I aim to respond within 24-48 hours</p>
               </div>
-              <div class="feature">
-                <div class="feature-icon">💼</div>
-                <h4>Professional Service</h4>
-                <p>Personalized attention to your needs</p>
-              </div>
+             
             </div>
             
-            <div class="cta-section">
-              <h3>What's Next?</h3>
-              <p>I'm currently reviewing your message and will get back to you with a detailed response very soon!</p>
-              <a href="#" class="cta-button">Explore My Work</a>
-            </div>
+            
           </div>
           
           <div class="footer">
-            <div class="social-links">
-              <a href="#" class="social-link">🌐 Website</a>
-              <a href="#" class="social-link">💼 LinkedIn</a>
-              <a href="#" class="social-link">📧 Email</a>
-            </div>
+            
             <div class="signature">
               <p>Best regards,<br/>
               <strong>Aditya Tyagi</strong><br/>
@@ -1015,9 +1003,9 @@ const MessageSchema = new mongoose.Schema({
       </body>
       </html>
     `;
-  };
-  
-  const getAdminNotificationTemplate = (name, email, message) => {
+};
+
+const getAdminNotificationTemplate = (name, email, message) => {
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -1220,9 +1208,9 @@ const MessageSchema = new mongoose.Schema({
       </body>
       </html>
     `;
-  };
-  
-  const getReplyEmailTemplate = (name, replyContent) => {
+};
+
+const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -1276,6 +1264,24 @@ const MessageSchema = new mongoose.Schema({
             margin-bottom: 30px;
             text-align: center;
           }
+          .message-section {
+            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+          }
+          .message-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          }
           .reply-section {
             background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
             border: 2px solid #e2e8f0;
@@ -1294,7 +1300,7 @@ const MessageSchema = new mongoose.Schema({
             height: 100%;
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
           }
-          .reply-header {
+          .message-header, .reply-header {
             color: #4a5568;
             font-weight: 600;
             margin-bottom: 20px;
@@ -1302,7 +1308,7 @@ const MessageSchema = new mongoose.Schema({
             display: flex;
             align-items: center;
           }
-          .reply-content {
+          .message-content, .reply-content {
             color: #2d3748;
             line-height: 1.8;
             font-size: 16px;
@@ -1394,6 +1400,15 @@ const MessageSchema = new mongoose.Schema({
               Hello <strong>${name}</strong> 👋
             </div>
             
+            <div class="message-section">
+              <div class="message-header">
+                📝 Your Original Message:
+              </div>
+              <div class="message-content">
+                ${originalMessage}
+              </div>
+            </div>
+            
             <div class="reply-section">
               <div class="reply-header">
                 💬 My Response:
@@ -1403,14 +1418,7 @@ const MessageSchema = new mongoose.Schema({
               </div>
             </div>
             
-            <div class="contact-section">
-              <h3>Let's Stay Connected!</h3>
-              <div class="contact-links">
-                <a href="#" class="contact-link">🌐 Website</a>
-                <a href="#" class="contact-link">💼 LinkedIn</a>
-                <a href="#" class="contact-link">📱 Twitter</a>
-              </div>
-            </div>
+           
           </div>
           
           <div class="signature-section">
@@ -1418,7 +1426,7 @@ const MessageSchema = new mongoose.Schema({
               Best regards,<br/>
               <strong>Aditya Tyagi</strong>
             </div>
-            <div class="role">Full Stack Developer & Tech Enthusiast</div>
+           
           </div>
           
           <div class="footer">
@@ -1431,8 +1439,7 @@ const MessageSchema = new mongoose.Schema({
       </body>
       </html>
     `;
-  };
-  
+};
   // Contact Routes to add to your app.js
   // Submit a new contact message (unchanged for non-admin users)
  app.post('/api/contact', async (req, res) => {
@@ -1650,7 +1657,7 @@ const MessageSchema = new mongoose.Schema({
   // Reply to a message (for admin) - Enhanced with better email template
   app.post('/api/admin/messages/:id/reply', authenticateToken, async (req, res) => {
     try {
-      const { replyContent } = req.body;
+      const { replyContent , originalMessage } = req.body;
       const messageId = req.params.id;
       const adminId = req.user.admin_id;
       
@@ -1667,6 +1674,7 @@ const MessageSchema = new mongoose.Schema({
       // Create the reply
       const newReply = new Reply({
         messageId,
+        originalMessage: originalMessage.trim(),
         replyContent: replyContent.trim(),
         repliedBy: adminId
       });
@@ -1679,7 +1687,7 @@ const MessageSchema = new mongoose.Schema({
       await message.save();
       
       // Send enhanced reply email to user using the template
-      const replyEmail = getReplyEmailTemplate(message.name, replyContent);
+      const replyEmail = getReplyEmailTemplate(message.name, originalMessage, replyContent);
       
       await sendEmail(
         message.email, 
