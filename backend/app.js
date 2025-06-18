@@ -989,11 +989,7 @@ const getConfirmationEmailTemplate = (name, message) => {
           </div>
           
           <div class="footer">
-            <div class="social-links">
-              <a href="#" class="social-link">🌐 Website</a>
-              <a href="#" class="social-link">💼 LinkedIn</a>
-              <a href="#" class="social-link">📧 Email</a>
-            </div>
+            
             <div class="signature">
               <p>Best regards,<br/>
               <strong>Aditya Tyagi</strong><br/>
