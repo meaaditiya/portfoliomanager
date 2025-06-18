@@ -750,9 +750,7 @@ const blogSchema = new mongoose.Schema({
     }
   });
 
-
-
-  const MessageSchema = new mongoose.Schema({
+const MessageSchema = new mongoose.Schema({
     name: {
       type: String,
       required: [true, 'Name is required']
@@ -807,8 +805,636 @@ const blogSchema = new mongoose.Schema({
   
   const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
   
+  // Enhanced Email Templates
+  const getConfirmationEmailTemplate = (name, message) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Thank You for Reaching Out</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+          }
+          .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+          }
+          .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          .header p {
+            font-size: 16px;
+            opacity: 0.9;
+            font-weight: 300;
+          }
+          .content {
+            padding: 40px 30px;
+          }
+          .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 25px;
+          }
+          .message-preview {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 25px 0;
+            box-shadow: 0 10px 20px rgba(240, 147, 251, 0.3);
+          }
+          .message-preview h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+          }
+          .message-text {
+            font-style: italic;
+            line-height: 1.7;
+            opacity: 0.95;
+          }
+          .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+          }
+          .feature {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #4facfe;
+          }
+          .feature-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+          }
+          .feature h4 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-weight: 600;
+          }
+          .feature p {
+            color: #718096;
+            font-size: 14px;
+          }
+          .cta-section {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 25px 0;
+          }
+          .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+          }
+          .footer {
+            background: #f8fafc;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+          }
+          .social-links {
+            margin: 20px 0;
+          }
+          .social-link {
+            display: inline-block;
+            margin: 0 10px;
+            color: #4facfe;
+            text-decoration: none;
+            font-weight: 500;
+          }
+          .signature {
+            color: #4a5568;
+            font-weight: 600;
+            font-size: 18px;
+          }
+          @media (max-width: 600px) {
+            .email-container {
+              margin: 10px;
+              border-radius: 15px;
+            }
+            .header, .content, .footer {
+              padding: 25px 20px;
+            }
+            .header h1 {
+              font-size: 24px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <h1>🚀 Thank You for Reaching Out!</h1>
+            <p>Your message has been received and I'm excited to connect with you</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              Hello <strong>${name}</strong>,
+            </div>
+            
+            <p>Thank you for taking the time to contact me! I truly appreciate your interest and I'm thrilled to hear from you.</p>
+            
+            <div class="message-preview">
+              <h3>📝 Your Message:</h3>
+              <div class="message-text">"${message}"</div>
+            </div>
+            
+            <div class="features">
+              <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h4>Quick Response</h4>
+                <p>I aim to respond within 24-48 hours</p>
+              </div>
+              <div class="feature">
+                <div class="feature-icon">💼</div>
+                <h4>Professional Service</h4>
+                <p>Personalized attention to your needs</p>
+              </div>
+            </div>
+            
+            <div class="cta-section">
+              <h3>What's Next?</h3>
+              <p>I'm currently reviewing your message and will get back to you with a detailed response very soon!</p>
+              <a href="#" class="cta-button">Explore My Work</a>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <div class="social-links">
+              <a href="#" class="social-link">🌐 Website</a>
+              <a href="#" class="social-link">💼 LinkedIn</a>
+              <a href="#" class="social-link">📧 Email</a>
+            </div>
+            <div class="signature">
+              <p>Best regards,<br/>
+              <strong>Aditya Tyagi</strong><br/>
+              <em style="color: #718096;">Looking forward to our conversation!</em></p>
+            </div>
+            <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
+              This is an automated confirmation. Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+  
+  const getAdminNotificationTemplate = (name, email, message) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Contact Message</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            line-height: 1.6;
+          }
+          .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+          }
+          .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+          }
+          .badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+          }
+          .content {
+            padding: 40px 30px;
+          }
+          .contact-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+          }
+          .contact-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #dee2e6;
+          }
+          .avatar {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            margin-right: 15px;
+          }
+          .contact-info h3 {
+            color: #2d3748;
+            font-size: 18px;
+            margin-bottom: 5px;
+          }
+          .contact-info p {
+            color: #718096;
+            font-size: 14px;
+          }
+          .message-section {
+            background: #fff;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+          }
+          .message-header {
+            color: #4a5568;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 16px;
+          }
+          .message-content {
+            color: #2d3748;
+            line-height: 1.7;
+            font-size: 15px;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4facfe;
+          }
+          .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 30px 0;
+          }
+          .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.3s ease;
+          }
+          .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+          }
+          .btn-secondary {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            color: #2d3748;
+            box-shadow: 0 5px 15px rgba(255, 234, 167, 0.4);
+          }
+          .timestamp {
+            background: #e2e8f0;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #4a5568;
+            text-align: center;
+            margin: 20px 0;
+          }
+          .footer {
+            background: #f8fafc;
+            padding: 25px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 14px;
+          }
+          @media (max-width: 600px) {
+            .action-buttons {
+              grid-template-columns: 1fr;
+            }
+            .contact-header {
+              flex-direction: column;
+              text-align: center;
+            }
+            .avatar {
+              margin: 0 0 15px 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <h1>🔔 New Contact Message</h1>
+            <div class="badge">Requires Your Attention</div>
+          </div>
+          
+          <div class="content">
+            <div class="contact-card">
+              <div class="contact-header">
+                <div class="avatar">${name.charAt(0).toUpperCase()}</div>
+                <div class="contact-info">
+                  <h3>${name}</h3>
+                  <p>📧 ${email}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="message-section">
+              <div class="message-header">💬 Message Content:</div>
+              <div class="message-content">${message}</div>
+            </div>
+            
+            <div class="timestamp">
+              ⏰ Received: ${new Date().toLocaleString()}
+            </div>
+            
+            <div class="action-buttons">
+              <a href="#" class="btn btn-primary">📋 View in Admin Panel</a>
+              <a href="mailto:${email}" class="btn btn-secondary">📧 Reply Directly</a>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p><strong>Action Required:</strong> Please log in to the admin panel to manage this message.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+  
+  const getReplyEmailTemplate = (name, replyContent) => {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Response from Aditya Tyagi</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+          }
+          .email-container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+          }
+          .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+          }
+          .header h1 {
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          .header p {
+            opacity: 0.9;
+            font-size: 16px;
+          }
+          .content {
+            padding: 40px 30px;
+          }
+          .greeting {
+            font-size: 22px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 30px;
+            text-align: center;
+          }
+          .reply-section {
+            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+          }
+          .reply-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          }
+          .reply-header {
+            color: #4a5568;
+            font-weight: 600;
+            margin-bottom: 20px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+          }
+          .reply-content {
+            color: #2d3748;
+            line-height: 1.8;
+            font-size: 16px;
+          }
+          .signature-section {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 30px 0;
+          }
+          .signature {
+            color: #2d3748;
+            font-weight: 600;
+            font-size: 18px;
+          }
+          .role {
+            color: #718096;
+            font-style: italic;
+            margin-top: 5px;
+          }
+          .contact-section {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+            text-align: center;
+          }
+          .contact-section h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+          }
+          .contact-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+          }
+          .contact-link {
+            color: #4facfe;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border: 2px solid #4facfe;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+          }
+          .footer {
+            background: #2d3748;
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .footer-content {
+            max-width: 400px;
+            margin: 0 auto;
+          }
+          .footer h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+          }
+          .footer p {
+            opacity: 0.8;
+            line-height: 1.6;
+          }
+          @media (max-width: 600px) {
+            .email-container {
+              margin: 10px;
+            }
+            .header, .content {
+              padding: 25px 20px;
+            }
+            .contact-links {
+              flex-direction: column;
+              align-items: center;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <h1>📧 Personal Response</h1>
+            <p>Thank you for your patience</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              Hello <strong>${name}</strong> 👋
+            </div>
+            
+            <div class="reply-section">
+              <div class="reply-header">
+                💬 My Response:
+              </div>
+              <div class="reply-content">
+                ${replyContent}
+              </div>
+            </div>
+            
+            <div class="contact-section">
+              <h3>Let's Stay Connected!</h3>
+              <div class="contact-links">
+                <a href="#" class="contact-link">🌐 Website</a>
+                <a href="#" class="contact-link">💼 LinkedIn</a>
+                <a href="#" class="contact-link">📱 Twitter</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="signature-section">
+            <div class="signature">
+              Best regards,<br/>
+              <strong>Aditya Tyagi</strong>
+            </div>
+            <div class="role">Full Stack Developer & Tech Enthusiast</div>
+          </div>
+          
+          <div class="footer">
+            <div class="footer-content">
+              <h3>Thank You!</h3>
+              <p>I appreciate your time and interest. Feel free to reach out anytime if you have more questions or just want to chat about technology, projects, or collaborations!</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+  
   // Contact Routes to add to your app.js
-  // Submit a new contact message
+  // Submit a new contact message (unchanged for non-admin users)
  app.post('/api/contact', async (req, res) => {
     try {
       const { name, email, message } = req.body;
@@ -833,202 +1459,17 @@ const blogSchema = new mongoose.Schema({
       
       await newMessage.save();
       
-      // Send confirmation email to user
-      const confirmationEmail = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Thank You for Reaching Out</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f8f9fa;
-            }
-            .container {
-              background: white;
-              padding: 40px;
-              border-radius: 12px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #007bff;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              color: #007bff;
-              margin: 0;
-              font-size: 28px;
-              font-weight: 600;
-            }
-            .greeting {
-              font-size: 18px;
-              color: #495057;
-              margin-bottom: 20px;
-            }
-            .message-content {
-              background-color: #f8f9fa;
-              padding: 20px;
-              border-left: 4px solid #007bff;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .footer {
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #dee2e6;
-              text-align: center;
-              color: #6c757d;
-            }
-            .signature {
-              margin-top: 25px;
-              font-weight: 500;
-              color: #495057;
-            }
-            .icon {
-              display: inline-block;
-              width: 20px;
-              height: 20px;
-              margin-right: 8px;
-              vertical-align: middle;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>✨ Thank You for Reaching Out!</h1>
-            </div>
-            
-            <div class="greeting">
-              Hello <strong>${name}</strong>,
-            </div>
-            
-            <p>Thank you for taking the time to contact me! I truly appreciate you reaching out and I'm excited to connect with you.</p>
-            
-            <p>I have successfully received your message and I will get back to you very soon. I make it a priority to respond to all inquiries within 24-48 hours.</p>
-            
-            <div class="message-content">
-              <p><strong>📝 Your Message:</strong></p>
-              <p><em>${message}</em></p>
-            </div>
-            
-            <p>In the meantime, feel free to explore more of my work or connect with me on social media. I look forward to our conversation!</p>
-            
-            <div class="footer">
-              <p>This is an automated confirmation. Please do not reply to this email.</p>
-              <div class="signature">
-                <p>Best regards,<br/>
-                <strong>Aditya Tyagi</strong><br/>
-                <em>Looking forward to connecting with you!</em></p>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+      // Send enhanced confirmation email to user
+      const confirmationEmail = getConfirmationEmailTemplate(name, message);
+      await sendEmail(email, '🚀 Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
       
-      await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
-      
-      // Send notification to admin
-      const adminNotification = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>New Contact Message</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f8f9fa;
-            }
-            .container {
-              background: white;
-              padding: 30px;
-              border-radius: 12px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-              background: linear-gradient(135deg, #28a745, #20c997);
-              color: white;
-              padding: 20px;
-              border-radius: 8px;
-              text-align: center;
-              margin-bottom: 25px;
-            }
-            .contact-info {
-              background-color: #f8f9fa;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 15px 0;
-            }
-            .message-box {
-              background-color: #fff3cd;
-              border: 1px solid #ffeaa7;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-            }
-            .label {
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 5px;
-            }
-            .action-note {
-              background-color: #d1ecf1;
-              border: 1px solid #bee5eb;
-              padding: 15px;
-              border-radius: 6px;
-              margin-top: 20px;
-              text-align: center;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>🔔 New Contact Message Received</h2>
-            </div>
-            
-            <div class="contact-info">
-              <div class="label">👤 From:</div>
-              <p><strong>${name}</strong></p>
-              
-              <div class="label">📧 Email:</div>
-              <p><strong>${email}</strong></p>
-            </div>
-            
-            <div class="message-box">
-              <div class="label">💬 Message:</div>
-              <p>${message}</p>
-            </div>
-            
-            <div class="action-note">
-              <p><strong>Action Required:</strong> Please log in to the admin panel to respond to this message.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+      // Send enhanced notification to admin
+      const adminNotification = getAdminNotificationTemplate(name, email, message);
       
       // Find admin email - assuming first admin or use a dedicated notifications email
       const admin = await Admin.findOne();
       if (admin) {
-        await sendEmail(admin.email, '🔔 New Contact Message Received', adminNotification);
+        await sendEmail(admin.email, '🔔 New Contact Message from ' + name, adminNotification);
       }
       
       res.status(201).json({ 
@@ -1042,12 +1483,104 @@ const blogSchema = new mongoose.Schema({
   });
   
   // Admin Routes for Messages
-  // Get all messages (for admin)
+  // Get all messages (for admin) - Enhanced with grouping by email
   app.get('/api/admin/messages', authenticateToken, async (req, res) => {
     try {
-      const messages = await Message.find().sort({ createdAt: -1 });
-      res.json(messages);
+      const { grouped = false, email } = req.query;
+      
+      if (grouped === 'true') {
+        // Group messages by email with enhanced aggregation
+        const messages = await Message.aggregate([
+          {
+            $sort: { createdAt: -1 }
+          },
+          {
+            $group: {
+              _id: '$email',
+              name: { $first: '$name' },
+              email: { $first: '$email' },
+              messages: {
+                $push: {
+                  _id: '$_id',
+                  message: '$message',
+                  createdAt: '$createdAt',
+                  status: '$status',
+                  replied: '$replied'
+                }
+              },
+              totalMessages: { $sum: 1 },
+              latestMessage: { $first: '$createdAt' },
+              firstMessage: { $last: '$createdAt' },
+              unreadCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$status', 'unread'] }, 1, 0]
+                }
+              },
+              readCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$status', 'read'] }, 1, 0]
+                }
+              },
+              repliedCount: {
+                $sum: {
+                  $cond: [{ $eq: ['$status', 'replied'] }, 1, 0]
+                }
+              },
+              // Overall status priority: unread > read > replied
+              overallStatus: {
+                $cond: [
+                  { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }, 0] },
+                  'unread',
+                  {
+                    $cond: [
+                      { $gt: [{ $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } }, 0] },
+                      'read',
+                      'replied'
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            $addFields: {
+              // Add priority for sorting (unread first)
+              priority: {
+                $cond: [
+                  { $eq: ['$overallStatus', 'unread'] }, 1,
+                  { $cond: [{ $eq: ['$overallStatus', 'read'] }, 2, 3] }
+                ]
+              }
+            }
+          },
+          {
+            $sort: { priority: 1, latestMessage: -1 }
+          }
+        ]);
+        
+        res.json({
+          success: true,
+          data: messages,
+          totalGroups: messages.length
+        });
+      } else if (email) {
+        // Get all messages from specific email
+        const messages = await Message.find({ email }).sort({ createdAt: -1 });
+        res.json({
+          success: true,
+          data: messages,
+          email: email
+        });
+      } else {
+        // Regular view - all messages individually
+        const messages = await Message.find().sort({ createdAt: -1 });
+        res.json({
+          success: true,
+          data: messages
+        });
+      }
     } catch (error) {
+      console.error('Fetch messages error:', error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -1071,18 +1604,75 @@ const blogSchema = new mongoose.Schema({
         .populate('repliedBy', 'name email')
         .sort({ repliedAt: -1 });
       
-      res.json({ message, replies });
+      res.json({ 
+        success: true,
+        message, 
+        replies 
+      });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });
   
-  // Reply to a message (for admin)
+  // Get all messages from specific email (for admin)
+  app.get('/api/admin/messages/email/:email', authenticateToken, async (req, res) => {
+    try {
+      const { email } = req.params;
+      const messages = await Message.find({ email }).sort({ createdAt: -1 });
+      
+      if (messages.length === 0) {
+        return res.status(404).json({ message: 'No messages found for this email' });
+      }
+      
+      // Get replies for all messages from this email
+      const messageIds = messages.map(msg => msg._id);
+      const replies = await Reply.find({ messageId: { $in: messageIds } })
+        .populate('repliedBy', 'name email')
+        .sort({ repliedAt: -1 });
+      
+      // Group replies by messageId
+      const repliesByMessage = replies.reduce((acc, reply) => {
+        if (!acc[reply.messageId]) {
+          acc[reply.messageId] = [];
+        }
+        acc[reply.messageId].push(reply);
+        return acc;
+      }, {});
+      
+     
+
+      // Add replies to corresponding messages
+      const messagesWithReplies = messages.map(message => ({
+        ...message.toObject(),
+        replies: repliesByMessage[message._id] || []
+      }));
+      
+      res.json({
+        success: true,
+        email,
+        name: messages[0].name,
+        totalMessages: messages.length,
+        unreadCount: messages.filter(msg => msg.status === 'unread').length,
+        readCount: messages.filter(msg => msg.status === 'read').length,
+        repliedCount: messages.filter(msg => msg.status === 'replied').length,
+        messages: messagesWithReplies
+      });
+    } catch (error) {
+      console.error('Fetch messages by email error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Reply to a message (for admin) - Enhanced with better email template
   app.post('/api/admin/messages/:id/reply', authenticateToken, async (req, res) => {
     try {
       const { replyContent } = req.body;
       const messageId = req.params.id;
       const adminId = req.user.admin_id;
+      
+      if (!replyContent || replyContent.trim() === '') {
+        return res.status(400).json({ message: 'Reply content is required' });
+      }
       
       // Find the message
       const message = await Message.findById(messageId);
@@ -1093,7 +1683,7 @@ const blogSchema = new mongoose.Schema({
       // Create the reply
       const newReply = new Reply({
         messageId,
-        replyContent,
+        replyContent: replyContent.trim(),
         repliedBy: adminId
       });
       
@@ -1104,115 +1694,55 @@ const blogSchema = new mongoose.Schema({
       message.replied = true;
       await message.save();
       
-      // Send reply email to user - ONLY the reply content
-      const replyEmail = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Response from Aditya Tyagi</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #f8f9fa;
-            }
-            .container {
-              background: white;
-              padding: 40px;
-              border-radius: 12px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #007bff;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              color: #007bff;
-              margin: 0;
-              font-size: 24px;
-              font-weight: 600;
-            }
-            .greeting {
-              font-size: 18px;
-              color: #495057;
-              margin-bottom: 25px;
-            }
-            .reply-content {
-              background-color: #f8f9fa;
-              padding: 25px;
-              border-left: 4px solid #007bff;
-              margin: 25px 0;
-              border-radius: 6px;
-              font-size: 16px;
-              line-height: 1.7;
-            }
-            .footer {
-              margin-top: 35px;
-              padding-top: 25px;
-              border-top: 1px solid #dee2e6;
-              text-align: center;
-            }
-            .signature {
-              color: #495057;
-              font-weight: 500;
-            }
-            .contact-info {
-              background-color: #e7f3ff;
-              padding: 20px;
-              border-radius: 8px;
-              margin-top: 25px;
-              text-align: center;
-              font-size: 14px;
-              color: #6c757d;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>📧 Response from Aditya Tyagi</h1>
-            </div>
-            
-            <div class="greeting">
-              Hello <strong>${message.name}</strong>,
-            </div>
-            
-            <div class="reply-content">
-              ${replyContent}
-            </div>
-            
-            <div class="footer">
-              <div class="signature">
-                <p>Best regards,<br/>
-                <strong>Aditya Tyagi</strong></p>
-              </div>
-              
-              <div class="contact-info">
-                <p>If you have any further questions, feel free to reach out again. I'm always happy to help!</p>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
+      // Send enhanced reply email to user using the template
+      const replyEmail = getReplyEmailTemplate(message.name, replyContent);
       
-      await sendEmail(message.email, 'Response from Aditya Tyagi', replyEmail);
+      await sendEmail(
+        message.email, 
+        '📧 Personal Response from Aditya Tyagi', 
+        replyEmail
+      );
+      
+      // Populate the reply with admin info for response
+      const populatedReply = await Reply.findById(newReply._id).populate('repliedBy', 'name email');
       
       res.json({ 
         success: true, 
         message: 'Reply sent successfully',
-        reply: newReply
+        reply: populatedReply
       });
     } catch (error) {
       console.error('Reply error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Update message status (for admin)
+  app.put('/api/admin/messages/:id/status', authenticateToken, async (req, res) => {
+    try {
+      const { status } = req.body;
+      const messageId = req.params.id;
+      
+      if (!['unread', 'read', 'replied'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status. Must be unread, read, or replied' });
+      }
+      
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+      
+      message.status = status;
+      message.replied = (status === 'replied');
+      await message.save();
+      
+      res.json({ 
+        success: true, 
+        message: `Message status updated to ${status}`,
+        updatedMessage: message
+      });
+    } catch (error) {
+      console.error('Update status error:', error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -1226,18 +1756,199 @@ const blogSchema = new mongoose.Schema({
       }
       
       // Delete associated replies
-      await Reply.deleteMany({ messageId: message._id });
+      const deletedReplies = await Reply.deleteMany({ messageId: message._id });
       
       // Delete the message
       await Message.deleteOne({ _id: message._id });
       
-      res.json({ message: 'Message and its replies deleted successfully' });
+      res.json({ 
+        success: true,
+        message: 'Message deleted successfully',
+        deletedRepliesCount: deletedReplies.deletedCount
+      });
     } catch (error) {
+      console.error('Delete message error:', error);
       res.status(500).json({ message: error.message });
     }
   });
   
-  // Get message stats (counts by status)
+  // NEW: Mark all messages as read (for admin)
+  app.put('/api/admin/messages/mark-all-read', authenticateToken, async (req, res) => {
+    try {
+      const updateResult = await Message.updateMany(
+        { status: 'unread' }, // Only update unread messages
+        { status: 'read' }
+      );
+      
+      res.json({ 
+        success: true,
+        message: `Successfully marked ${updateResult.modifiedCount} messages as read`,
+        modifiedCount: updateResult.modifiedCount
+      });
+    } catch (error) {
+      console.error('Mark all read error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Mark all messages as unread (for admin)
+  app.put('/api/admin/messages/mark-all-unread', authenticateToken, async (req, res) => {
+    try {
+      const updateResult = await Message.updateMany(
+        { status: { $ne: 'unread' } }, // Only update messages that are not already unread
+        { 
+          status: 'unread',
+          replied: false
+        }
+      );
+      
+      res.json({ 
+        success: true,
+        message: `Successfully marked ${updateResult.modifiedCount} messages as unread`,
+        modifiedCount: updateResult.modifiedCount
+      });
+    } catch (error) {
+      console.error('Mark all unread error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Delete all messages (for admin)
+  app.delete('/api/admin/messages', authenticateToken, async (req, res) => {
+    try {
+      // Get all message IDs first
+      const messages = await Message.find({}, '_id');
+      const messageIds = messages.map(msg => msg._id);
+      
+      if (messageIds.length === 0) {
+        return res.json({ 
+          success: true,
+          message: 'No messages to delete'
+        });
+      }
+      
+      // Delete all replies first
+      const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIds } });
+      
+      // Delete all messages
+      const deleteResult = await Message.deleteMany({});
+      
+      res.json({ 
+        success: true,
+        message: `Successfully deleted ${deleteResult.deletedCount} messages and ${deletedReplies.deletedCount} associated replies`,
+        deletedMessages: deleteResult.deletedCount,
+        deletedReplies: deletedReplies.deletedCount
+      });
+    } catch (error) {
+      console.error('Delete all messages error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Delete all messages from specific email (for admin)
+  app.delete('/api/admin/messages/email/:email', authenticateToken, async (req, res) => {
+    try {
+      const { email } = req.params;
+      
+      // Find all messages from this email
+      const messages = await Message.find({ email }, '_id');
+      
+      if (messages.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'No messages found for this email' 
+        });
+      }
+      
+      const messageIds = messages.map(msg => msg._id);
+      
+      // Delete all replies for these messages
+      const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIds } });
+      
+      // Delete all messages from this email
+      const deleteResult = await Message.deleteMany({ email });
+      
+      res.json({ 
+        success: true,
+        message: `Successfully deleted ${deleteResult.deletedCount} messages from ${email} and ${deletedReplies.deletedCount} associated replies`,
+        email,
+        deletedMessages: deleteResult.deletedCount,
+        deletedReplies: deletedReplies.deletedCount
+      });
+    } catch (error) {
+      console.error('Delete messages by email error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Mark all messages from specific email as read (for admin)
+  app.put('/api/admin/messages/email/:email/mark-read', authenticateToken, async (req, res) => {
+    try {
+      const { email } = req.params;
+      
+      const updateResult = await Message.updateMany(
+        { 
+          email,
+          status: 'unread'
+        },
+        { status: 'read' }
+      );
+      
+      if (updateResult.matchedCount === 0) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'No unread messages found for this email' 
+        });
+      }
+      
+      res.json({ 
+        success: true,
+        message: `Successfully marked ${updateResult.modifiedCount} messages from ${email} as read`,
+        email,
+        modifiedCount: updateResult.modifiedCount
+      });
+    } catch (error) {
+      console.error('Mark email messages read error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Mark all messages from specific email as unread (for admin)
+  app.put('/api/admin/messages/email/:email/mark-unread', authenticateToken, async (req, res) => {
+    try {
+      const { email } = req.params;
+      
+      const updateResult = await Message.updateMany(
+        { 
+          email,
+          status: { $ne: 'unread' }
+        },
+        { 
+          status: 'unread',
+          replied: false
+        }
+      );
+      
+      if (updateResult.matchedCount === 0) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'No messages found for this email or all are already unread' 
+        });
+      }
+      
+      res.json({ 
+        success: true,
+        message: `Successfully marked ${updateResult.modifiedCount} messages from ${email} as unread`,
+        email,
+        modifiedCount: updateResult.modifiedCount
+      });
+    } catch (error) {
+      console.error('Mark email messages unread error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Get message stats (counts by status) - Enhanced with more detailed statistics
   app.get('/api/admin/message-stats', authenticateToken, async (req, res) => {
     try {
       const totalCount = await Message.countDocuments();
@@ -1245,17 +1956,288 @@ const blogSchema = new mongoose.Schema({
       const readCount = await Message.countDocuments({ status: 'read' });
       const repliedCount = await Message.countDocuments({ status: 'replied' });
       
-      res.json({
+      // Get unique email count
+      const uniqueEmailsCount = await Message.distinct('email').then(emails => emails.length);
+      
+      // Get recent activity (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const recentCount = await Message.countDocuments({ 
+        createdAt: { $gte: sevenDaysAgo } 
+      });
+      
+      // Get today's messages
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayCount = await Message.countDocuments({
+        createdAt: { $gte: today }
+      });
+      
+      // Get this month's messages
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+      const thisMonthCount = await Message.countDocuments({
+        createdAt: { $gte: thisMonth }
+      });
+      
+      // Get total replies count
+      const totalRepliesCount = await Reply.countDocuments();
+      
+      // Get messages per status with percentage
+      const stats = {
         total: totalCount,
         unread: unreadCount,
         read: readCount,
-        replied: repliedCount
+        replied: repliedCount,
+        uniqueEmails: uniqueEmailsCount,
+        recentMessages: recentCount,
+        todayMessages: todayCount,
+        thisMonthMessages: thisMonthCount,
+        totalReplies: totalRepliesCount,
+        percentages: {
+          unread: totalCount > 0 ? Math.round((unreadCount / totalCount) * 100) : 0,
+          read: totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0,
+          replied: totalCount > 0 ? Math.round((repliedCount / totalCount) * 100) : 0
+        }
+      };
+      
+      res.json({
+        success: true,
+        data: stats
       });
     } catch (error) {
+      console.error('Message stats error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Get message analytics (for admin dashboard)
+  app.get('/api/admin/message-analytics', authenticateToken, async (req, res) => {
+    try {
+      const { period = '7' } = req.query; // Default to 7 days
+      const days = parseInt(period);
+      
+      if (isNaN(days) || days < 1 || days > 365) {
+        return res.status(400).json({ message: 'Invalid period. Must be between 1 and 365 days' });
+      }
+      
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
+      
+      // Daily message counts
+      const dailyStats = await Message.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: startDate }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              day: { $dayOfMonth: '$createdAt' }
+            },
+            count: { $sum: 1 },
+            unread: { $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } },
+            read: { $sum: { $cond: [{ $eq: ['$status', 'read'] }, 1, 0] } },
+            replied: { $sum: { $cond: [{ $eq: ['$status', 'replied'] }, 1, 0] } }
+          }
+        },
+        {
+          $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+        }
+      ]);
+      
+      // Top email senders
+      const topSenders = await Message.aggregate([
+        {
+          $group: {
+            _id: '$email',
+            name: { $first: '$name' },
+            count: { $sum: 1 },
+            latestMessage: { $max: '$createdAt' },
+            unreadCount: { $sum: { $cond: [{ $eq: ['$status', 'unread'] }, 1, 0] } }
+          }
+        },
+        {
+          $sort: { count: -1 }
+        },
+        {
+          $limit: 10
+        }
+      ]);
+      
+      // Response rate calculation
+      const totalMessages = await Message.countDocuments();
+      const repliedMessages = await Message.countDocuments({ status: 'replied' });
+      const responseRate = totalMessages > 0 ? Math.round((repliedMessages / totalMessages) * 100) : 0;
+      
+      res.json({
+        success: true,
+        period: `${days} days`,
+        dailyStats,
+        topSenders,
+        responseRate,
+        summary: {
+          totalInPeriod: dailyStats.reduce((sum, day) => sum + day.count, 0),
+          avgPerDay: dailyStats.length > 0 ? Math.round(dailyStats.reduce((sum, day) => sum + day.count, 0) / days * 10) / 10 : 0
+        }
+      });
+    } catch (error) {
+      console.error('Message analytics error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Bulk operations for messages (for admin)
+  app.post('/api/admin/messages/bulk-action', authenticateToken, async (req, res) => {
+    try {
+      const { action, messageIds, email } = req.body;
+      
+      if (!action || !['mark-read', 'mark-unread', 'delete', 'mark-replied'].includes(action)) {
+        return res.status(400).json({ message: 'Invalid action. Must be mark-read, mark-unread, delete, or mark-replied' });
+      }
+      
+      let filter = {};
+      
+      if (messageIds && Array.isArray(messageIds) && messageIds.length > 0) {
+        // Validate ObjectId format
+        const validIds = messageIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+        if (validIds.length === 0) {
+          return res.status(400).json({ message: 'No valid message IDs provided' });
+        }
+        filter._id = { $in: validIds };
+      } else if (email) {
+        filter.email = email;
+      } else {
+        return res.status(400).json({ message: 'Either messageIds array or email must be provided' });
+      }
+      
+      let result = {};
+      
+      switch (action) {
+        case 'mark-read':
+          result = await Message.updateMany(filter, { status: 'read' });
+          break;
+        case 'mark-unread':
+          result = await Message.updateMany(filter, { status: 'unread', replied: false });
+          break;
+        case 'mark-replied':
+          result = await Message.updateMany(filter, { status: 'replied', replied: true });
+          break;
+        case 'delete':
+          // First find messages to get their IDs for reply deletion
+          const messagesToDelete = await Message.find(filter, '_id');
+          const messageIdsToDelete = messagesToDelete.map(msg => msg._id);
+          
+          // Delete associated replies
+          const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIdsToDelete } });
+          
+          // Delete messages
+          result = await Message.deleteMany(filter);
+          result.deletedReplies = deletedReplies.deletedCount;
+          break;
+      }
+      
+      const actionPastTense = {
+        'mark-read': 'marked as read',
+        'mark-unread': 'marked as unread',
+        'mark-replied': 'marked as replied',
+        'delete': 'deleted'
+      };
+      
+      res.json({
+        success: true,
+        message: `Successfully ${actionPastTense[action]} ${result.modifiedCount || result.deletedCount} messages`,
+        result: {
+          affected: result.modifiedCount || result.deletedCount,
+          deletedReplies: result.deletedReplies || 0
+        }
+      });
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // NEW: Search messages (for admin)
+  app.get('/api/admin/messages/search', authenticateToken, async (req, res) => {
+    try {
+      const { q, status, email, startDate, endDate, page = 1, limit = 20 } = req.query;
+      
+      if (!q && !status && !email && !startDate) {
+        return res.status(400).json({ message: 'At least one search parameter is required' });
+      }
+      
+      let filter = {};
+      
+      // Text search
+      if (q) {
+        filter.$or = [
+          { name: { $regex: q, $options: 'i' } },
+          { email: { $regex: q, $options: 'i' } },
+          { message: { $regex: q, $options: 'i' } }
+        ];
+      }
+      
+      // Status filter
+      if (status && ['unread', 'read', 'replied'].includes(status)) {
+        filter.status = status;
+      }
+      
+      // Email filter
+      if (email) {
+        filter.email = { $regex: email, $options: 'i' };
+      }
+      
+      // Date range filter
+      if (startDate || endDate) {
+        filter.createdAt = {};
+        if (startDate) {
+          filter.createdAt.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          const endDateTime = new Date(endDate);
+          endDateTime.setHours(23, 59, 59, 999);
+          filter.createdAt.$lte = endDateTime;
+        }
+      }
+      
+      const pageNum = Math.max(1, parseInt(page));
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+      const skip = (pageNum - 1) * limitNum;
+      
+      const messages = await Message.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+      
+      const totalCount = await Message.countDocuments(filter);
+      const totalPages = Math.ceil(totalCount / limitNum);
+      
+      res.json({
+        success: true,
+        data: messages,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalCount,
+          hasNext: pageNum < totalPages,
+          hasPrev: pageNum > 1,
+          limit: limitNum
+        },
+        searchParams: { q, status, email, startDate, endDate }
+      });
+    } catch (error) {
+      console.error('Search messages error:', error);
       res.status(500).json({ message: error.message });
     }
   });
 
+  
 
   const ReactionSchema = new mongoose.Schema({
     blog: {

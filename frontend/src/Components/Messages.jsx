@@ -1,18 +1,30 @@
 // src/admin/pages/Messages.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaEnvelope, FaEye, FaReply, FaTrash, FaCheck, FaSpinner, FaArrowLeft, FaPaperPlane, FaCircle } from 'react-icons/fa';
+import { 
+  FaEnvelope, 
+  FaEye, 
+  FaReply, 
+  FaTrash, 
+  FaCheck, 
+  FaSpinner, 
+  FaArrowLeft, 
+  FaPaperPlane, 
+  FaCircle,
+  FaEyeSlash,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaUser,
+  FaCalendarAlt,
+  FaClock,
+  FaExclamationTriangle
+} from 'react-icons/fa';
 import '../ComponentsCSS/Message.css'
 
 const Messages = () => {
-  const [messages, setMessages] = useState([]);
-  const [messageStats, setMessageStats] = useState({
-    total: 0,
-    unread: 0,
-    read: 0,
-    replied: 0
-  });
-  const [currentMessage, setCurrentMessage] = useState(null);
+  const [conversations, setConversations] = useState([]); // Grouped conversations
+  const [currentConversation, setCurrentConversation] = useState(null);
+  const [currentMessages, setCurrentMessages] = useState([]);
   const [replies, setReplies] = useState([]);
   const [replyContent, setReplyContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -21,57 +33,84 @@ const Messages = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [notification, setNotification] = useState(null);
   const [isChatView, setIsChatView] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [messageStats, setMessageStats] = useState({
+    total: 0,
+    unread: 0,
+    read: 0,
+    replied: 0
+  });
 
-  // Fetch messages on component mount
+  // API Base URL
+  const API_BASE = 'https://connectwithaaditiyamg.onrender.com';
+
+  // Fetch conversations on component mount
   useEffect(() => {
-    fetchMessages();
+    fetchConversations();
     fetchMessageStats();
   }, []);
 
-  const fetchMessages = async () => {
+  const fetchConversations = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('https://connectwithaaditiyamg.onrender.com/api/admin/messages', {
+      const response = await axios.get(`${API_BASE}/api/admin/messages?grouped=true`, {
         withCredentials: true
       });
-      setMessages(response.data);
+      setConversations(response.data.data || []);
       setLoading(false);
     } catch (err) {
-      setError('Failed to fetch messages');
+      setError('Failed to fetch conversations');
       setLoading(false);
+      console.error(err);
     }
   };
 
   const fetchMessageStats = async () => {
     try {
-      const response = await axios.get('https://connectwithaaditiyamg.onrender.com/api/admin/message-stats', {
+      const response = await axios.get(`${API_BASE}/api/admin/message-stats`, {
         withCredentials: true
       });
-      setMessageStats(response.data);
+      setMessageStats(response.data.data || {
+        total: 0,
+        unread: 0,
+        read: 0,
+        replied: 0
+      });
     } catch (err) {
       console.error('Failed to fetch message stats', err);
     }
   };
 
-  const viewMessage = async (messageId) => {
+  const viewConversation = async (email) => {
     try {
-      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/admin/messages/${messageId}`, {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE}/api/admin/messages/email/${encodeURIComponent(email)}`, {
         withCredentials: true
       });
       
-      setCurrentMessage(response.data.message);
-      setReplies(response.data.replies);
-      setIsChatView(true);
-      
-      // Refresh messages and stats after viewing (to update read status)
-      fetchMessages();
-      fetchMessageStats();
-    } catch (err) {
-      setNotification({
-        type: 'error',
-        message: 'Failed to load message details'
+      const conversationData = response.data;
+      setCurrentConversation({
+        email: conversationData.email,
+        name: conversationData.name,
+        totalMessages: conversationData.totalMessages,
+        unreadCount: conversationData.unreadCount,
+        readCount: conversationData.readCount,
+        repliedCount: conversationData.repliedCount
       });
-      setTimeout(() => setNotification(null), 3000);
+      
+      setCurrentMessages(conversationData.messages || []);
+      setIsChatView(true);
+      setLoading(false);
+      
+      // Refresh conversations and stats
+      setTimeout(() => {
+        fetchConversations();
+        fetchMessageStats();
+      }, 500);
+    } catch (err) {
+      setError('Failed to load conversation');
+      setLoading(false);
+      showNotification('error', 'Failed to load conversation details');
     }
   };
 
@@ -79,11 +118,15 @@ const Messages = () => {
     e.preventDefault();
     
     if (!replyContent.trim()) {
-      setNotification({
-        type: 'error',
-        message: 'Reply content cannot be empty'
-      });
-      setTimeout(() => setNotification(null), 3000);
+      showNotification('error', 'Reply content cannot be empty');
+      return;
+    }
+    
+    // Find the original message to reply to (first message in conversation)
+    const originalMessage = currentMessages.find(msg => !msg.replies || msg.replies.length === 0) || currentMessages[0];
+    
+    if (!originalMessage) {
+      showNotification('error', 'No message found to reply to');
       return;
     }
     
@@ -91,35 +134,101 @@ const Messages = () => {
       setReplyLoading(true);
       
       await axios.post(
-        `https://connectwithaaditiyamg.onrender.com/api/admin/messages/${currentMessage._id}/reply`, 
+        `${API_BASE}/api/admin/messages/${originalMessage._id}/reply`, 
         { replyContent }, 
-        {
-          withCredentials: true
-        }
+        { withCredentials: true }
       );
       
-      // Reset form and refresh data
       setReplyContent('');
       setReplyLoading(false);
       
-      // Show success notification
-      setNotification({
-        type: 'success',
-        message: 'Reply sent successfully'
-      });
-      setTimeout(() => setNotification(null), 3000);
+      showNotification('success', 'Reply sent successfully');
       
-      // Refresh current message, all messages, and stats
-      viewMessage(currentMessage._id);
-      fetchMessages();
+      // Refresh conversation
+      viewConversation(currentConversation.email);
+      fetchConversations();
       fetchMessageStats();
     } catch (err) {
       setReplyLoading(false);
-      setNotification({
-        type: 'error',
-        message: 'Failed to send reply'
+      showNotification('error', 'Failed to send reply');
+    }
+  };
+
+  const markConversationAsRead = async (email) => {
+    try {
+      setActionLoading(`read-${email}`);
+      await axios.put(`${API_BASE}/api/admin/messages/email/${encodeURIComponent(email)}/mark-read`, {}, {
+        withCredentials: true
       });
-      setTimeout(() => setNotification(null), 3000);
+      
+      showNotification('success', 'Conversation marked as read');
+      
+      // Refresh data
+      fetchConversations();
+      fetchMessageStats();
+      
+      // Update current conversation if viewing
+      if (isChatView && currentConversation?.email === email) {
+        viewConversation(email);
+      }
+      
+      setActionLoading(null);
+    } catch (err) {
+      setActionLoading(null);
+      showNotification('error', 'Failed to mark conversation as read');
+    }
+  };
+
+  const markConversationAsUnread = async (email) => {
+    try {
+      setActionLoading(`unread-${email}`);
+      await axios.put(`${API_BASE}/api/admin/messages/email/${encodeURIComponent(email)}/mark-unread`, {}, {
+        withCredentials: true
+      });
+      
+      showNotification('success', 'Conversation marked as unread');
+      
+      // Refresh data
+      fetchConversations();
+      fetchMessageStats();
+      
+      // Update current conversation if viewing
+      if (isChatView && currentConversation?.email === email) {
+        viewConversation(email);
+      }
+      
+      setActionLoading(null);
+    } catch (err) {
+      setActionLoading(null);
+      showNotification('error', 'Failed to mark conversation as unread');
+    }
+  };
+
+  const deleteConversation = async (email) => {
+    if (!window.confirm(`Are you sure you want to delete all messages from ${email}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      setActionLoading(`delete-${email}`);
+      await axios.delete(`${API_BASE}/api/admin/messages/email/${encodeURIComponent(email)}`, {
+        withCredentials: true
+      });
+      
+      // If currently viewing this conversation, go back to list
+      if (isChatView && currentConversation?.email === email) {
+        goBackToConversations();
+      }
+      
+      showNotification('success', 'Conversation deleted successfully');
+      
+      // Refresh data
+      fetchConversations();
+      fetchMessageStats();
+      setActionLoading(null);
+    } catch (err) {
+      setActionLoading(null);
+      showNotification('error', 'Failed to delete conversation');
     }
   };
 
@@ -129,46 +238,41 @@ const Messages = () => {
     }
     
     try {
-      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/admin/messages/${messageId}`, {
+      await axios.delete(`${API_BASE}/api/admin/messages/${messageId}`, {
         withCredentials: true
       });
       
-      // Clear current message if it's the one being deleted
-      if (currentMessage && currentMessage._id === messageId) {
-        setCurrentMessage(null);
-        setReplies([]);
-        setIsChatView(false);
+      showNotification('success', 'Message deleted successfully');
+      
+      // Refresh current conversation
+      if (currentConversation) {
+        viewConversation(currentConversation.email);
       }
       
-      // Refresh messages and stats
-      fetchMessages();
+      fetchConversations();
       fetchMessageStats();
-      
-      setNotification({
-        type: 'success',
-        message: 'Message deleted successfully'
-      });
-      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      setNotification({
-        type: 'error',
-        message: 'Failed to delete message'
-      });
-      setTimeout(() => setNotification(null), 3000);
+      showNotification('error', 'Failed to delete message');
     }
   };
 
-  const goBackToMessages = () => {
+  const goBackToConversations = () => {
     setIsChatView(false);
-    setCurrentMessage(null);
+    setCurrentConversation(null);
+    setCurrentMessages([]);
     setReplies([]);
     setReplyContent('');
   };
 
-  // Filter messages based on active tab
-  const filteredMessages = messages.filter(message => {
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Filter conversations based on active tab
+  const filteredConversations = conversations.filter(conversation => {
     if (activeTab === 'all') return true;
-    return message.status === activeTab;
+    return conversation.overallStatus === activeTab;
   });
 
   const formatDate = (dateString) => {
@@ -209,7 +313,8 @@ const Messages = () => {
     }
   };
 
-  if (isChatView && currentMessage) {
+  // Chat view for individual conversation
+  if (isChatView && currentConversation) {
     return (
       <div className="insta-messages-main-wrapper">
         {notification && (
@@ -220,47 +325,108 @@ const Messages = () => {
         
         <div className="insta-chat-container">
           <div className="insta-chat-header">
-            <button className="insta-back-button" onClick={goBackToMessages}>
+            <button className="insta-back-button" onClick={goBackToConversations}>
               <FaArrowLeft />
             </button>
             <div className="insta-chat-user-info">
               <div className="insta-chat-avatar">
-                {getInitials(currentMessage.name)}
+                {getInitials(currentConversation.name)}
               </div>
               <div className="insta-chat-user-details">
-                <h3 className="insta-chat-username">{currentMessage.name}</h3>
-                <span className="insta-chat-user-email">{currentMessage.email}</span>
+                <h3 className="insta-chat-username">{currentConversation.name}</h3>
+                <span className="insta-chat-user-email">{currentConversation.email}</span>
+                <div className="insta-conversation-stats">
+                  <span className="insta-stat-item">
+                    <FaEnvelope /> {currentConversation.totalMessages} messages
+                  </span>
+                  {currentConversation.unreadCount > 0 && (
+                    <span className="insta-stat-item unread">
+                      <FaCircle /> {currentConversation.unreadCount} unread
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <button 
-              className="insta-delete-chat-button" 
-              onClick={() => deleteMessage(currentMessage._id)}
-            >
-              <FaTrash />
-            </button>
+            <div className="insta-chat-actions">
+              <button 
+                className="insta-action-button mark-read"
+                onClick={() => markConversationAsRead(currentConversation.email)}
+                disabled={actionLoading === `read-${currentConversation.email}`}
+                title="Mark all as read"
+              >
+                {actionLoading === `read-${currentConversation.email}` ? (
+                  <FaSpinner className="insta-spinner" />
+                ) : (
+                  <FaEye />
+                )}
+              </button>
+              <button 
+                className="insta-action-button mark-unread"
+                onClick={() => markConversationAsUnread(currentConversation.email)}
+                disabled={actionLoading === `unread-${currentConversation.email}`}
+                title="Mark all as unread"
+              >
+                {actionLoading === `unread-${currentConversation.email}` ? (
+                  <FaSpinner className="insta-spinner" />
+                ) : (
+                  <FaEyeSlash />
+                )}
+              </button>
+              <button 
+                className="insta-action-button delete"
+                onClick={() => deleteConversation(currentConversation.email)}
+                disabled={actionLoading === `delete-${currentConversation.email}`}
+                title="Delete conversation"
+              >
+                {actionLoading === `delete-${currentConversation.email}` ? (
+                  <FaSpinner className="insta-spinner" />
+                ) : (
+                  <FaTrash />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="insta-chat-messages-area">
-            <div className="insta-original-message">
-              <div className="insta-message-bubble insta-received-message">
-                <p className="insta-message-text">{currentMessage.message}</p>
-                <span className="insta-message-timestamp">
-                  {formatTime(currentMessage.createdAt)}
-                </span>
-              </div>
-            </div>
-
-            {replies.map(reply => (
-              <div key={reply._id} className="insta-reply-message">
-                <div className="insta-message-bubble insta-sent-message">
-                  <div 
-                    className="insta-message-text" 
-                    dangerouslySetInnerHTML={{ __html: reply.replyContent }}
-                  ></div>
-                  <span className="insta-message-timestamp">
-                    {formatTime(reply.repliedAt)}
-                  </span>
+            {currentMessages.map(message => (
+              <div key={message._id} className="insta-message-group">
+                <div className="insta-original-message">
+                  <div className="insta-message-bubble insta-received-message">
+                    <div className="insta-message-header">
+                      <span className={`insta-status-badge ${message.status}`}>
+                        {message.status === 'unread' && <FaCircle />}
+                        {message.status === 'read' && <FaEye />}
+                        {message.status === 'replied' && <FaCheck />}
+                        {message.status}
+                      </span>
+                      <button 
+                        className="insta-delete-message-btn"
+                        onClick={() => deleteMessage(message._id)}
+                        title="Delete this message"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                    <p className="insta-message-text">{message.message}</p>
+                    <span className="insta-message-timestamp">
+                      <FaCalendarAlt /> {formatDate(message.createdAt)} at {formatTime(message.createdAt)}
+                    </span>
+                  </div>
                 </div>
+
+                {message.replies && message.replies.map(reply => (
+                  <div key={reply._id} className="insta-reply-message">
+                    <div className="insta-message-bubble insta-sent-message">
+                      <div 
+                        className="insta-message-text" 
+                        dangerouslySetInnerHTML={{ __html: reply.replyContent }}
+                      ></div>
+                      <span className="insta-message-timestamp">
+                        <FaClock /> {formatTime(reply.repliedAt)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -270,10 +436,10 @@ const Messages = () => {
               <div className="insta-input-wrapper">
                 <textarea
                   className="insta-message-input"
-                  placeholder="Message..."
+                  placeholder="Type your reply..."
                   value={replyContent}
                   onChange={(e) => setReplyContent(e.target.value)}
-                  rows="1"
+                  rows="3"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -300,10 +466,13 @@ const Messages = () => {
     );
   }
 
+  // Main conversations list view
   return (
     <div className="insta-messages-main-wrapper">
       <div className="insta-messages-header">
-        <h2 className="insta-messages-title">Messages</h2>
+        <h2 className="insta-messages-title">
+          <FaEnvelope /> Conversations
+        </h2>
       </div>
       
       {notification && (
@@ -348,48 +517,106 @@ const Messages = () => {
         {loading ? (
           <div className="insta-loading-state">
             <FaSpinner className="insta-loading-spinner" />
-            <span>Loading messages...</span>
+            <span>Loading conversations...</span>
           </div>
         ) : error ? (
-          <div className="insta-error-state">{error}</div>
-        ) : filteredMessages.length === 0 ? (
+          <div className="insta-error-state">
+            <FaExclamationTriangle />
+            <span>{error}</span>
+          </div>
+        ) : filteredConversations.length === 0 ? (
           <div className="insta-empty-state">
             <FaEnvelope className="insta-empty-icon" />
-            <p>No messages found</p>
+            <p>No conversations found</p>
           </div>
         ) : (
           <div className="insta-conversations-list">
-            {filteredMessages.map(message => (
+            {filteredConversations.map(conversation => (
               <div 
-                key={message._id} 
-                className="insta-conversation-item"
-                onClick={() => viewMessage(message._id)}
+                key={conversation._id} 
+                className={`insta-conversation-item ${conversation.overallStatus}`}
               >
-                <div className="insta-conversation-avatar">
-                  {getInitials(message.name)}
-                  {message.status === 'unread' && (
-                    <div className="insta-online-indicator"></div>
-                  )}
-                </div>
-                
-                <div className="insta-conversation-content">
-                  <div className="insta-conversation-header">
-                    <span className="insta-conversation-name">{message.name}</span>
-                    <span className="insta-conversation-time">{formatDate(message.createdAt)}</span>
+                <div className="insta-conversation-content" onClick={() => viewConversation(conversation.email)}>
+                  <div className="insta-conversation-avatar">
+                    <FaUser />
+                    {conversation.overallStatus === 'unread' && (
+                      <div className="insta-online-indicator"></div>
+                    )}
                   </div>
-                  <div className="insta-conversation-preview">
-                    <p className="insta-message-preview">
-                      {message.message.substring(0, 50)}...
-                    </p>
-                    <div className="insta-message-status">
-                      {message.status === 'replied' && (
-                        <FaCheck className="insta-replied-check" />
-                      )}
-                      {message.status === 'unread' && (
-                        <div className="insta-unread-badge">{1}</div>
-                      )}
+                  
+                  <div className="insta-conversation-details">
+                    <div className="insta-conversation-header">
+                      <span className="insta-conversation-name">{conversation.name}</span>
+                      <span className="insta-conversation-time">{formatDate(conversation.latestMessage)}</span>
+                    </div>
+                    <div className="insta-conversation-info">
+                      <span className="insta-conversation-email">{conversation.email}</span>
+                      <div className="insta-conversation-stats-inline">
+                        <span className="insta-message-count">{conversation.totalMessages} messages</span>
+                        {conversation.unreadCount > 0 && (
+                          <span className="insta-unread-count">{conversation.unreadCount} unread</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="insta-conversation-preview">
+                      <span className={`insta-status-indicator ${conversation.overallStatus}`}>
+                        {conversation.overallStatus === 'unread' && <FaCircle />}
+                        {conversation.overallStatus === 'read' && <FaEye />}
+                        {conversation.overallStatus === 'replied' && <FaCheck />}
+                      </span>
+                      <span className="insta-latest-message">
+                        Latest: {conversation.messages[0]?.message.substring(0, 60)}...
+                      </span>
                     </div>
                   </div>
+                </div>
+                
+                <div className="insta-conversation-actions">
+                  <button 
+                    className="insta-action-btn mark-read"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markConversationAsRead(conversation.email);
+                    }}
+                    disabled={actionLoading === `read-${conversation.email}`}
+                    title="Mark as read"
+                  >
+                    {actionLoading === `read-${conversation.email}` ? (
+                      <FaSpinner className="insta-spinner" />
+                    ) : (
+                      <FaEye />
+                    )}
+                  </button>
+                  <button 
+                    className="insta-action-btn mark-unread"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markConversationAsUnread(conversation.email);
+                    }}
+                    disabled={actionLoading === `unread-${conversation.email}`}
+                    title="Mark as unread"
+                  >
+                    {actionLoading === `unread-${conversation.email}` ? (
+                      <FaSpinner className="insta-spinner" />
+                    ) : (
+                      <FaEyeSlash />
+                    )}
+                  </button>
+                  <button 
+                    className="insta-action-btn delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteConversation(conversation.email);
+                    }}
+                    disabled={actionLoading === `delete-${conversation.email}`}
+                    title="Delete conversation"
+                  >
+                    {actionLoading === `delete-${conversation.email}` ? (
+                      <FaSpinner className="insta-spinner" />
+                    ) : (
+                      <FaTrash />
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
