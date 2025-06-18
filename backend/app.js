@@ -1654,60 +1654,65 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     }
   });
   
-  // Reply to a message (for admin) - Enhanced with better email template
   app.post('/api/admin/messages/:id/reply', authenticateToken, async (req, res) => {
-    try {
-      const { replyContent , originalMessage } = req.body;
-      const messageId = req.params.id;
-      const adminId = req.user.admin_id;
-      
-      if (!replyContent || replyContent.trim() === '') {
-        return res.status(400).json({ message: 'Reply content is required' });
-      }
-      
-      // Find the message
-      const message = await Message.findById(messageId);
-      if (!message) {
-        return res.status(404).json({ message: 'Message not found' });
-      }
-      
-      // Create the reply
-      const newReply = new Reply({
-        messageId,
-        originalMessage: originalMessage.trim(),
-        replyContent: replyContent.trim(),
-        repliedBy: adminId
-      });
-      
-      await newReply.save();
-      
-      // Update message status
-      message.status = 'replied';
-      message.replied = true;
-      await message.save();
-      
-      // Send enhanced reply email to user using the template
-      const replyEmail = getReplyEmailTemplate(message.name, originalMessage, replyContent);
-      
-      await sendEmail(
-        message.email, 
-        '📧 Personal Response from Aditya Tyagi', 
-        replyEmail
-      );
-      
-      // Populate the reply with admin info for response
-      const populatedReply = await Reply.findById(newReply._id).populate('repliedBy', 'name email');
-      
-      res.json({ 
-        success: true, 
-        message: 'Reply sent successfully',
-        reply: populatedReply
-      });
-    } catch (error) {
-      console.error('Reply error:', error);
-      res.status(500).json({ message: error.message });
+  try {
+    const { replyContent } = req.body; // Remove originalMessage from destructuring
+    const messageId = req.params.id;
+    const adminId = req.user.admin_id;
+
+    // Validate inputs
+    if (!replyContent || replyContent.trim() === '') {
+      return res.status(400).json({ message: 'Reply content is required' });
     }
-  });
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: 'Invalid message ID' });
+    }
+    if (!adminId) {
+      return res.status(401).json({ message: 'Unauthorized: Invalid admin credentials' });
+    }
+
+    // Find the message
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Create the reply
+    const newReply = new Reply({
+      messageId,
+      replyContent: replyContent.trim(),
+      repliedBy: adminId
+    });
+
+    await newReply.save();
+
+    // Update message status
+    message.status = 'replied';
+    message.replied = true;
+    await message.save();
+
+    // Send enhanced reply email using the original message from the Message document
+    const replyEmail = getReplyEmailTemplate(message.name, message.message, replyContent);
+
+    await sendEmail(
+      message.email,
+      '📧 Personal Response from Aditya Tyagi',
+      replyEmail
+    );
+
+    // Populate the reply with admin info for response
+    const populatedReply = await Reply.findById(newReply._id).populate('repliedBy', 'name email');
+
+    res.json({
+      success: true,
+      message: 'Reply sent successfully',
+      reply: populatedReply
+    });
+  } catch (error) {
+    console.error('Reply error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
   
   // Update message status (for admin)
   app.put('/api/admin/messages/:id/status', authenticateToken, async (req, res) => {
