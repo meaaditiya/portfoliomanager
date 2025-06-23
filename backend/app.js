@@ -920,27 +920,61 @@ const blogSchema = new mongoose.Schema({
   });
   
   // Helper function to process content and replace image placeholders
-  function processContentImages(content, contentImages) {
-    if (!content || !contentImages || contentImages.length === 0) {
-      return content;
-    }
-    
-    let processedContent = content;
-    
+function processContentImages(content, contentImages) {
+  // Add safety checks
+  if (!content || typeof content !== 'string') {
+    return content || '';
+  }
+  
+  if (!contentImages || !Array.isArray(contentImages) || contentImages.length === 0) {
+    return content;
+  }
+  
+  let processedContent = content;
+  
+  try {
     contentImages.forEach(image => {
-      const placeholder = `[IMAGE:${image.imageId}]`;
-      const imageHtml = `
-        <div class="blog-image blog-image-${image.position}">
-          <img src="${image.url}" alt="${image.alt}" loading="lazy" />
-          ${image.caption ? `<p class="image-caption">${image.caption}</p>` : ''}
-        </div>
-      `;
+      // Safety checks for image object
+      if (!image || !image.imageId) {
+        return; // Skip invalid image objects
+      }
       
-      processedContent = processedContent.replace(new RegExp(placeholder, 'g'), imageHtml);
+      const placeholder = `[IMAGE:${image.imageId}]`;
+      
+      // Check if placeholder exists in content before attempting replacement
+      if (!processedContent.includes(placeholder)) {
+        return; // Skip if placeholder doesn't exist
+      }
+      
+      // Sanitize image properties to prevent injection
+      const safeUrl = (image.url || '').replace(/"/g, '&quot;');
+      const safeAlt = (image.alt || '').replace(/"/g, '&quot;');
+      const safeCaption = (image.caption || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safePosition = (image.position || 'center').replace(/[^a-zA-Z-]/g, '');
+      
+      const imageHtml = `<div class="blog-image blog-image-${safePosition}">
+  <img src="${safeUrl}" alt="${safeAlt}" loading="lazy" />
+  ${safeCaption ? `<p class="image-caption">${safeCaption}</p>` : ''}
+</div>`;
+      
+      // Use a more specific replacement to avoid infinite loops
+      // Replace only the first occurrence to prevent circular replacements
+      const index = processedContent.indexOf(placeholder);
+      if (index !== -1) {
+        processedContent = processedContent.substring(0, index) + 
+                          imageHtml + 
+                          processedContent.substring(index + placeholder.length);
+      }
     });
     
     return processedContent;
+    
+  } catch (error) {
+    console.error('Error processing content images:', error);
+    // Return original content if processing fails
+    return content;
   }
+}
   
   // Get all images for a specific blog post
   app.get('/api/blogs/:id/images', authenticateToken, async (req, res) => {
