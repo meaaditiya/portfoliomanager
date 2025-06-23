@@ -128,13 +128,53 @@ const BlogManagementPanel = () => {
   
   // Handle form input changes
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+  const { name, value } = e.target;
+  
+  if (name === 'content') {
+    // Clean up contentImages when content changes
+    const updatedImages = cleanupContentImages(value, formData.contentImages);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      contentImages: updatedImages
+    }));
+  } else {
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-  };
+  }
+};
+  const cleanupContentImages = (content, contentImages) => {
+  if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
+    return contentImages;
+  }
   
+  // Filter out images that are not referenced in content
+  return contentImages.filter(image => {
+    if (!image || !image.imageId) {
+      return false; // Remove invalid images
+    }
+    
+    const placeholder = `[IMAGE:${image.imageId}]`;
+    return content.includes(placeholder);
+  });
+};
+const generateImagePreview = (contentImages, content) => {
+  if (!Array.isArray(contentImages) || contentImages.length === 0) {
+    return [];
+  }
+  
+  // Only show images that are actually used in content
+  return contentImages.filter(image => {
+    if (!image || !image.imageId || !content) {
+      return false;
+    }
+    
+    const placeholder = `[IMAGE:${image.imageId}]`;
+    return content.includes(placeholder);
+  });
+};
   // Handle image modal input changes
   const handleImageModalChange = (e) => {
     const { name, value } = e.target;
@@ -144,78 +184,7 @@ const BlogManagementPanel = () => {
     }));
   };
   
-  // Add image to content
-  const handleAddImage = async () => {
-    if (!imageModal.url.trim()) {
-      alert('Please enter an image URL');
-      return;
-    }
-    
-    try {
-      setUploadingImage(true);
-      
-      // If we're editing an existing blog, add image via API
-      if (selectedBlog) {
-        const response = await axios.post(
-          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
-          {
-            url: imageModal.url,
-            alt: imageModal.alt,
-            caption: imageModal.caption,
-            position: imageModal.position
-          },
-          { withCredentials: true }
-        );
-        
-        const { imageId, embedCode } = response.data;
-        
-        // Insert embed code at cursor position
-        insertTextAtCursor(embedCode);
-        
-        // Update contentImages in formData
-        setFormData(prev => ({
-          ...prev,
-          contentImages: [...prev.contentImages, response.data.image]
-        }));
-      } else {
-        // For new blogs, generate temporary image ID and add to contentImages
-        const imageId = 'temp_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const embedCode = `[IMAGE:${imageId}]`;
-        
-        const newImage = {
-          url: imageModal.url,
-          alt: imageModal.alt,
-          caption: imageModal.caption,
-          position: imageModal.position,
-          imageId: imageId
-        };
-        
-        // Insert embed code at cursor position
-        insertTextAtCursor(embedCode);
-        
-        // Update contentImages in formData
-        setFormData(prev => ({
-          ...prev,
-          contentImages: [...prev.contentImages, newImage]
-        }));
-      }
-      
-      // Close modal and reset
-      setImageModal({
-        isOpen: false,
-        url: '',
-        alt: '',
-        caption: '',
-        position: 'center'
-      });
-      
-    } catch (err) {
-      console.error('Error adding image:', err);
-      setError(err.response?.data?.message || 'Failed to add image. Please try again.');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+
   
   // Insert text at cursor position in textarea
   const insertTextAtCursor = (text) => {
@@ -238,57 +207,61 @@ const BlogManagementPanel = () => {
   
   // Create or update blog post
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  try {
+    setLoading(true);
+    setError(null);
+    setSuccessMessage('');
     
-    try {
-      setLoading(true);
-      setError(null);
-      setSuccessMessage('');
-      
-      // Format tags
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag !== '');
-      
-      const blogData = {
-        ...formData,
-        tags: tagsArray
-      };
-      
-      let response;
-      
-      if (selectedBlog) {
-        // Update existing blog
-        response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
-          withCredentials: true
-        });
-        setSuccessMessage('Blog post updated successfully!');
-      } else {
-        // Create new blog
-        response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
-          withCredentials: true
-        });
-        setSuccessMessage('Blog post created successfully!');
-      }
-      
-      // Refresh blog list and reset form
-      fetchBlogs();
-      
-      // Show success message for 3 seconds then close editor
-      setTimeout(() => {
-        setSuccessMessage('');
-        setEditMode(false);
-        setSelectedBlog(null);
-      }, 3000);
-      
-    } catch (err) {
-      console.error('Error saving blog:', err);
-      setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
-    } finally {
-      setLoading(false);
+    // Format tags
+    const tagsArray = formData.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag !== '');
+    
+    // Clean up contentImages to only include those referenced in content
+    const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
+    
+    const blogData = {
+      ...formData,
+      tags: tagsArray,
+      contentImages: cleanedImages
+    };
+    
+    let response;
+    
+    if (selectedBlog) {
+      // Update existing blog
+      response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
+        withCredentials: true
+      });
+      setSuccessMessage('Blog post updated successfully!');
+    } else {
+      // Create new blog
+      response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
+        withCredentials: true
+      });
+      setSuccessMessage('Blog post created successfully!');
     }
-  };
+    
+    // Refresh blog list and reset form
+    fetchBlogs();
+    
+    // Show success message for 3 seconds then close editor
+    setTimeout(() => {
+      setSuccessMessage('');
+      setEditMode(false);
+      setSelectedBlog(null);
+    }, 3000);
+    
+  } catch (err) {
+    console.error('Error saving blog:', err);
+    setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
   
   // Delete blog post
   const handleDelete = async (blogId) => {
@@ -431,7 +404,161 @@ const BlogManagementPanel = () => {
     // Scroll to top for better UX
     window.scrollTo(0, 0);
   };
+  const ContentImagesSection = ({ contentImages, content }) => {
+  const activeImages = generateImagePreview(contentImages, content);
   
+  if (!activeImages || activeImages.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="form-group">
+      <label>Content Images ({activeImages.length})</label>
+      <div className="content-images-list">
+        {activeImages.map((image, index) => (
+          <div key={image.imageId || index} className="content-image-item">
+            <img 
+              src={image.url} 
+              alt={image.alt} 
+              className="content-image-thumb"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/50x50?text=Error';
+              }}
+            />
+            <div className="content-image-info">
+              <span className="image-id">[IMAGE:{image.imageId}]</span>
+              <span className="image-position">{image.position}</span>
+              {image.caption && <span className="image-caption">{image.caption}</span>}
+            </div>
+            <button
+              type="button"
+              className="btn btn-small btn-delete"
+              onClick={() => removeImageFromContent(image.imageId)}
+              title="Remove this image from content"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="helper-text">
+        Only images referenced in your content are shown above. 
+        Remove the [IMAGE:id] placeholder from your content to remove an image.
+      </div>
+    </div>
+  );
+};
+
+// Function to remove image placeholder from content
+const removeImageFromContent = (imageId) => {
+  const placeholder = `[IMAGE:${imageId}]`;
+  const newContent = formData.content.replace(new RegExp(escapeRegExp(placeholder), 'g'), '');
+  
+  // Update content and let handleInputChange clean up the images array
+  const updatedImages = cleanupContentImages(newContent, formData.contentImages);
+  
+  setFormData(prev => ({
+    ...prev,
+    content: newContent,
+    contentImages: updatedImages
+  }));
+};
+
+// Helper function to escape regex special characters
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+// Replace the existing Content Images Summary section in your JSX with:
+{formData.contentImages && formData.contentImages.length > 0 && (
+  <ContentImagesSection 
+    contentImages={formData.contentImages} 
+    content={formData.content} 
+  />
+)}
+
+// Enhanced image modal with better error handling
+const handleAddImage = async () => {
+  if (!imageModal.url.trim()) {
+    setError('Please enter an image URL');
+    return;
+  }
+  
+  // Basic URL validation
+  try {
+    new URL(imageModal.url);
+  } catch {
+    setError('Please enter a valid URL');
+    return;
+  }
+  
+  try {
+    setUploadingImage(true);
+    setError(null);
+    
+    // If we're editing an existing blog, add image via API
+    if (selectedBlog) {
+      const response = await axios.post(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
+        {
+          url: imageModal.url,
+          alt: imageModal.alt,
+          caption: imageModal.caption,
+          position: imageModal.position
+        },
+        { withCredentials: true }
+      );
+      
+      const { imageId, embedCode } = response.data;
+      
+      // Insert embed code at cursor position
+      insertTextAtCursor(embedCode);
+      
+      // Update contentImages in formData
+      setFormData(prev => ({
+        ...prev,
+        contentImages: [...prev.contentImages, response.data.image]
+      }));
+    } else {
+      // For new blogs, generate temporary image ID and add to contentImages
+      const imageId = 'temp_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      const embedCode = `[IMAGE:${imageId}]`;
+      
+      const newImage = {
+        url: imageModal.url,
+        alt: imageModal.alt,
+        caption: imageModal.caption,
+        position: imageModal.position,
+        imageId: imageId
+      };
+      
+      // Insert embed code at cursor position
+      insertTextAtCursor(embedCode);
+      
+      // Update contentImages in formData
+      setFormData(prev => ({
+        ...prev,
+        contentImages: [...prev.contentImages, newImage]
+      }));
+    }
+    
+    // Close modal and reset
+    setImageModal({
+      isOpen: false,
+      url: '',
+      alt: '',
+      caption: '',
+      position: 'center'
+    });
+    
+  } catch (err) {
+    console.error('Error adding image:', err);
+    setError(err.response?.data?.message || 'Failed to add image. Please try again.');
+  } finally {
+    setUploadingImage(false);
+  }
+};
   return (
     <div className="blog-management-panel">
       <div className="container">
