@@ -458,7 +458,7 @@ app.get('/api/admin/profile', authenticateToken, async (req, res) => {
 
 
 
-// Blog Model
+// Blog Model with Inline Image Support
 const blogSchema = new mongoose.Schema({
     title: { 
       type: String, 
@@ -469,6 +469,32 @@ const blogSchema = new mongoose.Schema({
       type: String, 
       required: true 
     },
+    // Array to store inline images used in content
+    contentImages: [{
+      url: {
+        type: String,
+        required: true
+      },
+      alt: {
+        type: String,
+        default: ''
+      },
+      caption: {
+        type: String,
+        default: ''
+      },
+      position: {
+        type: String,
+        enum: ['left', 'right', 'center', 'full-width'],
+        default: 'center'
+      },
+      // Unique identifier to reference in content
+      imageId: {
+        type: String,
+        required: true,
+        unique: true
+      }
+    }],
     summary: {
       type: String,
       required: true,
@@ -525,13 +551,22 @@ const blogSchema = new mongoose.Schema({
     }
   });
   
-  // Create slug from title
+  // Create slug from title and generate unique image IDs
   blogSchema.pre('save', function(next) {
     if (this.isModified('title')) {
       this.slug = this.title
         .toLowerCase()
         .replace(/[^\w\s]/g, '')
         .replace(/\s+/g, '-');
+    }
+    
+    // Generate unique IDs for new content images
+    if (this.isModified('contentImages')) {
+      this.contentImages.forEach(image => {
+        if (!image.imageId) {
+          image.imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+      });
     }
     
     if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
@@ -548,7 +583,7 @@ const blogSchema = new mongoose.Schema({
   // Create a new blog post
   app.post('/api/blogs', authenticateToken, async (req, res) => {
     try {
-      const { title, content, summary, status, tags, featuredImage } = req.body;
+      const { title, content, summary, status, tags, featuredImage, contentImages } = req.body;
       
       // Validate required fields
       if (!title || !content || !summary) {
@@ -562,7 +597,8 @@ const blogSchema = new mongoose.Schema({
         author: req.user.admin_id,
         status: status || 'draft',
         tags: tags || [],
-        featuredImage
+        featuredImage,
+        contentImages: contentImages || []
       });
       
       await newBlog.save();
@@ -573,6 +609,126 @@ const blogSchema = new mongoose.Schema({
       });
     } catch (error) {
       console.error('Error creating blog post:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Add image to blog content
+  app.post('/api/blogs/:id/images', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { url, alt, caption, position } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ message: 'Image URL is required' });
+      }
+      
+      const blog = await Blog.findById(id);
+      
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog post not found' });
+      }
+      
+      // Check authorization
+      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+      }
+      
+      // Generate unique image ID
+      const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      
+      const newImage = {
+        url,
+        alt: alt || '',
+        caption: caption || '',
+        position: position || 'center',
+        imageId
+      };
+      
+      blog.contentImages.push(newImage);
+      await blog.save();
+      
+      res.status(201).json({
+        message: 'Image added successfully',
+        image: newImage,
+        imageId: imageId,
+        embedCode: `[IMAGE:${imageId}]`
+      });
+    } catch (error) {
+      console.error('Error adding image:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Update content image
+  app.put('/api/blogs/:id/images/:imageId', authenticateToken, async (req, res) => {
+    try {
+      const { id, imageId } = req.params;
+      const { url, alt, caption, position } = req.body;
+      
+      const blog = await Blog.findById(id);
+      
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog post not found' });
+      }
+      
+      // Check authorization
+      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+      }
+      
+      const imageIndex = blog.contentImages.findIndex(img => img.imageId === imageId);
+      
+      if (imageIndex === -1) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+      
+      // Update image properties
+      if (url) blog.contentImages[imageIndex].url = url;
+      if (alt !== undefined) blog.contentImages[imageIndex].alt = alt;
+      if (caption !== undefined) blog.contentImages[imageIndex].caption = caption;
+      if (position) blog.contentImages[imageIndex].position = position;
+      
+      await blog.save();
+      
+      res.json({
+        message: 'Image updated successfully',
+        image: blog.contentImages[imageIndex]
+      });
+    } catch (error) {
+      console.error('Error updating image:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Delete content image
+  app.delete('/api/blogs/:id/images/:imageId', authenticateToken, async (req, res) => {
+    try {
+      const { id, imageId } = req.params;
+      
+      const blog = await Blog.findById(id);
+      
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog post not found' });
+      }
+      
+      // Check authorization
+      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+      }
+      
+      const imageIndex = blog.contentImages.findIndex(img => img.imageId === imageId);
+      
+      if (imageIndex === -1) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+      
+      blog.contentImages.splice(imageIndex, 1);
+      await blog.save();
+      
+      res.json({ message: 'Image deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting image:', error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -633,11 +789,18 @@ const blogSchema = new mongoose.Schema({
         .populate('author', 'name email')
         .exec();
       
+      // Process content to replace image placeholders with actual images
+      const processedBlogs = blogs.map(blog => {
+        const blogObj = blog.toObject();
+        blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
+        return blogObj;
+      });
+      
       // Get total count for pagination info
       const total = await Blog.countDocuments(filter);
       
       res.json({
-        blogs,
+        blogs: processedBlogs,
         pagination: {
           total,
           page: parseInt(page),
@@ -678,7 +841,10 @@ const blogSchema = new mongoose.Schema({
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      res.json(blog);
+      const blogObj = blog.toObject();
+      blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
+      
+      res.json(blogObj);
     } catch (error) {
       console.error('Error fetching blog:', error);
       res.status(500).json({ message: error.message });
@@ -704,7 +870,7 @@ const blogSchema = new mongoose.Schema({
       }
       
       // Update only allowed fields
-      const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage'];
+      const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages'];
       
       allowedUpdates.forEach(field => {
         if (updates[field] !== undefined) {
@@ -714,9 +880,12 @@ const blogSchema = new mongoose.Schema({
       
       await blog.save();
       
+      const blogObj = blog.toObject();
+      blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
+      
       res.json({
         message: 'Blog post updated successfully',
-        blog
+        blog: blogObj
       });
     } catch (error) {
       console.error('Error updating blog:', error);
@@ -749,7 +918,55 @@ const blogSchema = new mongoose.Schema({
       res.status(500).json({ message: error.message });
     }
   });
-
+  
+  // Helper function to process content and replace image placeholders
+  function processContentImages(content, contentImages) {
+    if (!content || !contentImages || contentImages.length === 0) {
+      return content;
+    }
+    
+    let processedContent = content;
+    
+    contentImages.forEach(image => {
+      const placeholder = `[IMAGE:${image.imageId}]`;
+      const imageHtml = `
+        <div class="blog-image blog-image-${image.position}">
+          <img src="${image.url}" alt="${image.alt}" loading="lazy" />
+          ${image.caption ? `<p class="image-caption">${image.caption}</p>` : ''}
+        </div>
+      `;
+      
+      processedContent = processedContent.replace(new RegExp(placeholder, 'g'), imageHtml);
+    });
+    
+    return processedContent;
+  }
+  
+  // Get all images for a specific blog post
+  app.get('/api/blogs/:id/images', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const blog = await Blog.findById(id);
+      
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog post not found' });
+      }
+      
+      // Check authorization
+      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Not authorized to view this blog post images' });
+      }
+      
+      res.json({
+        images: blog.contentImages,
+        totalImages: blog.contentImages.length
+      });
+    } catch (error) {
+      console.error('Error fetching blog images:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 const MessageSchema = new mongoose.Schema({
     name: {
       type: String,

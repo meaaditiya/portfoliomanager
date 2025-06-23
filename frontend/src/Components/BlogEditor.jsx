@@ -31,11 +31,22 @@ const BlogManagementPanel = () => {
     summary: '',
     tags: '',
     status: 'draft',
-    featuredImage: ''
+    featuredImage: '',
+    contentImages: []
   });
   const [successMessage, setSuccessMessage] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
   const [analyticsId, setAnalyticsId] = useState(null);
+  
+  // Image embedding state
+  const [imageModal, setImageModal] = useState({
+    isOpen: false,
+    url: '',
+    alt: '',
+    caption: '',
+    position: 'center'
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Fetch blogs from API
   const fetchBlogs = async () => {
@@ -122,6 +133,107 @@ const BlogManagementPanel = () => {
       ...prev,
       [name]: value
     }));
+  };
+  
+  // Handle image modal input changes
+  const handleImageModalChange = (e) => {
+    const { name, value } = e.target;
+    setImageModal(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Add image to content
+  const handleAddImage = async () => {
+    if (!imageModal.url.trim()) {
+      alert('Please enter an image URL');
+      return;
+    }
+    
+    try {
+      setUploadingImage(true);
+      
+      // If we're editing an existing blog, add image via API
+      if (selectedBlog) {
+        const response = await axios.post(
+          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
+          {
+            url: imageModal.url,
+            alt: imageModal.alt,
+            caption: imageModal.caption,
+            position: imageModal.position
+          },
+          { withCredentials: true }
+        );
+        
+        const { imageId, embedCode } = response.data;
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentImages in formData
+        setFormData(prev => ({
+          ...prev,
+          contentImages: [...prev.contentImages, response.data.image]
+        }));
+      } else {
+        // For new blogs, generate temporary image ID and add to contentImages
+        const imageId = 'temp_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const embedCode = `[IMAGE:${imageId}]`;
+        
+        const newImage = {
+          url: imageModal.url,
+          alt: imageModal.alt,
+          caption: imageModal.caption,
+          position: imageModal.position,
+          imageId: imageId
+        };
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentImages in formData
+        setFormData(prev => ({
+          ...prev,
+          contentImages: [...prev.contentImages, newImage]
+        }));
+      }
+      
+      // Close modal and reset
+      setImageModal({
+        isOpen: false,
+        url: '',
+        alt: '',
+        caption: '',
+        position: 'center'
+      });
+      
+    } catch (err) {
+      console.error('Error adding image:', err);
+      setError(err.response?.data?.message || 'Failed to add image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+  
+  // Insert text at cursor position in textarea
+  const insertTextAtCursor = (text) => {
+    const textarea = document.getElementById('content');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newContent = formData.content.substring(0, start) + text + formData.content.substring(end);
+    
+    setFormData(prev => ({
+      ...prev,
+      content: newContent
+    }));
+    
+    // Reset focus and cursor position
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
   };
   
   // Create or update blog post
@@ -240,6 +352,9 @@ const BlogManagementPanel = () => {
           return; // User cancelled
         }
         break;
+      case 'image':
+        setImageModal(prev => ({ ...prev, isOpen: true }));
+        return;
       default:
         return;
     }
@@ -272,6 +387,13 @@ const BlogManagementPanel = () => {
     setSelectedBlog(null);
     setAnalyticsId(null);
     setSuccessMessage('');
+    setImageModal({
+      isOpen: false,
+      url: '',
+      alt: '',
+      caption: '',
+      position: 'center'
+    });
   };
   
   const handleEdit = async (blog) => {
@@ -284,7 +406,8 @@ const BlogManagementPanel = () => {
       summary: blog.summary,
       tags: blog.tags.join(', '),
       status: blog.status,
-      featuredImage: blog.featuredImage || ''
+      featuredImage: blog.featuredImage || '',
+      contentImages: blog.contentImages || []
     });
     
     // Scroll to top for better UX
@@ -301,7 +424,8 @@ const BlogManagementPanel = () => {
       summary: '',
       tags: '',
       status: 'draft',
-      featuredImage: ''
+      featuredImage: '',
+      contentImages: []
     });
     
     // Scroll to top for better UX
@@ -345,6 +469,105 @@ const BlogManagementPanel = () => {
         {error && (
           <div className="error-message">
             {error}
+          </div>
+        )}
+        
+        {/* Image Modal */}
+        {imageModal.isOpen && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>Add Image to Content</h3>
+                <button 
+                  className="modal-close"
+                  onClick={() => setImageModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="imageUrl">Image URL *</label>
+                  <input
+                    type="url"
+                    id="imageUrl"
+                    name="url"
+                    value={imageModal.url}
+                    onChange={handleImageModalChange}
+                    placeholder="https://example.com/image.jpg"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="imageAlt">Alt Text</label>
+                  <input
+                    type="text"
+                    id="imageAlt"
+                    name="alt"
+                    value={imageModal.alt}
+                    onChange={handleImageModalChange}
+                    placeholder="Description of the image"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="imageCaption">Caption</label>
+                  <input
+                    type="text"
+                    id="imageCaption"
+                    name="caption"
+                    value={imageModal.caption}
+                    onChange={handleImageModalChange}
+                    placeholder="Image caption (optional)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="imagePosition">Position</label>
+                  <select
+                    id="imagePosition"
+                    name="position"
+                    value={imageModal.position}
+                    onChange={handleImageModalChange}
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                    <option value="full-width">Full Width</option>
+                  </select>
+                </div>
+                {imageModal.url && (
+                  <div className="image-preview">
+                    <p>Preview:</p>
+                    <img
+                      src={imageModal.url}
+                      alt="Preview"
+                      style={{ maxWidth: '100%', maxHeight: '200px' }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setImageModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAddImage}
+                  disabled={uploadingImage || !imageModal.url.trim()}
+                >
+                  {uploadingImage && <span className="spinner"></span>}
+                  Add Image
+                </button>
+              </div>
+            </div>
           </div>
         )}
         
@@ -431,6 +654,14 @@ const BlogManagementPanel = () => {
                   >
                     <span>🔗 Link</span>
                   </button>
+                  <button 
+                    type="button" 
+                    onClick={(e) => formatText(e, 'image')}
+                    className="toolbar-btn"
+                    title="Insert Image"
+                  >
+                    <span>🖼️ Image</span>
+                  </button>
                 </div>
                 <textarea
                   id="content"
@@ -439,9 +670,12 @@ const BlogManagementPanel = () => {
                   onChange={handleInputChange}
                   required
                   rows={15}
-                  placeholder="Write your blog content here... Use the toolbar to format your text or use Markdown directly."
+                  placeholder="Write your blog content here... Use the toolbar to format your text or use Markdown directly. Click the Image button to embed images within your content."
                 ></textarea>
-                <span className="helper-text">Markdown is supported. You can use **bold**, *italic*, # headings, etc.</span>
+                <span className="helper-text">
+                  Markdown is supported. You can use **bold**, *italic*, # headings, etc. 
+                  Use [IMAGE:imageId] placeholders to embed images within content.
+                </span>
               </div>
               
               <div className="form-group">
@@ -496,6 +730,33 @@ const BlogManagementPanel = () => {
                   </select>
                 </div>
               </div>
+              
+              {/* Content Images Summary */}
+              {formData.contentImages && formData.contentImages.length > 0 && (
+                <div className="form-group">
+                  <label>Content Images ({formData.contentImages.length})</label>
+                  <div className="content-images-list">
+                    {formData.contentImages.map((image, index) => (
+                      <div key={image.imageId || index} className="content-image-item">
+                        <img 
+                          src={image.url} 
+                          alt={image.alt} 
+                          className="content-image-thumb"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/50x50?text=Error';
+                          }}
+                        />
+                        <div className="content-image-info">
+                          <span className="image-id">[IMAGE:{image.imageId}]</span>
+                          <span className="image-position">{image.position}</span>
+                          {image.caption && <span className="image-caption">{image.caption}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="form-actions">
                 <button
@@ -619,6 +880,15 @@ const BlogManagementPanel = () => {
                           </div>
                         )}
                         
+                        {/* Content Images Count */}
+                        {blog.contentImages && blog.contentImages.length > 0 && (
+                          <div className="card-images-count">
+                            <span className="images-count">
+                              🖼️ {blog.contentImages.length} embedded image{blog.contentImages.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
+                        
                         <div className="card-footer">
                           <div className="author-info">
                             {blog.author?.name || 'Unknown Author'}
@@ -667,6 +937,7 @@ const BlogManagementPanel = () => {
                     </div>
                   ))}
                 </div>
+
 
                 {/* Pagination */}
                 {pagination.pages > 1 && (
