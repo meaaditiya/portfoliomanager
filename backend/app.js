@@ -581,38 +581,40 @@ const blogSchema = new mongoose.Schema({
   
   // Blog Routes
   // Create a new blog post
-  app.post('/api/blogs', authenticateToken, async (req, res) => {
-    try {
-      const { title, content, summary, status, tags, featuredImage, contentImages } = req.body;
-      
-      // Validate required fields
-      if (!title || !content || !summary) {
-        return res.status(400).json({ message: 'Title, content, and summary are required' });
-      }
-      
-      const newBlog = new Blog({
-        title,
-        content,
-        summary,
-        author: req.user.admin_id,
-        status: status || 'draft',
-        tags: tags || [],
-        featuredImage,
-        contentImages: contentImages || []
-      });
-      
-      await newBlog.save();
-      
-      res.status(201).json({
-        message: 'Blog post created successfully',
-        blog: newBlog
-      });
-    } catch (error) {
-      console.error('Error creating blog post:', error);
-      res.status(500).json({ message: error.message });
+app.post('/api/blogs', authenticateToken, async (req, res) => {
+  try {
+    const { title, content, summary, status, tags, featuredImage, contentImages } = req.body;
+    
+    // Validate required fields
+    if (!title || !content || !summary) {
+      return res.status(400).json({ message: 'Title, content, and summary are required' });
     }
-  });
-  
+    
+    // Clean up contentImages to only include those referenced in content
+    const cleanedImages = cleanupUnusedImages(content, contentImages || []);
+    
+    const newBlog = new Blog({
+      title,
+      content,
+      summary,
+      author: req.user.admin_id,
+      status: status || 'draft',
+      tags: tags || [],
+      featuredImage,
+      contentImages: cleanedImages
+    });
+    
+    await newBlog.save();
+    
+    res.status(201).json({
+      message: 'Blog post created successfully',
+      blog: newBlog
+    });
+  } catch (error) {
+    console.error('Error creating blog post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
   // Add image to blog content
   app.post('/api/blogs/:id/images', authenticateToken, async (req, res) => {
     try {
@@ -852,47 +854,51 @@ const blogSchema = new mongoose.Schema({
   });
   
   // Update a blog post
-  app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      
-      // Find blog post
-      const blog = await Blog.findById(id);
-      
-      if (!blog) {
-        return res.status(404).json({ message: 'Blog post not found' });
-      }
-      
-      // Check if user is the author or has admin rights
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Not authorized to update this blog post' });
-      }
-      
-      // Update only allowed fields
-      const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages'];
-      
-      allowedUpdates.forEach(field => {
-        if (updates[field] !== undefined) {
-          blog[field] = updates[field];
-        }
-      });
-      
-      await blog.save();
-      
-      const blogObj = blog.toObject();
-      blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
-      
-      res.json({
-        message: 'Blog post updated successfully',
-        blog: blogObj
-      });
-    } catch (error) {
-      console.error('Error updating blog:', error);
-      res.status(500).json({ message: error.message });
+ app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Find blog post
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
     }
-  });
-  
+    
+    // Check if user is the author or has admin rights
+    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update this blog post' });
+    }
+    
+    // Update only allowed fields
+    const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages'];
+    
+    allowedUpdates.forEach(field => {
+      if (updates[field] !== undefined) {
+        blog[field] = updates[field];
+      }
+    });
+    
+    // Clean up unused images if content was updated
+    if (updates.content !== undefined) {
+      blog.contentImages = cleanupUnusedImages(updates.content, blog.contentImages);
+    }
+    
+    await blog.save();
+    
+    const blogObj = blog.toObject();
+    blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
+    
+    res.json({
+      message: 'Blog post updated successfully',
+      blog: blogObj
+    });
+  } catch (error) {
+    console.error('Error updating blog:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
   // Delete a blog post
   app.delete('/api/blogs/:id', authenticateToken, async (req, res) => {
     try {
@@ -919,8 +925,7 @@ const blogSchema = new mongoose.Schema({
     }
   });
   
-  // Helper function to process content and replace image placeholders
-function processContentImages(content, contentImages) {
+ function processContentImages(content, contentImages) {
   // Add safety checks
   if (!content || typeof content !== 'string') {
     return content || '';
@@ -957,14 +962,8 @@ function processContentImages(content, contentImages) {
   ${safeCaption ? `<p class="image-caption">${safeCaption}</p>` : ''}
 </div>`;
       
-      // Use a more specific replacement to avoid infinite loops
-      // Replace only the first occurrence to prevent circular replacements
-      const index = processedContent.indexOf(placeholder);
-      if (index !== -1) {
-        processedContent = processedContent.substring(0, index) + 
-                          imageHtml + 
-                          processedContent.substring(index + placeholder.length);
-      }
+      // Replace ALL occurrences of the placeholder
+      processedContent = processedContent.replace(new RegExp(escapeRegExp(placeholder), 'g'), imageHtml);
     });
     
     return processedContent;
@@ -975,6 +974,29 @@ function processContentImages(content, contentImages) {
     return content;
   }
 }
+
+// Helper function to escape special regex characters
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Enhanced function to clean up unused images
+function cleanupUnusedImages(content, contentImages) {
+  if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
+    return contentImages;
+  }
+  
+  // Filter out images that are not referenced in content
+  return contentImages.filter(image => {
+    if (!image || !image.imageId) {
+      return false; // Remove invalid images
+    }
+    
+    const placeholder = `[IMAGE:${image.imageId}]`;
+    return content.includes(placeholder);
+  });
+}
+
   
   // Get all images for a specific blog post
   app.get('/api/blogs/:id/images', authenticateToken, async (req, res) => {
