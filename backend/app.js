@@ -2561,40 +2561,160 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
   const Reaction = mongoose.model('Reaction', ReactionSchema);
   
   const CommentSchema = new mongoose.Schema({
-    blog: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Blog',
+  blog: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Blog',
+    required: true
+  },
+  user: {
+    name: {
+      type: String,
       required: true
     },
-    user: {
-      name: {
-        type: String,
-        required: true
-      },
-      email: {
-        type: String,
-        required: true
-      }
-    },
-    content: {
+    email: {
       type: String,
-      required: true,
-      trim: true,
-      maxlength: 1000
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'approved' // You can change to 'pending' if you want moderation
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
+      required: true
     }
-  });
-  
+  },
+  content: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 1000
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved'
+  },
+  // New field to identify author comments
+  isAuthorComment: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
   const Comment = mongoose.model('Comment', CommentSchema);
-  
+  // Author route: Add author comment (requires authentication)
+app.post(
+  '/api/blogs/:blogId/author-comment',
+  authenticateToken, // Assuming you have auth middleware
+  [
+    body('content').trim().notEmpty().withMessage('Comment content is required')
+      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { blogId } = req.params;
+      const { content } = req.body;
+
+      // Check if blog exists
+      const blog = await Blog.findById(blogId);
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog not found' });
+      }
+
+      // Create new author comment
+      const newComment = new Comment({
+        blog: blogId,
+        user: { 
+          name: req.user.name || 'Aaditiya Tyagi', // Get from authenticated user
+          email: req.user.email // Get from authenticated user
+        },
+        content,
+        isAuthorComment: true,
+        status: 'approved' // Author comments are auto-approved
+      });
+
+      await newComment.save();
+      
+      // Update blog comments count
+      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Author comment added successfully',
+        comment: newComment
+      });
+    } catch (error) {
+      console.error('Error adding author comment:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// Author route: Get author comments for a blog
+app.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Get only author comments
+    const comments = await Comment.find({ 
+      blog: blogId,
+      isAuthorComment: true
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+    
+    const total = await Comment.countDocuments({
+      blog: blogId,
+      isAuthorComment: true
+    });
+    
+    res.status(200).json({
+      comments,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching author comments:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Author route: Delete author comment
+app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Check if it's an author comment
+    if (!comment.isAuthorComment) {
+      return res.status(403).json({ message: 'Not an author comment' });
+    }
+    
+    // Update blog comments count
+    await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+    
+    await Comment.deleteOne({ _id: commentId });
+    
+    res.status(200).json({ message: 'Author comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting author comment:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
   app.post(
     '/api/blogs/:blogId/reactions',
     [
@@ -2827,43 +2947,88 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     }
   );
   
-  // Get comments for a blog (public)
   app.get('/api/blogs/:blogId/comments', async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Get approved comments (both regular and author comments)
+    const comments = await Comment.find({ 
+      blog: blogId,
+      status: 'approved'
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+    
+    const total = await Comment.countDocuments({
+      blog: blogId,
+      status: 'approved'
+    });
+    
+    res.status(200).json({
+      comments,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+// Public route: Delete user's own comment
+app.delete('/api/comments/:commentId/user', 
+  [
+    body('email').isEmail().withMessage('Valid email is required')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
-      const { blogId } = req.params;
+      const { commentId } = req.params;
+      const { email } = req.body;
       
-      // Pagination
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const skip = (page - 1) * limit;
+      // Find the comment
+      const comment = await Comment.findById(commentId);
+      if (!comment) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+
+      // Check if the email matches the comment owner
+      if (comment.user.email !== email) {
+        return res.status(403).json({ message: 'You can only delete your own comments' });
+      }
+
+      // Prevent deletion of author comments through this route
+      if (comment.isAuthorComment) {
+        return res.status(403).json({ message: 'Author comments cannot be deleted through this route' });
+      }
       
-      // Only get approved comments for public view
-      const comments = await Comment.find({ 
-        blog: blogId,
-        status: 'approved'
-      })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      // If comment was approved, update the blog comments count
+      if (comment.status === 'approved') {
+        await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+      }
       
-      const total = await Comment.countDocuments({
-        blog: blogId,
-        status: 'approved'
-      });
+      await Comment.deleteOne({ _id: commentId });
       
-      res.status(200).json({
-        comments,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit)
-        }
-      });
+      res.status(200).json({ message: 'Comment deleted successfully' });
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      console.error('Error deleting user comment:', error);
       res.status(500).json({ message: 'Server error', error: error.message });
     }
-  });
+  }
+);
   
   // Admin route: Get all comments for a blog (including pending/rejected)
   app.get('/api/admin/blogs/:blogId/comments', authenticateToken, async (req, res) => {
