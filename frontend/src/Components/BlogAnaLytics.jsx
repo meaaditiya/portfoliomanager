@@ -58,7 +58,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       const reactionsResponse = await axios.get(
-        `http://localhost:5000/api/admin/blogs/${blogId}/reactions`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/blogs/${blogId}/reactions`,
         {
           withCredentials: true,
           headers: {
@@ -90,7 +90,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       const commentsResponse = await axios.get(
-        `http://localhost:5000/api/admin/blogs/${blogId}/comments`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/blogs/${blogId}/comments`,
         { 
           params: { status, page, limit: 10 },
           withCredentials: true,
@@ -122,7 +122,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `http://localhost:5000/api/blogs/${blogId}/author-comments`,
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/author-comments`,
         {
           params: { page, limit: 10 },
           withCredentials: true,
@@ -158,7 +158,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `http://localhost:5000/api/blogs/${blogId}/author-comment`,
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/author-comment`,
         { content: authorCommentForm.content },
         {
           withCredentials: true,
@@ -189,7 +189,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:5000/api/author-comments/${commentId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/author-comments/${commentId}`,
         {
           withCredentials: true,
           headers: {
@@ -231,7 +231,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `http://localhost:5000/api/admin/comments/${commentId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/comments/${commentId}`,
         { status: newStatus },
         {
           withCredentials: true,
@@ -261,7 +261,7 @@ const BlogAnalytics = ({ blogId }) => {
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:5000/api/admin/comments/${commentId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/admin/comments/${commentId}`,
         {
           withCredentials: true,
           headers: {
