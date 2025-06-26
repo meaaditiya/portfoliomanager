@@ -2592,12 +2592,372 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     type: Boolean,
     default: false
   },
+  // New fields for replies
+  parentComment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null // null means it's a top-level comment
+  },
+  repliesCount: {
+    type: Number,
+    default: 0
+  },
+  // New fields for comment reactions
+  reactionCounts: {
+    likes: {
+      type: Number,
+      default: 0
+    },
+    dislikes: {
+      type: Number,
+      default: 0
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
-  const Comment = mongoose.model('Comment', CommentSchema);
+
+const Comment = mongoose.model('Comment', CommentSchema);
+  const CommentReactionSchema = new mongoose.Schema({
+  comment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    required: true
+  },
+  type: {
+    type: String,
+    enum: ['like', 'dislike'],
+    required: true
+  },
+  user: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    }
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Compound index to prevent multiple reactions from the same user on the same comment
+CommentReactionSchema.index({ comment: 1, 'user.email': 1 }, { unique: true });
+
+const CommentReaction = mongoose.model('CommentReaction', CommentReactionSchema);
+// PUBLIC ROUTE: Add reply to a comment
+app.post(
+  '/api/comments/:commentId/replies',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('content').trim().notEmpty().withMessage('Reply content is required')
+      .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { commentId } = req.params;
+      const { name, email, content } = req.body;
+
+      // Check if parent comment exists
+      const parentComment = await Comment.findById(commentId);
+      if (!parentComment) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+
+      // Check if parent comment is approved
+      if (parentComment.status !== 'approved') {
+        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
+      }
+
+      // Create new reply
+      const newReply = new Comment({
+        blog: parentComment.blog,
+        user: { name, email },
+        content,
+        parentComment: commentId
+      });
+
+      await newReply.save();
+      
+      // Update parent comment's replies count
+      await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Reply added successfully',
+        reply: newReply
+      });
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// AUTHOR ROUTE: Add author reply to a comment
+app.post(
+  '/api/comments/:commentId/author-reply',
+  authenticateToken,
+  [
+    body('content').trim().notEmpty().withMessage('Reply content is required')
+      .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { commentId } = req.params;
+      const { content } = req.body;
+
+      // Check if parent comment exists
+      const parentComment = await Comment.findById(commentId);
+      if (!parentComment) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+
+      // Check if parent comment is approved
+      if (parentComment.status !== 'approved') {
+        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
+      }
+
+      // Create new author reply
+      const newReply = new Comment({
+        blog: parentComment.blog,
+        user: { 
+          name: req.user.name || 'Aaditiya Tyagi',
+          email: req.user.email
+        },
+        content,
+        parentComment: commentId,
+        isAuthorComment: true,
+        status: 'approved' // Author replies are auto-approved
+      });
+
+      await newReply.save();
+      
+      // Update parent comment's replies count
+      await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Author reply added successfully',
+        reply: newReply
+      });
+    } catch (error) {
+      console.error('Error adding author reply:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// Get replies for a comment
+app.get('/api/comments/:commentId/replies', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Get approved replies
+    const replies = await Comment.find({ 
+      parentComment: commentId,
+      status: 'approved'
+    })
+    .sort({ createdAt: 1 }) // Replies in chronological order
+    .skip(skip)
+    .limit(limit);
+    
+    const total = await Comment.countDocuments({
+      parentComment: commentId,
+      status: 'approved'
+    });
+    
+    res.status(200).json({
+      replies,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching replies:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+// Add/Remove reaction to a comment
+app.post(
+  '/api/comments/:commentId/reactions',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { commentId } = req.params;
+      const { name, email, type } = req.body;
+
+      // Check if comment exists and is approved
+      const comment = await Comment.findOne({ _id: commentId, status: 'approved' });
+      if (!comment) {
+        return res.status(404).json({ message: 'Comment not found or not approved' });
+      }
+
+      // Check if user already reacted to this comment
+      const existingReaction = await CommentReaction.findOne({
+        comment: commentId,
+        'user.email': email
+      });
+
+      // If reaction exists but is of different type, update it
+      if (existingReaction) {
+        if (existingReaction.type === type) {
+          // User is toggling off their reaction
+          await CommentReaction.deleteOne({ _id: existingReaction._id });
+          
+          // Update comment reaction counts
+          if (type === 'like') {
+            await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': -1 } });
+          } else {
+            await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.dislikes': -1 } });
+          }
+          
+          return res.status(200).json({ 
+            message: `${type} removed successfully`,
+            reactionRemoved: true
+          });
+        } else {
+          // User is changing reaction type
+          existingReaction.type = type;
+          await existingReaction.save();
+          
+          // Update comment reaction counts
+          if (type === 'like') {
+            await Comment.findByIdAndUpdate(commentId, { 
+              $inc: { 
+                'reactionCounts.likes': 1,
+                'reactionCounts.dislikes': -1
+              } 
+            });
+          } else {
+            await Comment.findByIdAndUpdate(commentId, { 
+              $inc: { 
+                'reactionCounts.likes': -1,
+                'reactionCounts.dislikes': 1
+              } 
+            });
+          }
+          
+          return res.status(200).json({
+            message: `Reaction changed to ${type}`,
+            reaction: existingReaction
+          });
+        }
+      }
+
+      // Create new reaction
+      const newReaction = new CommentReaction({
+        comment: commentId,
+        type,
+        user: { name, email }
+      });
+
+      await newReaction.save();
+      
+      // Update comment reaction counts
+      if (type === 'like') {
+        await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': 1 } });
+      } else {
+        await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.dislikes': 1 } });
+      }
+
+      res.status(201).json({ 
+        message: `${type} added successfully`,
+        reaction: newReaction
+      });
+    } catch (error) {
+      if (error.code === 11000) {
+        // Handle duplicate key error
+        return res.status(400).json({ message: 'You have already reacted to this comment' });
+      }
+      console.error('Error adding comment reaction:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// Get user's reaction to a comment
+app.get('/api/comments/:commentId/reactions/user', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    const reaction = await CommentReaction.findOne({
+      comment: commentId,
+      'user.email': email
+    });
+    
+    if (!reaction) {
+      return res.status(200).json({ hasReacted: false });
+    }
+    
+    res.status(200).json({
+      hasReacted: true,
+      reactionType: reaction.type
+    });
+  } catch (error) {
+    console.error('Error fetching user comment reaction:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get reaction counts for a comment
+app.get('/api/comments/:commentId/reactions/count', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await Comment.findById(commentId, 'reactionCounts');
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    res.status(200).json({
+      likes: comment.reactionCounts.likes || 0,
+      dislikes: comment.reactionCounts.dislikes || 0
+    });
+  } catch (error) {
+    console.error('Error fetching comment reaction counts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
   // Author route: Add author comment (requires authentication)
 app.post(
   '/api/blogs/:blogId/author-comment',
@@ -2703,9 +3063,27 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
     if (!comment.isAuthorComment) {
       return res.status(403).json({ message: 'Not an author comment' });
     }
+
+    // If it's a reply, update parent comment's replies count
+    if (comment.parentComment) {
+      await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
+    }
     
-    // Update blog comments count
-    await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+    // If it's a top-level comment, update blog comments count
+    if (!comment.parentComment) {
+      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+      
+      // Delete all replies to this comment
+      const repliesToDelete = await Comment.find({ parentComment: commentId });
+      for (const reply of repliesToDelete) {
+        // Delete reactions for each reply
+        await CommentReaction.deleteMany({ comment: reply._id });
+      }
+      await Comment.deleteMany({ parentComment: commentId });
+    }
+
+    // Delete reactions for this comment
+    await CommentReaction.deleteMany({ comment: commentId });
     
     await Comment.deleteOne({ _id: commentId });
     
@@ -2946,7 +3324,6 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
       }
     }
   );
-  
   app.get('/api/blogs/:blogId/comments', async (req, res) => {
   try {
     const { blogId } = req.params;
@@ -2956,10 +3333,11 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Get approved comments (both regular and author comments)
+    // Get only top-level approved comments (not replies)
     const comments = await Comment.find({ 
       blog: blogId,
-      status: 'approved'
+      status: 'approved',
+      parentComment: null // Only top-level comments
     })
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -2967,7 +3345,8 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
     
     const total = await Comment.countDocuments({
       blog: blogId,
-      status: 'approved'
+      status: 'approved',
+      parentComment: null
     });
     
     res.status(200).json({
@@ -2983,6 +3362,7 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+ 
 // Public route: Delete user's own comment
 app.delete('/api/comments/:commentId/user', 
   [
@@ -3014,11 +3394,29 @@ app.delete('/api/comments/:commentId/user',
       if (comment.isAuthorComment) {
         return res.status(403).json({ message: 'Author comments cannot be deleted through this route' });
       }
+
+      // If it's a reply, update parent comment's replies count
+      if (comment.parentComment) {
+        await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
+      }
       
-      // If comment was approved, update the blog comments count
-      if (comment.status === 'approved') {
+      // If comment was approved and is a top-level comment, update the blog comments count
+      if (comment.status === 'approved' && !comment.parentComment) {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       }
+
+      // Delete all replies to this comment if it's a top-level comment
+      if (!comment.parentComment) {
+        const repliesToDelete = await Comment.find({ parentComment: commentId });
+        for (const reply of repliesToDelete) {
+          // Delete reactions for each reply
+          await CommentReaction.deleteMany({ comment: reply._id });
+        }
+        await Comment.deleteMany({ parentComment: commentId });
+      }
+
+      // Delete reactions for this comment
+      await CommentReaction.deleteMany({ comment: commentId });
       
       await Comment.deleteOne({ _id: commentId });
       
