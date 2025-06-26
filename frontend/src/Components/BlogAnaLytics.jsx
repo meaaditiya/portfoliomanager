@@ -1,7 +1,7 @@
 // src/components/BlogAnalytics.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash, FaReply, FaHeart, FaHeartBroken } from 'react-icons/fa';
 import './Analytics.css';
 
 const BlogAnalytics = ({ blogId }) => {
@@ -23,6 +23,16 @@ const BlogAnalytics = ({ blogId }) => {
     isSubmitting: false
   });
   const [showAuthorCommentForm, setShowAuthorCommentForm] = useState(false);
+  
+  // Comment replies state
+  const [commentReplies, setCommentReplies] = useState({});
+  const [showReplies, setShowReplies] = useState({});
+  const [replyForms, setReplyForms] = useState({});
+  const [showReplyForms, setShowReplyForms] = useState({});
+  
+  // Comment reactions state
+  const [commentReactions, setCommentReactions] = useState({});
+  const [userCommentReactions, setUserCommentReactions] = useState({});
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -111,6 +121,11 @@ const BlogAnalytics = ({ blogId }) => {
         total: commentsResponse.data.pagination.total
       });
       
+      // Fetch comment reactions for each comment
+      for (const comment of commentsResponse.data.comments) {
+        await fetchCommentReactions(comment._id);
+      }
+      
     } catch (err) {
       console.error(`Error fetching ${status} comments:`, err);
       setError(err.response?.data?.message || `Failed to load ${status} comments`);
@@ -139,8 +154,145 @@ const BlogAnalytics = ({ blogId }) => {
         total: response.data.pagination.total
       });
       
+      // Fetch comment reactions for author comments
+      for (const comment of response.data.comments) {
+        await fetchCommentReactions(comment._id);
+      }
+      
     } catch (err) {
       console.error('Error fetching author comments:', err);
+    }
+  };
+  
+  // Fetch comment reactions
+  const fetchCommentReactions = async (commentId) => {
+    try {
+      const [countsResponse, userReactionResponse] = await Promise.all([
+        axios.get(`https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/reactions/count`),
+        axios.get(`https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/reactions/user`, {
+          params: { email: 'admin@example.com' } // Use admin email or get from token
+        })
+      ]);
+      
+      setCommentReactions(prev => ({
+        ...prev,
+        [commentId]: countsResponse.data
+      }));
+      
+      setUserCommentReactions(prev => ({
+        ...prev,
+        [commentId]: userReactionResponse.data
+      }));
+      
+    } catch (err) {
+      console.error('Error fetching comment reactions:', err);
+    }
+  };
+  
+  // Fetch comment replies
+  const fetchCommentReplies = async (commentId) => {
+    try {
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/replies`
+      );
+      
+      setCommentReplies(prev => ({
+        ...prev,
+        [commentId]: response.data.replies
+      }));
+      
+      // Fetch reactions for each reply
+      for (const reply of response.data.replies) {
+        await fetchCommentReactions(reply._id);
+      }
+      
+    } catch (err) {
+      console.error('Error fetching comment replies:', err);
+    }
+  };
+  
+  // Toggle show replies
+  const toggleShowReplies = async (commentId) => {
+    setShowReplies(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+    
+    if (!showReplies[commentId] && !commentReplies[commentId]) {
+      await fetchCommentReplies(commentId);
+    }
+  };
+  
+  // Handle comment reaction
+  const handleCommentReaction = async (commentId, type) => {
+    try {
+      const token = localStorage.getItem('token');
+      const userInfo = JSON.parse(localStorage.getItem('userInfo')) || { name: 'Admin', email: 'admin@example.com' };
+      
+      await axios.post(
+        `https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/reactions`,
+        {
+          name: userInfo.name,
+          email: userInfo.email,
+          type: type
+        }
+      );
+      
+      // Refresh comment reactions
+      await fetchCommentReactions(commentId);
+      
+    } catch (err) {
+      console.error('Error handling comment reaction:', err);
+      alert(err.response?.data?.message || 'Failed to update reaction');
+    }
+  };
+  
+  // Add author reply to comment
+  const handleAddAuthorReply = async (commentId) => {
+    const replyContent = replyForms[commentId]?.content;
+    
+    if (!replyContent?.trim()) {
+      alert('Please enter a reply');
+      return;
+    }
+    
+    setReplyForms(prev => ({
+      ...prev,
+      [commentId]: { ...prev[commentId], isSubmitting: true }
+    }));
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/author-reply`,
+        { content: replyContent },
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      // Reset form and refresh replies
+      setReplyForms(prev => ({
+        ...prev,
+        [commentId]: { content: '', isSubmitting: false }
+      }));
+      setShowReplyForms(prev => ({
+        ...prev,
+        [commentId]: false
+      }));
+      
+      await fetchCommentReplies(commentId);
+      
+    } catch (err) {
+      console.error('Error adding author reply:', err);
+      alert(err.response?.data?.message || 'Failed to add reply');
+      setReplyForms(prev => ({
+        ...prev,
+        [commentId]: { ...prev[commentId], isSubmitting: false }
+      }));
     }
   };
   
@@ -298,6 +450,127 @@ const BlogAnalytics = ({ blogId }) => {
     return (
       <div className="empty-state">
         <p>No {type} found for this blog post.</p>
+      </div>
+    );
+  };
+
+  // Render comment reactions
+  const renderCommentReactions = (commentId) => {
+    const reactions = commentReactions[commentId] || { likes: 0, dislikes: 0 };
+    const userReaction = userCommentReactions[commentId];
+    
+    return (
+      <div className="comment-reactions">
+        <button 
+          className={`comment-reaction-btn like-btn ${userReaction?.hasReacted && userReaction?.reactionType === 'like' ? 'active' : ''}`}
+          onClick={() => handleCommentReaction(commentId, 'like')}
+          title="Like this comment"
+        >
+          <FaThumbsUp /> {reactions.likes}
+        </button>
+        <button 
+          className={`comment-reaction-btn dislike-btn ${userReaction?.hasReacted && userReaction?.reactionType === 'dislike' ? 'active' : ''}`}
+          onClick={() => handleCommentReaction(commentId, 'dislike')}
+          title="Dislike this comment"
+        >
+          <FaThumbsDown /> {reactions.dislikes}
+        </button>
+      </div>
+    );
+  };
+
+  // Render comment replies
+  const renderCommentReplies = (commentId, comment) => {
+    const replies = commentReplies[commentId] || [];
+    const showRepliesForComment = showReplies[commentId];
+    
+    return (
+      <div className="comment-replies-section">
+        {comment.repliesCount > 0 && (
+          <button 
+            className="show-replies-btn"
+            onClick={() => toggleShowReplies(commentId)}
+          >
+            {showRepliesForComment ? 'Hide' : 'Show'} {comment.repliesCount} replies
+          </button>
+        )}
+        
+        {showRepliesForComment && (
+          <div className="comment-replies">
+            {replies.map(reply => (
+              <div key={reply._id} className={`comment-reply ${reply.isAuthorComment ? 'author-reply' : ''}`}>
+                <div className="reply-header">
+                  <div className="reply-user-info">
+                    {reply.isAuthorComment ? (
+                      <div className="author-badge">
+                        <FaCrown /> <strong>{reply.user.name}</strong> <span className="author-tag">Author</span>
+                      </div>
+                    ) : (
+                      <strong>{reply.user.name}</strong>
+                    )}
+                  </div>
+                  <span className="reply-date">{formatDate(reply.createdAt)}</span>
+                </div>
+                <div className="reply-content">{reply.content}</div>
+                {renderCommentReactions(reply._id)}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Author Reply Form */}
+        <div className="author-reply-section">
+          <button 
+            className="show-reply-form-btn"
+            onClick={() => setShowReplyForms(prev => ({
+              ...prev,
+              [commentId]: !prev[commentId]
+            }))}
+          >
+            <FaReply /> Reply as Author
+          </button>
+          
+          {showReplyForms[commentId] && (
+            <div className="author-reply-form">
+              <textarea
+                value={replyForms[commentId]?.content || ''}
+                onChange={(e) => setReplyForms(prev => ({
+                  ...prev,
+                  [commentId]: { ...prev[commentId], content: e.target.value }
+                }))}
+                placeholder="Write your reply as author..."
+                rows="3"
+                maxLength="1000"
+                className="author-reply-textarea"
+                disabled={replyForms[commentId]?.isSubmitting}
+              />
+              <div className="reply-form-actions">
+                <button 
+                  className="btn btn-success btn-sm"
+                  onClick={() => handleAddAuthorReply(commentId)}
+                  disabled={replyForms[commentId]?.isSubmitting || !replyForms[commentId]?.content?.trim()}
+                >
+                  {replyForms[commentId]?.isSubmitting ? 'Adding...' : 'Add Reply'}
+                </button>
+                <button 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setShowReplyForms(prev => ({
+                      ...prev,
+                      [commentId]: false
+                    }));
+                    setReplyForms(prev => ({
+                      ...prev,
+                      [commentId]: { content: '', isSubmitting: false }
+                    }));
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -500,6 +773,13 @@ const BlogAnalytics = ({ blogId }) => {
                             <span className="comment-date">{formatDate(comment.createdAt)}</span>
                           </div>
                           <div className="comment-content">{comment.content}</div>
+                          
+                          {/* Comment Reactions */}
+                          {renderCommentReactions(comment._id)}
+                          
+                          {/* Comment Replies */}
+                          {renderCommentReplies(comment._id, comment)}
+                          
                           <div className="comment-actions">
                             <button 
                               className="btn btn-sm btn-delete author-delete-btn"
@@ -562,6 +842,13 @@ const BlogAnalytics = ({ blogId }) => {
                             <span className="comment-date">{formatDate(comment.createdAt)}</span>
                           </div>
                           <div className="comment-content">{comment.content}</div>
+                          
+                          {/* Comment Reactions */}
+                          {renderCommentReactions(comment._id)}
+                          
+                          {/* Comment Replies */}
+                          {renderCommentReplies(comment._id, comment)}
+                          
                           <div className="comment-actions">
                             {commentTab !== 'approved' && (
                               <button 
