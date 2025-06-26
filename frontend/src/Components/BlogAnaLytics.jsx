@@ -706,7 +706,7 @@ const BlogAnalytics = ({ blogId }) => {
                   <div className="author-comment-header">
                     <h3>Author Comments ({authorCommentPagination.total})</h3>
                     <button 
-                      className="btn btn-primary add-author-comment-btn"
+                      className="add-author-comment-btn1"
                       onClick={() => setShowAuthorCommentForm(!showAuthorCommentForm)}
                     >
                       <FaPlus /> Add Author Comment

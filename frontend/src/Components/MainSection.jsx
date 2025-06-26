@@ -3,10 +3,11 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import BlogEditor from '../Components/BlogEditor';
 import Messages from '../Components/Messages';
-import '../ComponentsCSS/mainsection.css';
-import  Adminpost from '../Components/Adminpost';
+import Adminpost from '../Components/Adminpost';
 import Socialpost from '../Components/SocialPost';
 import Project from '../Components/Project';
+import '../ComponentsCSS/mainsection.css';
+
 // Placeholder component for Snippets
 const Snippets = () => (
   <div className="content-section">
@@ -32,32 +33,39 @@ const Settings = () => (
 );
 
 const PortfolioSiteManager = () => {
-  const navigate = useNavigate(); // ✅ Moved here correctly
+  const navigate = useNavigate();
 
-  const [activeSection, setActiveSection] = useState('snippets');
+  // Initialize activeSection from localStorage or default to 'snippets'
+  const [activeSection, setActiveSection] = useState(
+    localStorage.getItem('activeSection') || 'snippets'
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Update localStorage whenever activeSection changes
+  useEffect(() => {
+    localStorage.setItem('activeSection', activeSection);
+  }, [activeSection]);
+
   // Check authentication status on mount
- 
   useEffect(() => {
     const verifyToken = async () => {
       try {
         const token = localStorage.getItem('token');
-        
+
         // Make request with Authorization header
         const response = await axios.get(
           'https://connectwithaaditiyamg.onrender.com/api/admin/verify',
           {
-            withCredentials: true, // Still try to send cookies
+            withCredentials: true,
             headers: {
-              Authorization: token ? `Bearer ${token}` : '' // Also send token in header
-            }
+              Authorization: token ? `Bearer ${token}` : '',
+            },
           }
         );
-        
+
         setIsAuthenticated(true);
       } catch (err) {
         console.error('Authentication failed:', err);
@@ -66,9 +74,10 @@ const PortfolioSiteManager = () => {
         setLoading(false);
       }
     };
-  
+
     verifyToken();
   }, []);
+
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -83,8 +92,9 @@ const PortfolioSiteManager = () => {
         { withCredentials: true }
       );
 
-      // Clear any client-side token (if stored in localStorage, optional)
+      // Clear client-side token and activeSection
       localStorage.removeItem('token');
+      localStorage.removeItem('activeSection');
 
       // Update state to reflect logged-out status
       setIsAuthenticated(false);
@@ -111,11 +121,11 @@ const PortfolioSiteManager = () => {
       case 'message':
         return <Messages />;
       case 'adminpost':
-        return<Adminpost/>;
-     case 'socialpost':
-      return<Socialpost/>
-     case 'project':
-       return<Project/>
+        return <Adminpost />;
+      case 'socialpost':
+        return <Socialpost />;
+      case 'project':
+        return <Project />;
       case 'snippets':
       default:
         return <Snippets />;
@@ -143,8 +153,7 @@ const PortfolioSiteManager = () => {
           {successMessage && <div className="success-message">{successMessage}</div>}
           <h2>Please Log In</h2>
           <p>You need to be authenticated to access the Portfolio Site Manager.</p>
-          {/* Add a link to login page if available */}
-          <button className="btn btn-primary" onClick={() => window.location.href = '/login'}>
+          <button className="btn btn-primary" onClick={() => navigate('/login')}>
             Go to Login
           </button>
         </div>
@@ -177,19 +186,19 @@ const PortfolioSiteManager = () => {
           >
             Messages
           </button>
-           <button
+          <button
             className={`nav-btn ${activeSection === 'adminpost' ? 'active' : ''}`}
             onClick={() => setActiveSection('adminpost')}
           >
             Posts
           </button>
-           <button
+          <button
             className={`nav-btn ${activeSection === 'socialpost' ? 'active' : ''}`}
             onClick={() => setActiveSection('socialpost')}
           >
             Social Posts
           </button>
-            <button
+          <button
             className={`nav-btn ${activeSection === 'project' ? 'active' : ''}`}
             onClick={() => setActiveSection('project')}
           >

@@ -1017,9 +1017,6 @@ const handleAddImage = async () => {
                         )}
                         
                         <div className="card-footer">
-                          <div className="author-info">
-                            {blog.author?.name || 'Unknown Author'}
-                          </div>
                           <div className="card-actions">
                             <button 
                               onClick={() => handleViewAnalytics(blog)}

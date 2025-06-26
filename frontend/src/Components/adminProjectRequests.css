@@ -1,34 +1,37 @@
+/* Project.css - Modern Black & White Sober Theme */
+
 /* Main container */
 .pr-main-container {
-  max-width: 1280px;
+  max-width: 1400px; /* Slightly wider for modern screens */
   margin: 0 auto;
-  padding: 40px 20px;
-  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 48px 24px; /* Increased padding for a spacious feel */
+  background: #f8f8f8; /* Light gray background */
 }
 
 /* Section title */
 .pr-section-title {
-  font-size: 32px;
+  font-size: 2.25rem; /* Slightly larger for emphasis */
   font-weight: 800;
-  color: #1e293b;
-  font-family: 'Inter', Arial, sans-serif;
-  margin-bottom: 40px;
+  color: #000000; /* Black text */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin-bottom: 48px;
   text-align: center;
   letter-spacing: -0.02em;
 }
 
 /* Card container */
 .pr-card {
-  background: #ffffff;
-  border-radius: 16px;
+  background: #ffffff; /* White background */
+  border-radius: 16px; /* Rounded corners */
   padding: 32px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  border: 1px solid #d1d5db;
-  transition: transform 0.3s ease;
+  border: 1px solid #e0e0e0; /* Light gray border */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .pr-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* Notification styles */
@@ -36,24 +39,16 @@
   padding: 16px 24px;
   border-radius: 10px;
   margin-bottom: 24px;
-  font-size: 15px;
-  font-family: 'Inter', Arial, sans-serif;
+  font-size: 0.9375rem; /* Slightly larger for readability */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   display: flex;
   align-items: center;
   gap: 10px;
   animation: slideIn 0.3s ease;
-}
-
-.pr-notification-success {
-  background: #d1fae5;
-  color: #065f46;
-  border-left: 4px solid #10b981;
-}
-
-.pr-notification-error {
-  background: #fee2e2;
-  color: #991b1b;
-  border-left: 4px solid #ef4444;
+  background: #ffffff; /* White background */
+  color: #000000; /* Black text */
+  border-left: 4px solid #000000; /* Black border for emphasis */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 /* Table styles */
@@ -61,60 +56,54 @@
   overflow-x: auto;
   border-radius: 10px;
   background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .pr-data-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Inter', Arial, sans-serif;
-  font-size: 15px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.9375rem;
 }
 
 .pr-table-header {
-  background: #f1f5f9;
+  background: #f5f5f5; /* Light gray background */
 }
 
 .pr-table-header-cell {
   padding: 16px;
   font-weight: 700;
-  color: #1e293b;
+  color: #000000; /* Black text */
   text-align: left;
-  border-bottom: 2px solid #d1d5db;
+  border-bottom: 2px solid #e0e0e0;
   white-space: nowrap;
 }
 
 .pr-table-row {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   transition: background-color 0.2s ease;
 }
 
 .pr-table-row:hover {
-  background: #f8fafc;
+  background: #f8f8f8; /* Light gray hover */
 }
 
 .pr-table-cell {
   padding: 16px;
-  color: #475569;
+  color: #666666; /* Gray text for secondary content */
   vertical-align: middle;
 }
 
 /* Status styles */
-.pr-status-acknowledged {
-  color: #047857;
-  text-transform: capitalize;
-  font-weight: 600;
-  background: #ecfdf5;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
+.pr-status-acknowledged,
 .pr-status-pending {
-  color: #b45309;
+  color: #000000; /* Black text */
   text-transform: capitalize;
   font-weight: 600;
-  background: #fefce8;
+  background: #ffffff; /* White background */
   padding: 4px 8px;
   border-radius: 6px;
+  border: 1px solid #000000; /* Black border */
 }
 
 /* Button styles */
@@ -122,17 +111,17 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #2563eb;
+  color: #000000; /* Black text */
   background: none;
   border: none;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .pr-view-button:hover {
-  color: #1e40af;
+  color: #333333; /* Darker gray hover */
   transform: translateY(-1px);
 }
 
@@ -140,11 +129,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #10b981;
-  color: #ffffff;
+  background: #000000; /* Black background */
+  color: #ffffff; /* White text */
   padding: 12px 24px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   border: none;
   cursor: pointer;
@@ -153,13 +142,15 @@
 }
 
 .pr-acknowledge-button:hover:not(:disabled) {
-  background: #059669;
+  background: #333333; /* Darker gray hover */
   transform: translateY(-1px);
 }
 
 .pr-acknowledge-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  background: #e0e0e0; /* Light gray for disabled */
+  color: #999999; /* Muted gray text */
 }
 
 .pr-button-icon {
@@ -199,19 +190,19 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 16px;
 }
 
 .pr-modal-title {
-  font-size: 24px;
+  font-size: 1.5rem; /* Slightly larger for emphasis */
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
 }
 
 .pr-close-button {
   font-size: 30px;
-  color: #64748b;
+  color: #666666; /* Gray icon */
   background: none;
   border: none;
   cursor: pointer;
@@ -219,7 +210,7 @@
 }
 
 .pr-close-button:hover {
-  color: #1e293b;
+  color: #000000; /* Black on hover */
 }
 
 .pr-modal-body {
@@ -234,17 +225,17 @@
 }
 
 .pr-modal-label {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: #1e293b;
+  color: #000000;
   margin-bottom: 8px;
 }
 
 .pr-modal-text {
-  font-size: 15px;
-  color: #475569;
+  font-size: 0.9375rem;
+  color: #666666; /* Gray text */
   line-height: 1.6;
-  background: #f8fafc;
+  background: #f8f8f8; /* Light gray background */
   padding: 12px;
   border-radius: 6px;
 }
@@ -253,16 +244,17 @@
   max-width: 100%;
   height: auto;
   border-radius: 10px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #e0e0e0;
   margin-top: 8px;
 }
 
 .pr-error-text {
-  color: #991b1b;
-  font-size: 15px;
+  color: #000000; /* Black text */
+  font-size: 0.9375rem;
   padding: 12px;
-  background: #fee2e2;
+  background: #ffffff; /* White background */
   border-radius: 6px;
+  border: 1px solid #000000; /* Black border */
 }
 
 /* Loading spinner */
@@ -276,27 +268,24 @@
 .pr-spinner {
   animation: pr-spin 1s linear infinite;
   font-size: 32px;
-  color: #64748b;
+  color: #666666; /* Gray spinner */
 }
 
 @keyframes pr-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Empty state */
 .pr-empty-text {
-  color: #64748b;
-  font-size: 16px;
+  color: #666666; /* Gray text */
+  font-size: 1rem;
   text-align: center;
   padding: 32px;
-  font-family: 'Inter', Arial, sans-serif;
-  background: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f8f8f8;
   border-radius: 10px;
+  border: 1px solid #e0e0e0;
 }
 
 /* Animations */
@@ -315,14 +304,33 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #666666;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
 /* Responsive design */
 @media (max-width: 1024px) {
   .pr-main-container {
-    padding: 24px 16px;
+    padding: 32px 16px;
   }
 
   .pr-section-title {
-    font-size: 28px;
+    font-size: 2rem;
   }
 
   .pr-card {
@@ -330,7 +338,7 @@
   }
 
   .pr-data-table {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .pr-table-header-cell,
@@ -341,11 +349,11 @@
 
 @media (max-width: 768px) {
   .pr-main-container {
-    padding: 16px 12px;
+    padding: 24px 12px;
   }
 
   .pr-section-title {
-    font-size: 24px;
+    font-size: 1.75rem;
   }
 
   .pr-card {
@@ -353,11 +361,11 @@
   }
 
   .pr-table-container {
-    margin: 0 -16px;
+    margin: 0 -12px;
   }
 
   .pr-data-table {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .pr-table-header-cell,
@@ -371,25 +379,25 @@
   }
 
   .pr-modal-title {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
 }
 
 @media (max-width: 480px) {
   .pr-section-title {
-    font-size: 20px;
+    font-size: 1.5rem;
     margin-bottom: 24px;
   }
 
   .pr-notification {
     padding: 12px 16px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .pr-view-button,
   .pr-acknowledge-button {
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .pr-button-icon {
@@ -403,10 +411,71 @@
   .pr-modal-label,
   .pr-modal-text,
   .pr-error-text {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .pr-modal-body {
     gap: 16px;
+  }
+}
+
+/* Accessibility */
+@media (prefers-contrast: high) {
+  .pr-card,
+  .pr-table-container,
+  .pr-modal-content,
+  .pr-notification,
+  .pr-empty-text {
+    border: 2px solid #000000;
+  }
+
+  .pr-view-button,
+  .pr-acknowledge-button {
+    color: #000000;
+  }
+
+  .pr-acknowledge-button {
+    background: #000000;
+    color: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-card,
+  .pr-view-button,
+  .pr-acknowledge-button,
+  .pr-notification,
+  .pr-modal-content {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Focus Styles */
+.pr-view-button:focus-visible,
+.pr-acknowledge-button:focus-visible,
+.pr-close-button:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+  .pr-main-container {
+    background: #ffffff;
+  }
+
+  .pr-card,
+  .pr-table-container,
+  .pr-notification,
+  .pr-empty-text {
+    box-shadow: none;
+    border: 1px solid #000000;
+  }
+
+  .pr-view-button,
+  .pr-acknowledge-button,
+  .pr-modal-overlay {
+    display: none;
   }
 }
