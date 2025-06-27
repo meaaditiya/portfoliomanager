@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './Header.css'; // Using the same CSS file as your main header
 
 const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState(null);
 
   const handleRefresh = () => {
     window.location.reload();
@@ -32,6 +35,38 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     { name: 'Projects', path: '/project' },
     { name: 'Social Posts', path: '/socialpost' },
   ];
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    setMessage(null);
+    try {
+      // Call logout API
+      await axios.post(
+        'https://connectwithaaditiyamg.onrender.com/api/admin/logout',
+        {},
+        { withCredentials: true }
+      );
+
+      // Clear client-side token
+      localStorage.removeItem('token');
+
+      // Show success message
+      setMessage({ type: 'success', text: 'Logged out successfully!' });
+
+      // Navigate to login after 2 seconds
+      setTimeout(() => {
+        navigate('/login');
+        setIsLoading(false);
+      }, 2000);
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Logout failed. Please try again.',
+      });
+      setIsLoading(false);
+    }
+  };
 
   return (
     <header className="portfolio-header">
@@ -64,6 +99,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
             onClick={handleRefresh}
             className="control-btn"
             title="Refresh Page"
+            disabled={isLoading}
           >
             ↻
           </button>
@@ -71,18 +107,33 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
             onClick={handleFullscreen}
             className="control-btn"
             title={document.fullscreenElement ? "Exit Fullscreen" : "Enter Fullscreen"}
+            disabled={isLoading}
           >
             {document.fullscreenElement ? '⤓' : '⤢'}
           </button>
           <button 
-            onClick={onLogout}
+            onClick={handleLogout}
             className="control-btn1"
             title="Logout"
+            disabled={isLoading}
           >
-            Logout
+            {isLoading ? <span className="spinner"></span> : 'Logout'}
           </button>
         </div>
       </div>
+      {message && (
+        <div className={`${message.type}-message`}>
+          {message.text}
+          {message.type === 'error' && (
+            <button
+              className="dismiss-btn"
+              onClick={() => setMessage(null)}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
     </header>
   );
 };

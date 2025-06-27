@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { Turnstile } from '@marsidev/react-turnstile';
-import '../ComponentsCSS/auth.css';
+import '../ComponentsCSS/auth.css'; // Updated to unique CSS file
+
 const Login = () => {
   const navigate = useNavigate();
   const turnstileRef = useRef(null);
@@ -104,7 +105,7 @@ const Login = () => {
         localStorage.setItem('token', response.data.token);
       }
       // Navigate to success page
-      navigate('/adminpost');
+      navigate('/welcome');
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
       setTurnstileToken(null);
@@ -187,9 +188,9 @@ const Login = () => {
   
   const getPasswordStrengthClass = () => {
     switch (passwordStrength) {
-      case 1: return 'strength-weak';
-      case 2: return 'strength-medium';
-      case 3: return 'strength-strong';
+      case 1: return 'login-strength-weak';
+      case 2: return 'login-strength-medium';
+      case 3: return 'login-strength-strong';
       default: return '';
     }
   };
@@ -205,12 +206,12 @@ const Login = () => {
   
   // Login Form
   const renderLoginForm = () => (
-    <div className={`form-container ${animating ? 'fade-out' : 'fade-in'}`}>
+    <div className={`login-form-container ${animating ? 'login-fade-out' : 'login-fade-in'}`}>
       <h2>Portfolio Admin Login</h2>
-      {error && <div className="error-box">{error}</div>}
-      {message && <div className="success-box">{message}</div>}
+      {error && <div className="login-error-box">{error}</div>}
+      {message && <div className="login-success-box">{message}</div>}
       <form onSubmit={handleLoginSubmit}>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>Email</label>
           <input
             type="email"
@@ -221,7 +222,7 @@ const Login = () => {
             autoFocus
           />
         </div>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>Password</label>
           <input
             type="password"
@@ -231,7 +232,7 @@ const Login = () => {
             required
           />
         </div>
-        <div className="form-group turnstile-container">
+        <div className="login-form-group login-turnstile-container">
           <Turnstile
             ref={turnstileRef}
             siteKey={siteKey}
@@ -253,22 +254,21 @@ const Login = () => {
             refreshExpired="auto"
           />
         </div>
-        <div className="form-actions">
+        <div className="login-form-actions">
           <button 
             type="submit" 
-            className="submit-btn"
+            className="login-submit-btn"
             disabled={loading || !turnstileToken}
           >
             {loading ? 'Processing...' : 'Login'}
           </button>
-          <div className="form-links">
+          <div className="login-form-links">
             <span 
               onClick={() => changeView('forgotPassword')}
-              className="text-link"
+              className="login-text-link"
             >
               Forgot Password?
             </span>
-           
           </div>
         </div>
       </form>
@@ -277,12 +277,12 @@ const Login = () => {
   
   // Forgot Password Form
   const renderForgotPasswordForm = () => (
-    <div className={`form-container ${animating ? 'fade-out' : 'fade-in'}`}>
+    <div className={`login-form-container ${animating ? 'login-fade-out' : 'login-fade-in'}`}>
       <h2>Forgot Password</h2>
-      {error && <div className="error-box">{error}</div>}
-      {message && <div className="success-box">{message}</div>}
+      {error && <div className="login-error-box">{error}</div>}
+      {message && <div className="login-success-box">{message}</div>}
       <form onSubmit={handleForgotPassword}>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>Email</label>
           <input
             type="email"
@@ -292,7 +292,7 @@ const Login = () => {
             autoFocus
           />
         </div>
-        <div className="form-group turnstile-container">
+        <div className="login-form-group login-turnstile-container">
           <Turnstile
             ref={turnstileRef}
             siteKey={siteKey}
@@ -314,17 +314,17 @@ const Login = () => {
             refreshExpired="auto"
           />
         </div>
-        <div className="form-actions">
+        <div className="login-form-actions">
           <button 
             type="button" 
-            className="secondary-btn"
+            className="login-secondary-btn"
             onClick={() => changeView('login')}
           >
             Back to Login
           </button>
           <button 
             type="submit" 
-            className="submit-btn"
+            className="login-submit-btn"
             disabled={loading || !turnstileToken}
           >
             {loading ? 'Processing...' : 'Send Reset Link'}
@@ -336,12 +336,12 @@ const Login = () => {
   
   // OTP Verification & Reset Password Form
   const renderResetOTPForm = () => (
-    <div className={`form-container ${animating ? 'fade-out' : 'fade-in'}`}>
+    <div className={`login-form-container ${animating ? 'login-fade-out' : 'login-fade-in'}`}>
       <h2>Enter OTP</h2>
-      {error && <div className="error-box">{error}</div>}
-      {message && <div className="success-box">{message}</div>}
+      {error && <div className="login-error-box">{error}</div>}
+      {message && <div className="login-success-box">{message}</div>}
       <form onSubmit={handleResetPassword}>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>OTP Code</label>
           <input
             type="text"
@@ -352,8 +352,9 @@ const Login = () => {
             required
             autoFocus
           />
+       Block
         </div>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>New Password</label>
           <input
             type="password"
@@ -364,16 +365,16 @@ const Login = () => {
           />
           {resetData.newPassword && (
             <>
-              <div className="password-strength">
-                <div className={`password-strength-meter ${getPasswordStrengthClass()}`}></div>
+              <div className="login-password-strength">
+                <div className={`login-password-strength-meter ${getPasswordStrengthClass()}`}></div>
               </div>
-              <div className="password-strength-label">
+              <div className="login-password-strength-label">
                 {getPasswordStrengthLabel()}
               </div>
             </>
           )}
         </div>
-        <div className="form-group">
+        <div className="login-form-group">
           <label>Confirm New Password</label>
           <input
             type="password"
@@ -383,22 +384,22 @@ const Login = () => {
             required
           />
           {resetData.confirmPassword && resetData.newPassword !== resetData.confirmPassword && (
-            <div className="error-text">
+            <div className="login-error-text">
               Passwords do not match
             </div>
           )}
         </div>
-        <div className="form-actions">
+        <div className="login-form-actions">
           <button 
             type="button" 
-            className="secondary-btn"
+            className="login-secondary-btn"
             onClick={() => changeView('login')}
           >
             Back to Login
           </button>
           <button 
             type="submit" 
-            className="submit-btn"
+            className="login-submit-btn"
             disabled={loading || resetData.newPassword !== resetData.confirmPassword || passwordStrength < 2}
           >
             {loading ? 'Processing...' : 'Reset Password'}
@@ -420,11 +421,10 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-box">
-        <div className="logo-container">
-         
-          <div className="app-title">Portfolio Admin</div>
+    <div className="login-auth-container">
+      <div className="login-auth-box">
+        <div className="login-logo-container">
+          <div className="login-app-title">Portfolio Admin</div>
         </div>
         {renderCurrentView()}
       </div>
