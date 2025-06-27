@@ -104,7 +104,7 @@ const Login = () => {
         localStorage.setItem('token', response.data.token);
       }
       // Navigate to success page
-      navigate('/mainsection');
+      navigate('/adminpost');
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
       setTurnstileToken(null);

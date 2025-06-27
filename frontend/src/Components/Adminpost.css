@@ -19,6 +19,7 @@ body {
   max-width: 1400px; /* Slightly wider for modern screens */
   margin: 0 auto;
   padding: 1.5rem;
+  margin-top:40px;
 }
 
 /* Typography */

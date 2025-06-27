@@ -11,7 +11,7 @@ const Home = () => {
     
     if (token) {
       // If token exists, navigate to main section automatically
-      navigate('/mainsection');
+      navigate('/welcome');
     }
   }, [navigate]);
 
