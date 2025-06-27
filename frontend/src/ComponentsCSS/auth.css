@@ -17,7 +17,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   max-width: 400px;
   width: 100%;
-  padding: 32px;
+  padding: 35px;
   box-sizing: border-box;
   transition: transform 0.3s ease;
 }
@@ -292,7 +292,7 @@
 
 @media (max-width: 480px) {
   .login-auth-container {
-    padding: 12px;
+    padding: 5px;
   }
 
   .login-auth-box {
