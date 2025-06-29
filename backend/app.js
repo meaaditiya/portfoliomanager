@@ -3616,21 +3616,43 @@ app.get('/api/ping', (req, res) => {
   console.log(`[${timestamp}] Ping received from ${req.ip}`);
   res.status(200).json({ message: 'Server is alive!', timestamp });
 });
-// Add these at the top of your app.js file
 const multer = require('multer');
+
+// Configure multer for file uploads - store in memory
 const storage = multer.memoryStorage();
-const upload = multer({ 
+
+const fileFilter = (req, file, cb) => {
+  // Allow various file types
+  const allowedTypes = [
+    // Images
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+    // Documents
+    'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Spreadsheets
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // Presentations
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    // Text files
+    'text/plain', 'text/csv',
+    // Archives
+    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+    // Others
+    'application/json', 'application/xml'
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File type ${file.mimetype} is not supported`), false);
+  }
+};
+
+const upload = multer({
   storage: storage,
+  fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    // Accept only image files
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
-    }
+    fileSize: 10 * 1024 * 1024, // 10MB limit per file
+    files: 5 // Maximum 5 files
   }
 });
 
@@ -4673,8 +4695,9 @@ app.get('/api/social-embeds/platform/:platform', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Multer configuration for multiple file types (store in memory)
 
-// Project Request Schema
+// Updated Project Request Schema with multiple files support
 const projectRequestSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -4723,10 +4746,32 @@ const projectRequestSchema = new mongoose.Schema({
     trim: true,
     default: null
   },
-  image: {
-    type: Buffer,
-    default: null
-  },
+  files: [{
+    filename: {
+      type: String,
+      required: true
+    },
+    originalName: {
+      type: String,
+      required: true
+    },
+    mimetype: {
+      type: String,
+      required: true
+    },
+    size: {
+      type: Number,
+      required: true
+    },
+    data: {
+      type: Buffer,
+      required: true
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   status: {
     type: String,
     enum: ['pending', 'acknowledged'],
@@ -4741,14 +4786,28 @@ const projectRequestSchema = new mongoose.Schema({
 const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
 
 // Routes
-// Submit project request (accessible to anyone)
-app.post('/api/project/submit', upload.single('image'), async (req, res) => {
+// Submit project request with multiple files (accessible to anyone)
+app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
   try {
     const { name, email, projectType, description, budget, timeline, features, techPreferences, additionalInfo } = req.body;
 
     // Validate required inputs
     if (!name || !email || !projectType || !description) {
       return res.status(400).json({ message: 'Name, email, project type, and description are required' });
+    }
+
+    // Process uploaded files
+    const files = [];
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file, index) => {
+        files.push({
+          filename: `${Date.now()}_${index}_${file.originalname}`,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          data: file.buffer
+        });
+      });
     }
 
     // Create new project request
@@ -4762,23 +4821,29 @@ app.post('/api/project/submit', upload.single('image'), async (req, res) => {
       features: features || null,
       techPreferences: techPreferences || null,
       additionalInfo: additionalInfo || null,
-      image: req.file ? req.file.buffer : null
+      files: files
     });
 
     await newRequest.save();
 
     // Send confirmation email to user
+    const fileList = files.length > 0 ? 
+      `<p><strong>Uploaded files:</strong></p><ul>${files.map(f => `<li>${f.originalName} (${(f.size / 1024).toFixed(2)} KB)</li>`).join('')}</ul>` : 
+      '<p>No files uploaded.</p>';
+
     const confirmationEmail = `
       <h1>Project Request Received</h1>
       <p>Hello ${name},</p>
       <p>Your project request of type "${projectType}" has been received.</p>
+      ${fileList}
       <p>We will review your request and get back to you soon.</p>
     `;
 
     await sendEmail(email, 'Project Request Confirmation', confirmationEmail);
 
     res.status(201).json({
-      message: 'Project request submitted successfully. Check your email for confirmation.'
+      message: 'Project request submitted successfully. Check your email for confirmation.',
+      filesUploaded: files.length
     });
   } catch (error) {
     console.error('Project submission error:', error);
@@ -4786,12 +4851,12 @@ app.post('/api/project/submit', upload.single('image'), async (req, res) => {
   }
 });
 
-// Get all project requests (admin only)
+// Get all project requests (admin only) - exclude file data for performance
 app.get('/api/admin/project/requests', authenticateToken, async (req, res) => {
   try {
     const requests = await ProjectRequest.find()
       .sort({ createdAt: -1 })
-      .select('-image'); // Exclude image data for list view
+      .select('-files.data'); // Exclude file data for list view
 
     res.json({ requests });
   } catch (error) {
@@ -4800,7 +4865,7 @@ app.get('/api/admin/project/requests', authenticateToken, async (req, res) => {
   }
 });
 
-// Get single project request with image (admin only)
+// Get single project request with files (admin only)
 app.get('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -4813,6 +4878,36 @@ app.get('/api/admin/project/requests/:id', authenticateToken, async (req, res) =
     res.json({ request });
   } catch (error) {
     console.error('Error fetching project request details:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Download specific file from project request (admin only)
+app.get('/api/admin/project/requests/:id/files/:fileIndex', authenticateToken, async (req, res) => {
+  try {
+    const { id, fileIndex } = req.params;
+
+    const request = await ProjectRequest.findById(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Project request not found' });
+    }
+
+    const fileIdx = parseInt(fileIndex);
+    if (fileIdx < 0 || fileIdx >= request.files.length) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    const file = request.files[fileIdx];
+    
+    res.set({
+      'Content-Type': file.mimetype,
+      'Content-Disposition': `attachment; filename="${file.originalName}"`,
+      'Content-Length': file.size
+    });
+
+    res.send(file.data);
+  } catch (error) {
+    console.error('Error downloading file:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -4853,6 +4948,39 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
     res.status(500).json({ message: error.message });
   }
 });
+
+// Delete specific project request (admin only)
+app.delete('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deletedRequest = await ProjectRequest.findByIdAndDelete(id);
+    if (!deletedRequest) {
+      return res.status(404).json({ message: 'Project request not found' });
+    }
+    
+    res.json({ message: 'Project request deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project request:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete all project requests (admin only)
+app.delete('/api/admin/project/requests', authenticateToken, async (req, res) => {
+  try {
+    const result = await ProjectRequest.deleteMany({});
+    
+    res.json({ 
+      message: 'All project requests deleted successfully',
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    console.error('Error deleting all project requests:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
