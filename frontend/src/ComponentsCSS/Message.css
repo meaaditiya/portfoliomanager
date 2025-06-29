@@ -48,7 +48,7 @@
 .insta-notification-toast.error {
   background-color: #ffffff;
   color: #000000;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
 }
 
 /* Stats Tabs */
@@ -62,7 +62,7 @@
 
 .insta-stat-tab {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   padding: 10px 16px;
   border-radius: 12px;
   cursor: pointer;
@@ -132,7 +132,7 @@
 /* Conversations List */
 .insta-messages-list-container {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   border-radius: 8px;
   overflow-y: auto;
   max-height: 70vh;
@@ -187,7 +187,7 @@
   position: absolute;
   bottom: 0;
   right: 0;
-  border: 2px solid #ffffff;
+  border: 0.2px solid #ffffff;
 }
 
 .insta-conversation-details {
@@ -274,7 +274,7 @@
 .insta-action-btn {
   background-color: #000000;
   color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   padding: 8px;
   border-radius: 12px;
   cursor: pointer;
@@ -298,7 +298,7 @@
 /* Chat View */
 .insta-chat-container {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   border-radius: 8px;
   max-height: 80vh;
   display: flex;
@@ -310,7 +310,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 2px solid #000000;
+  border-bottom: 0.1px solid #000000;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -318,7 +318,7 @@
 .insta-back-button {
   background-color: #ffffff;
   color: #000000;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   padding: 8px 12px;
   border-radius: 12px;
   cursor: pointer;
@@ -422,7 +422,7 @@
 
 .insta-received-message {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   margin-right: auto;
 }
 
@@ -492,12 +492,12 @@
 
 .insta-chat-input-area {
   padding: 16px;
-  border-top: 2px solid #000000;
+  border-top: 0.1px solid #000000;
 }
 
 .insta-selected-message-preview {
   background-color: #f5f5f5;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
@@ -547,7 +547,7 @@
   display: flex;
   align-items: center;
   width: 100%;
-  border: 2px solid #000000;
+  border: 0.2px none #000000;
   border-radius: 12px;
   padding: 8px;
   background-color: #ffffff;
@@ -563,7 +563,24 @@
   resize: none;
   padding: 8px;
 }
-
+.mark-all-read,
+.mark-all-unread,
+.delete-all{
+  background-color: white;
+  color:black;
+  padding:8px;
+  border-radius: 10px;
+  border: 1px solid black
+}
+.mark-all-read:hover,
+.mark-all-unread:hover,
+.delete-all:hover{
+  cursor:pointer;
+}
+.icon1{
+  position: relative;
+  left:10px;
+}
 .insta-message-input:focus {
   outline: none;
 }
@@ -571,7 +588,7 @@
 .insta-send-button {
   background-color: #000000;
   color: #ffffff;
-  border: 2px solid #000000;
+  border: 0.2px solid #000000;
   padding: 8px 12px;
   border-radius: 12px;
   cursor: pointer;

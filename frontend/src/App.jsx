@@ -27,7 +27,6 @@ function AppContent() {
   useEffect(() => {
     const publicRoutes = ['/', '/login'];
     const token = localStorage.getItem('token');
-
     if (!token && !publicRoutes.includes(location.pathname)) {
       // Show redirect message briefly
       setRedirectMessage('Please log in to access this page.');

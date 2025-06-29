@@ -318,7 +318,7 @@ const Messages = () => {
             </div>
             <div className="insta-chat-actions">
               <button 
-                className="insta-action-button mark-read"
+                className="mark-all-read"
                 onClick={() => markConversationAsRead(currentConversation.email)}
                 disabled={actionLoading === `read-${currentConversation.email}`}
                 title="Mark all as read"
@@ -326,11 +326,12 @@ const Messages = () => {
                 {actionLoading === `read-${currentConversation.email}` ? (
                   <FaSpinner className="insta-spinner" />
                 ) : (
-                  <FaEye />
+                  <FaEye classname="icon1"/>
                 )}
+                mark all read
               </button>
               <button 
-                className="insta-action-button mark-unread"
+                className="mark-all-unread"
                 onClick={() => markConversationAsUnread(currentConversation.email)}
                 disabled={actionLoading === `unread-${currentConversation.email}`}
                 title="Mark all as unread"
@@ -338,11 +339,12 @@ const Messages = () => {
                 {actionLoading === `unread-${currentConversation.email}` ? (
                   <FaSpinner className="insta-spinner" />
                 ) : (
-                  <FaEyeSlash />
+                  <FaEyeSlash  classname="icon1"/>
                 )}
+                 mark all unread
               </button>
               <button 
-                className="insta-action-button delete"
+                className="delete-all"
                 onClick={() => deleteConversation(currentConversation.email)}
                 disabled={actionLoading === `delete-${currentConversation.email}`}
                 title="Delete conversation"
@@ -350,8 +352,9 @@ const Messages = () => {
                 {actionLoading === `delete-${currentConversation.email}` ? (
                   <FaSpinner className="insta-spinner" />
                 ) : (
-                  <FaTrash />
+                  <FaTrash  classname="icon1"/>
                 )}
+                 delete all
               </button>
             </div>
           </div>

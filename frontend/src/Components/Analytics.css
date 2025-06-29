@@ -7,35 +7,52 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   line-height: 1.6;
   padding: 20px;
-  max-width: 1200px;
+  max-width: 1800px;
   margin: 0 auto;
+  margin-left: -30px;
+  margin-right: -30px;
 }
 
 /* Analytics Tabs */
 .analytics-tabs {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 24px;
-  border-bottom: 2px solid #e0e0e0;
+ 
+  flex-wrap: wrap;
+}
+.summary-card {
+  display: flex;
+  justify-content: space-around; /* Spread items */
+  align-items: center; /* Vertical alignment */
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .tab-btn {
   background-color: #ffffff;
   color: #333333;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 12px 24px;
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.3s ease;
-  border-radius: 0;
+  transition: all 0.2s ease;
+  border-radius: 25px;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {
   background-color: #f5f5f5;
   color: #000000;
+  transform: none;
 }
 
 .tab-btn.active {
@@ -70,11 +87,12 @@
 
 .error-message {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   color: #000000;
   padding: 16px;
   margin: 16px 0;
   font-weight: 500;
+  border-radius: 15px;
 }
 
 .empty-state {
@@ -94,12 +112,13 @@
 
 .summary-card {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
   transition: transform 0.2s ease;
+  border-radius: 15px;
 }
 
 .summary-card:hover {
@@ -115,6 +134,7 @@
   background-color: #000000;
   color: #ffffff;
   font-size: 20px;
+  border-radius: 50%;
 }
 
 .summary-data h3 {
@@ -135,8 +155,12 @@
 /* Tables */
 .reactions-table-container {
   overflow-x: auto;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   margin-bottom: 24px;
+  max-width: 1800px;
+  margin-left: -10px;
+  margin-right: -10px;
+  border-radius: 15px;
 }
 
 .reactions-table {
@@ -184,6 +208,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-radius: 20px;
 }
 
 .reaction-badge.like {
@@ -199,7 +224,7 @@
 /* Comments Tabs */
 .comments-tabs {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 24px;
   flex-wrap: wrap;
 }
@@ -207,7 +232,7 @@
 .comment-tab-btn {
   background-color: #ffffff;
   color: #333333;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 10px 16px;
   cursor: pointer;
   font-weight: 500;
@@ -215,11 +240,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 20px;
+  flex-shrink: 0;
 }
 
 .comment-tab-btn:hover {
   background-color: #f5f5f5;
+  transform: none;
 }
 
 .comment-tab-btn.active {
@@ -250,46 +278,50 @@
 .add-author-comment-btn1 {
   background-color: #000000;
   color: #ffffff;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 10px 16px;
   cursor: pointer;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 20px;
 }
 
 .add-author-comment-btn:hover {
   background-color: #333333;
+  transform: none;
 }
 
 /* Forms */
 .author-comment-form,
 .author-reply-form {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  
   padding: 20px;
   margin-bottom: 20px;
+  border-radius: 15px;
 }
 
 .author-comment-textarea,
 .author-reply-textarea {
   width: 100%;
   padding: 12px;
-  border: 2px solid #000000;
+ 
   background-color: #ffffff;
   color: #000000;
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
   margin-bottom: 8px;
+  border-radius: 10px;
 }
 
 .author-comment-textarea:focus,
 .author-reply-textarea:focus {
-  outline: none;
-  border-color: #333333;
+  
+ 
 }
 
 .character-count {
@@ -309,16 +341,18 @@
 /* Buttons */
 .btn {
   padding: 10px 16px;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   cursor: pointer;
   font-weight: 600;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  border-radius: 20px;
+  flex-shrink: 0;
 }
 
 .btn:disabled {
@@ -333,6 +367,7 @@
 
 .btn-primary:hover:not(:disabled) {
   background-color: #333333;
+  transform: none;
 }
 
 .btn-success {
@@ -342,6 +377,7 @@
 
 .btn-success:hover:not(:disabled) {
   background-color: #333333;
+  transform: none;
 }
 
 .btn-secondary {
@@ -351,11 +387,13 @@
 
 .btn-secondary:hover:not(:disabled) {
   background-color: #f5f5f5;
+  transform: none;
 }
 
 .btn-sm {
   padding: 6px 12px;
   font-size: 11px;
+  border-radius: 15px;
 }
 
 .btn-approve {
@@ -365,6 +403,7 @@
 
 .btn-approve:hover {
   background-color: #333333;
+  transform: none;
 }
 
 .btn-pending {
@@ -374,6 +413,7 @@
 
 .btn-pending:hover {
   background-color: #555555;
+  transform: none;
 }
 
 .btn-reject {
@@ -383,6 +423,7 @@
 
 .btn-reject:hover {
   background-color: #333333;
+  transform: none;
 }
 
 .btn-delete,
@@ -394,6 +435,7 @@
 .btn-delete:hover,
 .author-delete-btn:hover {
   background-color: #333333;
+  transform: none;
 }
 
 /* Comments List */
@@ -406,12 +448,14 @@
 
 .comment-card {
   background-color: #ffffff;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 20px;
+  border-radius: 15px;
 }
 
 .author-comment-card {
-  border-left: 6px solid #000000;
+  border-left: 4px solid #000000;
+  border-top:4px solid black;
 }
 
 .comment-header {
@@ -455,10 +499,11 @@
 .author-tag {
   background-color: #000000;
   color: #ffffff;
-  padding: 2px 8px;
+  padding: 1px 8px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-radius: 10px;
 }
 
 .comment-date,
@@ -476,7 +521,7 @@
 /* Comment Actions */
 .comment-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
   margin-top: 16px;
 }
@@ -486,24 +531,28 @@
   display: flex;
   gap: 12px;
   margin: 12px 0;
+  flex-wrap: wrap;
 }
 
 .comment-reaction-btn {
   background-color: #ffffff;
   color: #666666;
-  border: 2px solid #e0e0e0;
+  border: 1px solid #e0e0e0;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 12px;
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 15px;
+  flex-shrink: 0;
 }
 
 .comment-reaction-btn:hover {
   border-color: #000000;
   color: #000000;
+  transform: none;
 }
 
 .comment-reaction-btn.active {
@@ -516,7 +565,7 @@
 .comment-replies-section {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #e0e0e0;
+ 
 }
 
 .show-replies-btn {
@@ -527,23 +576,25 @@
   cursor: pointer;
   font-size: 12px;
   margin-bottom: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 15px;
 }
 
 .show-replies-btn:hover {
   background-color: #f5f5f5;
   color: #000000;
+  transform: none;
 }
 
 .comment-replies {
   margin-left: 20px;
-  border-left: 2px solid #e0e0e0;
+  border-left: 1px solid #e0e0e0;
   padding-left: 16px;
 }
 
 .comment-reply {
   padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+ 
 }
 
 .comment-reply:last-child {
@@ -554,6 +605,7 @@
   border-left: 3px solid #000000;
   padding-left: 12px;
   background-color: #fafafa;
+  border-radius: 8px;
 }
 
 .reply-header {
@@ -573,15 +625,15 @@
 
 /* Author Reply Section */
 .author-reply-section {
-  margin-top: 16px;
+  margin-top: -30px;
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+ 
 }
 
 .show-reply-form-btn {
   background-color: #ffffff;
   color: #000000;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 8px 12px;
   cursor: pointer;
   font-size: 12px;
@@ -590,11 +642,13 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 15px;
 }
 
 .show-reply-form-btn:hover {
   background-color: #f5f5f5;
+  transform: none;
 }
 
 /* Pagination */
@@ -609,17 +663,20 @@
 .pagination-btn {
   background-color: #ffffff;
   color: #000000;
-  border: 2px solid #000000;
+  border: 1px solid #000000;
   padding: 8px 12px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   min-width: 40px;
   text-align: center;
+  border-radius: 15px;
+  flex-shrink: 0;
 }
 
 .pagination-btn:hover:not(:disabled) {
   background-color: #f5f5f5;
+  transform: none;
 }
 
 .pagination-btn:disabled {
@@ -636,10 +693,12 @@
 @media (max-width: 768px) {
   .blog-analytics {
     padding: 16px;
+    margin-left: -30px;
+    margin-right: -30px;
   }
   
   .analytics-tabs {
-    flex-direction: column;
+    gap: 8px;
   }
   
   .tab-btn {
@@ -666,6 +725,8 @@
   
   .reactions-table-container {
     overflow-x: scroll;
+    margin-left: -5px;
+    margin-right: -5px;
   }
   
   .reactions-table th,
@@ -675,7 +736,7 @@
   }
   
   .comments-tabs {
-    flex-direction: column;
+    gap: 8px;
   }
   
   .comment-tab-btn {
@@ -693,7 +754,7 @@
   }
   
   .comment-actions {
-    flex-direction: column;
+    gap: 8px;
   }
   
   .btn {
@@ -702,7 +763,7 @@
   
   .form-actions,
   .reply-form-actions {
-    flex-direction: column;
+    gap: 8px;
   }
   
   .comment-replies {
@@ -719,11 +780,17 @@
     padding: 6px 10px;
     font-size: 12px;
   }
+  
+  .comment-reactions {
+    gap: 8px;
+  }
 }
 
 @media (max-width: 480px) {
   .blog-analytics {
     padding: 12px;
+    margin-left: -10px;
+    margin-right: -10px;
   }
   
   .summary-card {
@@ -751,5 +818,17 @@
   .btn-sm {
     padding: 4px 8px;
     font-size: 10px;
+  }
+  
+  .reactions-table-container {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .analytics-tabs,
+  .comments-tabs,
+  .comment-actions,
+  .comment-reactions {
+    gap: 6px;
   }
 }

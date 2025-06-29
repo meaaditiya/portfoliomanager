@@ -1,19 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import '../ComponentsCSS/Home.css';
 
 const Home = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // Check if token exists in localStorage
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      // If token exists, navigate to main section automatically
-      navigate('/welcome');
-    }
-  }, [navigate]);
+  
 
   return (
     <div className="home-container">

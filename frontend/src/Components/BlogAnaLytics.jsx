@@ -604,34 +604,25 @@ const BlogAnalytics = ({ blogId }) => {
           {activeTab === 'reactions' && (
             <div className="reactions-analytics">
               <div className="analytics-summary">
-                <div className="summary-card">
-                  <div className="summary-icon like-icon">
-                    <FaThumbsUp />
-                  </div>
-                  <div className="summary-data">
-                    <h3>{reactions.counts.likes}</h3>
-                    <p>Likes</p>
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-icon dislike-icon">
-                    <FaThumbsDown />
-                  </div>
-                  <div className="summary-data">
-                    <h3>{reactions.counts.dislikes}</h3>
-                    <p>Dislikes</p>
-                  </div>
-                </div>
-                <div className="summary-card">
-                  <div className="summary-icon total-icon">
-                    <FaCommentAlt />
-                  </div>
-                  <div className="summary-data">
-                    <h3>{reactions.counts.total}</h3>
-                    <p>Total Reactions</p>
-                  </div>
-                </div>
-              </div>
+  <div className="summary-card">
+    <div className="summary-item">
+      <FaThumbsUp />
+      <h3>{reactions.counts.likes}</h3>
+      <p>Likes</p>
+    </div>
+    <div className="summary-item">
+      <FaThumbsDown />
+      <h3>{reactions.counts.dislikes}</h3>
+      <p>Dislikes</p>
+    </div>
+    <div className="summary-item">
+      <FaCommentAlt />
+      <h3>{reactions.counts.total}</h3>
+      <p>Total</p>
+    </div>
+  </div>
+</div>
+
               
               <h3>Reaction Details</h3>
               {reactions.reactionsList.length === 0 ? (
