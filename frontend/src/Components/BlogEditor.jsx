@@ -1020,24 +1020,24 @@ const handleAddImage = async () => {
                           <div className="card-actions">
                             <button 
                               onClick={() => handleViewAnalytics(blog)}
-                              className="btn btn-analytics"
+                              className="btn3 btn-analytics1"
                               title="View blog analytics"
                             >
                               Analytics
                             </button>
                             <button 
                               onClick={() => handleEdit(blog)}
-                              className="btn btn-edit"
+                              className="btn3 btn-edit1"
                               title="Edit blog post"
                             >
-                              Edit
+                              Edit Blog
                             </button>
                             <button 
                               onClick={() => handleDelete(blog._id)}
-                              className="btn btn-delete"
+                              className="btn3 btn-delete1"
                               title="Delete blog post"
                             >
-                              Delete
+                              Delete It
                             </button>
                           </div>
                         </div>

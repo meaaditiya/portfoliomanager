@@ -353,3 +353,6 @@ html, body {
     transform: translateX(-50%) translateY(0);
   }
 }
+::-webkit-scrollbar {
+  width: 0px;
+}

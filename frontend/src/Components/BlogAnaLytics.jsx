@@ -604,23 +604,13 @@ const BlogAnalytics = ({ blogId }) => {
           {activeTab === 'reactions' && (
             <div className="reactions-analytics">
               <div className="analytics-summary">
-  <div className="summary-card">
-    <div className="summary-item">
-      <FaThumbsUp />
-      <h3>{reactions.counts.likes}</h3>
-      <p>Likes</p>
-    </div>
-    <div className="summary-item">
-      <FaThumbsDown />
-      <h3>{reactions.counts.dislikes}</h3>
-      <p>Dislikes</p>
-    </div>
-    <div className="summary-item">
-      <FaCommentAlt />
-      <h3>{reactions.counts.total}</h3>
-      <p>Total</p>
-    </div>
-  </div>
+<div className='blog-summary-card'>
+  <h3>
+    <p className="summary-stat">{reactions.counts.likes} <FaThumbsUp /> Likes</p>
+    <p className="summary-stat">{reactions.counts.dislikes} <FaThumbsDown /> Dislikes</p>
+    <p className="summary-stat">{reactions.counts.total} <FaCommentAlt /> Total</p>
+  </h3>
+</div>
 </div>
 
               

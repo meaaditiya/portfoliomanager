@@ -789,8 +789,8 @@
 @media (max-width: 480px) {
   .blog-analytics {
     padding: 12px;
-    margin-left: -10px;
-    margin-right: -10px;
+    margin-left: -30px;
+    margin-right: -40px;
   }
   
   .summary-card {
@@ -831,4 +831,31 @@
   .comment-reactions {
     gap: 6px;
   }
+}
+.blog-summary-card {
+  width: 100%;
+}
+
+.blog-summary-card h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: nowrap;
+  margin: 0;
+  gap: 0.5rem;
+}
+
+.summary-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin: 0;
+  white-space: nowrap;
+  font-size: clamp(1rem, 2.5vw, 2rem);
+  gap: 0.25rem;
+}
+
+.summary-stat svg {
+  flex-shrink: 0;
 }
