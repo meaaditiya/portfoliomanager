@@ -411,22 +411,8 @@ const AdminProjectRequests = () => {
   return (
     <div className="admin-container">
       <div className="header">
-        <h1>Project Requests Management</h1>
-      </div>
-
-      {success && (
-        <div className="notification success">
-          {success}
-        </div>
-      )}
-
-      {error && (
-        <div className="notification error">
-          {error}
-        </div>
-      )}
-      
-      <div className="header-actions">
+        <h1>Project Requests</h1>
+         <div className="header-actions">
         <button
           className="button2"
           onClick={fetchRequests}
@@ -444,6 +430,21 @@ const AdminProjectRequests = () => {
           </button>
         )}
       </div>
+      </div>
+
+      {success && (
+        <div className="notification success">
+          {success}
+        </div>
+      )}
+
+      {error && (
+        <div className="notification error">
+          {error}
+        </div>
+      )}
+      
+     
       
       {loading ? (
         <div className="loading">
