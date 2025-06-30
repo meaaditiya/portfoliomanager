@@ -313,7 +313,7 @@ const ImagePostManager = () => {
 
   return (
     <div className="container">
-      <h1 className="text-large bold mb-6">Image Post Manager</h1>
+      <h1 className="text-large bold mb-6">Posts</h1>
       
       {/* Alert */}
       {alert.show && (

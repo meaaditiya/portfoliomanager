@@ -16,10 +16,12 @@ body {
 
 /* Container */
 .container {
-  max-width: 1400px; /* Slightly wider for modern screens */
+  max-width: 1800px; /* Slightly wider for modern screens */
   margin: 0 auto;
   padding: 1.5rem;
   margin-top:40px;
+  margin-left: -10px;
+  margin-right:-10px;
 }
 
 /* Typography */
@@ -84,7 +86,7 @@ body {
 }
 
 .card:hover {
-  transform: translateY(-2px);
+ 
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -176,7 +178,7 @@ body {
 }
 
 .button:hover {
-  transform: translateY(-1px);
+ 
   background-color: #f5f5f5; /* Light gray hover */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -440,10 +442,7 @@ body {
     padding: 0.5rem 1rem;
   }
 
-  .button-group {
-    flex-direction: column;
-  }
-
+  
   .comment-header {
     flex-direction: column;
     gap: 0.5rem;

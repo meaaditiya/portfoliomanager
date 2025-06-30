@@ -184,8 +184,6 @@ const generateImagePreview = (contentImages, content) => {
     }));
   };
   
-
-  
   // Insert text at cursor position in textarea
   const insertTextAtCursor = (text) => {
     const textarea = document.getElementById('content');
@@ -207,61 +205,62 @@ const generateImagePreview = (contentImages, content) => {
   
   // Create or update blog post
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  try {
-    setLoading(true);
-    setError(null);
-    setSuccessMessage('');
+    e.preventDefault();
     
-    // Format tags
-    const tagsArray = formData.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag !== '');
-    
-    // Clean up contentImages to only include those referenced in content
-    const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
-    
-    const blogData = {
-      ...formData,
-      tags: tagsArray,
-      contentImages: cleanedImages
-    };
-    
-    let response;
-    
-    if (selectedBlog) {
-      // Update existing blog
-      response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
-        withCredentials: true
-      });
-      setSuccessMessage('Blog post updated successfully!');
-    } else {
-      // Create new blog
-      response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
-        withCredentials: true
-      });
-      setSuccessMessage('Blog post created successfully!');
-    }
-    
-    // Refresh blog list and reset form
-    fetchBlogs();
-    
-    // Show success message for 3 seconds then close editor
-    setTimeout(() => {
+    try {
+      setLoading(true);
+      setError(null);
       setSuccessMessage('');
-      setEditMode(false);
-      setSelectedBlog(null);
-    }, 3000);
-    
-  } catch (err) {
-    console.error('Error saving blog:', err);
-    setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+      
+      // Format tags
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag !== '');
+      
+      // Clean up contentImages to only include those referenced in content
+      const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
+      
+      const blogData = {
+        ...formData,
+        tags: tagsArray,
+        contentImages: cleanedImages
+      };
+      
+      let response;
+      
+      if (selectedBlog) {
+        // Update existing blog
+        response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
+          withCredentials: true
+        });
+        setSuccessMessage('Blog post updated successfully!');
+      } else {
+        // Create new blog
+        response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
+          withCredentials: true
+        });
+        setSuccessMessage('Blog post created successfully!');
+      }
+      
+      // Refresh blog list and reset form
+      fetchBlogs();
+      
+      // Show success message and automatically return to blog list
+      setTimeout(() => {
+        setSuccessMessage('');
+        setEditMode(false);
+        setSelectedBlog(null);
+        setViewMode('list');
+      }, 3000);
+      
+    } catch (err) {
+      console.error('Error saving blog:', err);
+      setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Delete blog post
   const handleDelete = async (blogId) => {
@@ -346,6 +345,7 @@ const generateImagePreview = (contentImages, content) => {
     }, 0);
   };
   
+  // Handle view analytics
   const handleViewAnalytics = (blog) => {
     setViewMode('analytics');
     setAnalyticsId(blog._id);
@@ -404,161 +404,155 @@ const generateImagePreview = (contentImages, content) => {
     // Scroll to top for better UX
     window.scrollTo(0, 0);
   };
+  
   const ContentImagesSection = ({ contentImages, content }) => {
-  const activeImages = generateImagePreview(contentImages, content);
-  
-  if (!activeImages || activeImages.length === 0) {
-    return null;
-  }
-  
-  return (
-    <div className="form-group">
-      <label>Content Images ({activeImages.length})</label>
-      <div className="content-images-list">
-        {activeImages.map((image, index) => (
-          <div key={image.imageId || index} className="content-image-item">
-            <img 
-              src={image.url} 
-              alt={image.alt} 
-              className="content-image-thumb"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://via.placeholder.com/50x50?text=Error';
-              }}
-            />
-            <div className="content-image-info">
-              <span className="image-id">[IMAGE:{image.imageId}]</span>
-              <span className="image-position">{image.position}</span>
-              {image.caption && <span className="image-caption">{image.caption}</span>}
-            </div>
-            <button
-              type="button"
-              className="btn btn-small btn-delete"
-              onClick={() => removeImageFromContent(image.imageId)}
-              title="Remove this image from content"
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-      </div>
-      <div className="helper-text">
-        Only images referenced in your content are shown above. 
-        Remove the [IMAGE:id] placeholder from your content to remove an image.
-      </div>
-    </div>
-  );
-};
-
-// Function to remove image placeholder from content
-const removeImageFromContent = (imageId) => {
-  const placeholder = `[IMAGE:${imageId}]`;
-  const newContent = formData.content.replace(new RegExp(escapeRegExp(placeholder), 'g'), '');
-  
-  // Update content and let handleInputChange clean up the images array
-  const updatedImages = cleanupContentImages(newContent, formData.contentImages);
-  
-  setFormData(prev => ({
-    ...prev,
-    content: newContent,
-    contentImages: updatedImages
-  }));
-};
-
-// Helper function to escape regex special characters
-const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-// Replace the existing Content Images Summary section in your JSX with:
-{formData.contentImages && formData.contentImages.length > 0 && (
-  <ContentImagesSection 
-    contentImages={formData.contentImages} 
-    content={formData.content} 
-  />
-)}
-
-// Enhanced image modal with better error handling
-const handleAddImage = async () => {
-  if (!imageModal.url.trim()) {
-    setError('Please enter an image URL');
-    return;
-  }
-  
-  // Basic URL validation
-  try {
-    new URL(imageModal.url);
-  } catch {
-    setError('Please enter a valid URL');
-    return;
-  }
-  
-  try {
-    setUploadingImage(true);
-    setError(null);
+    const activeImages = generateImagePreview(contentImages, content);
     
-    // If we're editing an existing blog, add image via API
-    if (selectedBlog) {
-      const response = await axios.post(
-        `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
-        {
+    if (!activeImages || activeImages.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="form-group">
+        <label>Content Images ({activeImages.length})</label>
+        <div className="content-images-list">
+          {activeImages.map((image, index) => (
+            <div key={image.imageId || index} className="content-image-item">
+              <img 
+                src={image.url} 
+                alt={image.alt} 
+                className="content-image-thumb"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/50x50?text=Error';
+                }}
+              />
+              <div className="content-image-info">
+                <span className="image-id">[IMAGE:{image.imageId}]</span>
+                <span className="image-position">{image.position}</span>
+                {image.caption && <span className="image-caption">{image.caption}</span>}
+              </div>
+              <button
+                type="button"
+                className="btn btn-small btn-delete"
+                onClick={() => removeImageFromContent(image.imageId)}
+                title="Remove this image from content"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="helper-text">
+          Only images referenced in your content are shown above. 
+          Remove the [IMAGE:id] placeholder from your content to remove an image.
+        </div>
+      </div>
+    );
+  };
+
+  // Function to remove image placeholder from content
+  const removeImageFromContent = (imageId) => {
+    const placeholder = `[IMAGE:${imageId}]`;
+    const newContent = formData.content.replace(new RegExp(escapeRegExp(placeholder), 'g'), '');
+    
+    // Update content and let handleInputChange clean up the images array
+    const updatedImages = cleanupContentImages(newContent, formData.contentImages);
+    
+    setFormData(prev => ({
+      ...prev,
+      content: newContent,
+      contentImages: updatedImages
+    }));
+  };
+
+  // Helper function to escape regex special characters
+  const escapeRegExp = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+
+  // Enhanced image modal with better error handling
+  const handleAddImage = async () => {
+    if (!imageModal.url.trim()) {
+      setError('Please enter an image URL');
+      return;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(imageModal.url);
+    } catch {
+      setError('Please enter a valid URL');
+      return;
+    }
+    
+    try {
+      setUploadingImage(true);
+      setError(null);
+      
+      // If we're editing an existing blog, add image via API
+      if (selectedBlog) {
+        const response = await axios.post(
+          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
+          {
+            url: imageModal.url,
+            alt: imageModal.alt,
+            caption: imageModal.caption,
+            position: imageModal.position
+          },
+          { withCredentials: true }
+        );
+        
+        const { imageId, embedCode } = response.data;
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentImages in formData
+        setFormData(prev => ({
+          ...prev,
+          contentImages: [...prev.contentImages, response.data.image]
+        }));
+      } else {
+        // For new blogs, generate temporary image ID and add to contentImages
+        const imageId = 'temp_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const embedCode = `[IMAGE:${imageId}]`;
+        
+        const newImage = {
           url: imageModal.url,
           alt: imageModal.alt,
           caption: imageModal.caption,
-          position: imageModal.position
-        },
-        { withCredentials: true }
-      );
+          position: imageModal.position,
+          imageId: imageId
+        };
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentImages in formData
+        setFormData(prev => ({
+          ...prev,
+          contentImages: [...prev.contentImages, newImage]
+        }));
+      }
       
-      const { imageId, embedCode } = response.data;
+      // Close modal and reset
+      setImageModal({
+        isOpen: false,
+        url: '',
+        alt: '',
+        caption: '',
+        position: 'center'
+      });
       
-      // Insert embed code at cursor position
-      insertTextAtCursor(embedCode);
-      
-      // Update contentImages in formData
-      setFormData(prev => ({
-        ...prev,
-        contentImages: [...prev.contentImages, response.data.image]
-      }));
-    } else {
-      // For new blogs, generate temporary image ID and add to contentImages
-      const imageId = 'temp_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      const embedCode = `[IMAGE:${imageId}]`;
-      
-      const newImage = {
-        url: imageModal.url,
-        alt: imageModal.alt,
-        caption: imageModal.caption,
-        position: imageModal.position,
-        imageId: imageId
-      };
-      
-      // Insert embed code at cursor position
-      insertTextAtCursor(embedCode);
-      
-      // Update contentImages in formData
-      setFormData(prev => ({
-        ...prev,
-        contentImages: [...prev.contentImages, newImage]
-      }));
+    } catch (err) {
+      console.error('Error adding image:', err);
+      setError(err.response?.data?.message || 'Failed to add image. Please try again.');
+    } finally {
+      setUploadingImage(false);
     }
-    
-    // Close modal and reset
-    setImageModal({
-      isOpen: false,
-      url: '',
-      alt: '',
-      caption: '',
-      position: 'center'
-    });
-    
-  } catch (err) {
-    console.error('Error adding image:', err);
-    setError(err.response?.data?.message || 'Failed to add image. Please try again.');
-  } finally {
-    setUploadingImage(false);
-  }
-};
+  };
+
   return (
     <div className="blog-management-panel">
       <div className="container">
@@ -577,7 +571,15 @@ const handleAddImage = async () => {
           )}
           
           {viewMode === 'edit' && (
-            <h1>{selectedBlog ? 'Edit Blog Post' : 'Create New Blog Post'}</h1>
+            <>
+              <h1>{selectedBlog ? 'Edit Blog Post' : 'Create New Blog Post'}</h1>
+              <button 
+                className="btn-back"
+                onClick={handleCancel}
+              >
+                Back to Blog List
+              </button>
+            </>
           )}
           
           {viewMode === 'analytics' && (
@@ -860,29 +862,10 @@ const handleAddImage = async () => {
               
               {/* Content Images Summary */}
               {formData.contentImages && formData.contentImages.length > 0 && (
-                <div className="form-group">
-                  <label>Content Images ({formData.contentImages.length})</label>
-                  <div className="content-images-list">
-                    {formData.contentImages.map((image, index) => (
-                      <div key={image.imageId || index} className="content-image-item">
-                        <img 
-                          src={image.url} 
-                          alt={image.alt} 
-                          className="content-image-thumb"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://via.placeholder.com/50x50?text=Error';
-                          }}
-                        />
-                        <div className="content-image-info">
-                          <span className="image-id">[IMAGE:{image.imageId}]</span>
-                          <span className="image-position">{image.position}</span>
-                          {image.caption && <span className="image-caption">{image.caption}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ContentImagesSection 
+                  contentImages={formData.contentImages} 
+                  content={formData.content} 
+                />
               )}
               
               <div className="form-actions">
@@ -1061,7 +1044,6 @@ const handleAddImage = async () => {
                     </div>
                   ))}
                 </div>
-
 
                 {/* Pagination */}
                 {pagination.pages > 1 && (

@@ -411,7 +411,6 @@ const AdminProjectRequests = () => {
   return (
     <div className="admin-container">
       <div className="header">
-        <h1>Project Requests</h1>
          <div className="header-actions">
         <button
           className="button2"
