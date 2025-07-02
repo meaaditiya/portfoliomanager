@@ -347,7 +347,23 @@
   padding-top: 1.5rem;
   border-top: 1px solid #e0e0e0;
 }
+.modal-overlay{
+   max-width: 1800px;
+            margin-top:80px;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #ffffff;
+          z-index: 1000;
+          overflow-y: auto;
 
+           -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+    margin-left:-53px;
+    margin-right:-60px;
+}
 .modal-content {
   background: #ffffff;
   border-radius: 12px;
