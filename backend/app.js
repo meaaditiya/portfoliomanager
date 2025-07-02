@@ -24,7 +24,10 @@ if (process.env.SENDGRID_API_KEY) {
 // Middleware
 app.use(cors({
   origin: function(origin, callback) {
-    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com','https://connectwithaaditiyaadmin.onrender.com','http://192.168.1.33:5173','http://192.168.1.33:5174','http://192.168.1.34:5173','https://aaditiyatyagi.vercel.app'];
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 
+      'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com',
+      'https://connectwithaaditiyaadmin.onrender.com','http://192.168.1.33:5173',
+      'http://192.168.1.33:5174','http://192.168.1.34:5173','https://aaditiyatyagi.vercel.app'];
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
@@ -1078,7 +1081,7 @@ const ReplySchema = new mongoose.Schema({
 
 const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
 
-// Enhanced Email Templates
+// Professional Email Templates
 const getConfirmationEmailTemplate = (name, message) => {
     return `
       <!DOCTYPE html>
@@ -1086,7 +1089,7 @@ const getConfirmationEmailTemplate = (name, message) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Thank You for Reaching Out</title>
+        <title>Message Confirmation - Thank You</title>
         <style>
           * {
             margin: 0;
@@ -1094,31 +1097,30 @@ const getConfirmationEmailTemplate = (name, message) => {
             box-sizing: border-box;
           }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #2d3748;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #2c3e50;
+            background-color: #ecf0f1;
             padding: 20px;
           }
           .email-container {
             max-width: 600px;
             margin: 0 auto;
             background: #ffffff;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid #bdc3c7;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           }
           .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
             padding: 40px 30px;
             text-align: center;
             color: white;
           }
           .header h1 {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
           }
           .header p {
             font-size: 16px;
@@ -1129,97 +1131,112 @@ const getConfirmationEmailTemplate = (name, message) => {
             padding: 40px 30px;
           }
           .greeting {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
-            color: #2d3748;
+            color: #2c3e50;
             margin-bottom: 25px;
           }
+          .main-text {
+            font-size: 16px;
+            color: #34495e;
+            margin-bottom: 25px;
+            line-height: 1.7;
+          }
           .message-preview {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
             padding: 25px;
-            border-radius: 15px;
             margin: 25px 0;
-            box-shadow: 0 10px 20px rgba(240, 147, 251, 0.3);
           }
           .message-preview h3 {
             font-size: 16px;
             margin-bottom: 15px;
             font-weight: 600;
+            color: #2c3e50;
           }
           .message-text {
             font-style: italic;
             line-height: 1.7;
-            opacity: 0.95;
+            color: #5d6d7e;
           }
-          .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+          .info-section {
+            background-color: #f1f2f6;
+            border: 1px solid #ddd;
+            padding: 25px;
             margin: 30px 0;
           }
-          .feature {
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 12px;
-            border-left: 4px solid #4facfe;
+          .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: white;
+            border-left: 3px solid #3498db;
           }
-          .feature-icon {
-            font-size: 24px;
-            margin-bottom: 10px;
+          .info-item:last-child {
+            margin-bottom: 0;
           }
-          .feature h4 {
-            color: #2d3748;
-            margin-bottom: 8px;
+          .info-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #3498db;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-weight: bold;
+          }
+          .info-content h4 {
+            color: #2c3e50;
+            margin-bottom: 5px;
             font-weight: 600;
           }
-          .feature p {
-            color: #718096;
+          .info-content p {
+            color: #7f8c8d;
             font-size: 14px;
           }
           .cta-section {
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            background-color: #ecf0f1;
             padding: 30px;
-            border-radius: 15px;
             text-align: center;
             margin: 25px 0;
+            border: 1px solid #bdc3c7;
           }
           .cta-button {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             color: white;
             padding: 15px 30px;
             text-decoration: none;
-            border-radius: 50px;
             font-weight: 600;
             margin-top: 15px;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+          }
+          .cta-button:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
           }
           .footer {
-            background: #f8fafc;
+            background-color: #f8f9fa;
             padding: 30px;
             text-align: center;
-            border-top: 1px solid #e2e8f0;
-          }
-          .social-links {
-            margin: 20px 0;
-          }
-          .social-link {
-            display: inline-block;
-            margin: 0 10px;
-            color: #4facfe;
-            text-decoration: none;
-            font-weight: 500;
+            border-top: 1px solid #e9ecef;
           }
           .signature {
-            color: #4a5568;
+            color: #2c3e50;
             font-weight: 600;
-            font-size: 18px;
+            font-size: 16px;
+            margin-bottom: 10px;
+          }
+          .disclaimer {
+            color: #95a5a6;
+            font-size: 12px;
+            margin-top: 20px;
+            line-height: 1.4;
           }
           @media (max-width: 600px) {
             .email-container {
               margin: 10px;
-              border-radius: 15px;
             }
             .header, .content, .footer {
               padding: 25px 20px;
@@ -1227,49 +1244,62 @@ const getConfirmationEmailTemplate = (name, message) => {
             .header h1 {
               font-size: 24px;
             }
+            .info-item {
+              flex-direction: column;
+              text-align: center;
+            }
+            .info-icon {
+              margin-right: 0;
+              margin-bottom: 10px;
+            }
           }
         </style>
       </head>
       <body>
         <div class="email-container">
           <div class="header">
-            <h1>🚀 Thank You for Reaching Out!</h1>
-            <p>Your message has been received and I'm excited to connect with you</p>
+            <h1>MESSAGE CONFIRMATION</h1>
+            <p>Your inquiry has been successfully received</p>
           </div>
           
           <div class="content">
             <div class="greeting">
-              Hello <strong>${name}</strong>,
+              Dear ${name},
             </div>
             
-            <p>Thank you for taking the time to contact me! I truly appreciate your interest and I'm thrilled to hear from you.</p>
+            <p class="main-text">Thank you for contacting me. I have received your message and appreciate your interest. I will review your inquiry and respond as soon as possible.</p>
             
             <div class="message-preview">
-              <h3>📝 Your Message:</h3>
+              <h3>Your Message Summary:</h3>
               <div class="message-text">"${message}"</div>
             </div>
             
-            <div class="features">
-              <div class="feature">
-                <div class="feature-icon">⚡</div>
-                <h4>Quick Response</h4>
-                <p>I aim to respond within 24-48 hours</p>
+            <div class="info-section">
+              <div class="info-item">
+                <div class="info-icon">1</div>
+                <div class="info-content">
+                  <h4>Response Timeline</h4>
+                  <p>You can expect a response within 24-48 business hours</p>
+                </div>
               </div>
-             
+              <div class="info-item">
+                <div class="info-icon">2</div>
+                <div class="info-content">
+                  <h4>Next Steps</h4>
+                  <p>I will review your message and provide a detailed response</p>
+                </div>
+              </div>
             </div>
-            
-            
           </div>
           
           <div class="footer">
-            
             <div class="signature">
               <p>Best regards,<br/>
               <strong>Aditya Tyagi</strong><br/>
-              <em style="color: #718096;">Looking forward to our conversation!</em></p>
+              <em style="color: #7f8c8d;">Professional Services</em></p>
             </div>
-            <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
-              This is an automated confirmation. Please do not reply to this email.
+            <p class="disclaimer">
+              This is an automated confirmation email. Please do not reply to this message.
             </p>
           </div>
         </div>
@@ -1285,7 +1315,7 @@ const getAdminNotificationTemplate = (name, email, message) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>New Contact Message</title>
+        <title>New Contact Form Submission</title>
         <style>
           * {
             margin: 0;
@@ -1293,8 +1323,8 @@ const getAdminNotificationTemplate = (name, email, message) => {
             box-sizing: border-box;
           }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ecf0f1;
             padding: 20px;
             line-height: 1.6;
           }
@@ -1302,35 +1332,44 @@ const getAdminNotificationTemplate = (name, email, message) => {
             max-width: 600px;
             margin: 0 auto;
             background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            border: 1px solid #bdc3c7;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           }
           .header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
             padding: 30px;
             text-align: center;
           }
           .header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
           }
-          .badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
+          .priority-badge {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            font-size: 12px;
             font-weight: 500;
+            letter-spacing: 0.5px;
           }
           .content {
             padding: 40px 30px;
           }
+          .alert-section {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 25px;
+          }
+          .alert-section p {
+            color: #856404;
+            font-weight: 500;
+          }
           .contact-card {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border: 2px solid #dee2e6;
-            border-radius: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
             padding: 25px;
             margin: 20px 0;
           }
@@ -1339,92 +1378,108 @@ const getAdminNotificationTemplate = (name, email, message) => {
             align-items: center;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 2px solid #dee2e6;
+            border-bottom: 1px solid #dee2e6;
           }
-          .avatar {
+          .contact-avatar {
             width: 50px;
             height: 50px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
             font-weight: bold;
-            font-size: 20px;
+            font-size: 18px;
             margin-right: 15px;
           }
-          .contact-info h3 {
-            color: #2d3748;
+          .contact-details h3 {
+            color: #2c3e50;
             font-size: 18px;
             margin-bottom: 5px;
           }
-          .contact-info p {
-            color: #718096;
+          .contact-details p {
+            color: #7f8c8d;
             font-size: 14px;
           }
           .message-section {
-            background: #fff;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
+            background-color: #ffffff;
+            border: 1px solid #e9ecef;
             padding: 25px;
             margin: 20px 0;
           }
           .message-header {
-            color: #4a5568;
+            color: #2c3e50;
             font-weight: 600;
             margin-bottom: 15px;
             font-size: 16px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 10px;
           }
           .message-content {
-            color: #2d3748;
+            color: #34495e;
             line-height: 1.7;
             font-size: 15px;
-            background: #f8fafc;
+            background-color: #f8f9fa;
             padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #4facfe;
+            border-left: 4px solid #3498db;
+          }
+          .metadata {
+            background-color: #e9ecef;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 12px;
+            color: #6c757d;
+          }
+          .metadata-item {
+            margin-bottom: 5px;
+          }
+          .metadata-item:last-child {
+            margin-bottom: 0;
+          }
+          .action-section {
+            background-color: #f1f3f4;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
           }
           .action-buttons {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
-            margin: 30px 0;
+            margin-top: 20px;
           }
           .btn {
-            padding: 15px 25px;
+            padding: 12px 20px;
             border: none;
-            border-radius: 10px;
             font-weight: 600;
             text-decoration: none;
             text-align: center;
             transition: all 0.3s ease;
+            cursor: pointer;
           }
           .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
             color: white;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
           }
           .btn-secondary {
-            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
-            color: #2d3748;
-            box-shadow: 0 5px 15px rgba(255, 234, 167, 0.4);
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            color: white;
           }
-          .timestamp {
-            background: #e2e8f0;
-            padding: 10px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            color: #4a5568;
-            text-align: center;
-            margin: 20px 0;
+          .btn:hover {
+            opacity: 0.9;
           }
           .footer {
-            background: #f8fafc;
+            background-color: #2c3e50;
+            color: white;
             padding: 25px;
             text-align: center;
-            border-top: 1px solid #e2e8f0;
-            color: #718096;
+          }
+          .footer h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+          }
+          .footer p {
+            opacity: 0.8;
             font-size: 14px;
           }
           @media (max-width: 600px) {
@@ -1435,7 +1490,7 @@ const getAdminNotificationTemplate = (name, email, message) => {
               flex-direction: column;
               text-align: center;
             }
-            .avatar {
+            .contact-avatar {
               margin: 0 0 15px 0;
             }
           }
@@ -1444,38 +1499,48 @@ const getAdminNotificationTemplate = (name, email, message) => {
       <body>
         <div class="email-container">
           <div class="header">
-            <h1>🔔 New Contact Message</h1>
-            <div class="badge">Requires Your Attention</div>
+            <h1>NEW MESSAGE RECEIVED</h1>
+            <div class="priority-badge">ACTION REQUIRED</div>
           </div>
           
           <div class="content">
+            <div class="alert-section">
+              <p><strong>New Contact:</strong> A new message has been submitted through your contact form and requires your attention.</p>
+            </div>
+            
             <div class="contact-card">
               <div class="contact-header">
-                <div class="avatar">${name.charAt(0).toUpperCase()}</div>
-                <div class="contact-info">
+                <div class="contact-avatar">${name.charAt(0).toUpperCase()}</div>
+                <div class="contact-details">
                   <h3>${name}</h3>
-                  <p>📧 ${email}</p>
+                  <p>Email: ${email}</p>
                 </div>
               </div>
             </div>
             
             <div class="message-section">
-              <div class="message-header">💬 Message Content:</div>
+              <div class="message-header">Message Content</div>
               <div class="message-content">${message}</div>
             </div>
             
-            <div class="timestamp">
-              ⏰ Received: ${new Date().toLocaleString()}
+            <div class="metadata">
+              <div class="metadata-item"><strong>Timestamp:</strong> ${new Date().toLocaleString()}</div>
+              <div class="metadata-item"><strong>Source:</strong> Contact Form</div>
+              <div class="metadata-item"><strong>Status:</strong> Pending Response</div>
             </div>
             
-            <div class="action-buttons">
-              <a href="#" class="btn btn-primary">📋 View in Admin Panel</a>
-              <a href="mailto:${email}" class="btn btn-secondary">📧 Reply Directly</a>
+            <div class="action-section">
+              <h3>Required Actions</h3>
+              <div class="action-buttons">
+                <a href="#" class="btn btn-primary">View in Admin Panel</a>
+                <a href="mailto:${email}" class="btn btn-secondary">Reply via Email</a>
+              </div>
             </div>
           </div>
           
           <div class="footer">
-            <p><strong>Action Required:</strong> Please log in to the admin panel to manage this message.</p>
+            <h3>System Notification</h3>
+            <p>Please log in to your admin panel to manage this message and update its status.</p>
           </div>
         </div>
       </body>
@@ -1498,8 +1563,8 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             box-sizing: border-box;
           }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ecf0f1;
             padding: 20px;
             line-height: 1.6;
           }
@@ -1507,21 +1572,20 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             max-width: 650px;
             margin: 0 auto;
             background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            border: 1px solid #bdc3c7;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           }
           .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
             color: white;
             padding: 40px 30px;
             text-align: center;
           }
           .header h1 {
-            font-size: 30px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 26px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
           }
           .header p {
             opacity: 0.9;
@@ -1531,106 +1595,84 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             padding: 40px 30px;
           }
           .greeting {
-            font-size: 22px;
+            font-size: 18px;
             font-weight: 600;
-            color: #2d3748;
+            color: #2c3e50;
+            margin-bottom: 25px;
+          }
+          .intro-text {
+            font-size: 16px;
+            color: #34495e;
             margin-bottom: 30px;
-            text-align: center;
+            line-height: 1.7;
           }
-          .message-section {
-            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
-            border: 2px solid #e2e8f0;
-            border-radius: 15px;
-            padding: 30px;
+          .conversation-section {
             margin: 30px 0;
-            position: relative;
-            overflow: hidden;
           }
-          .message-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 5px;
-            height: 100%;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          .message-block {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 25px;
+            margin: 20px 0;
           }
-          .reply-section {
-            background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
-            border: 2px solid #e2e8f0;
-            border-radius: 15px;
-            padding: 30px;
-            margin: 30px 0;
-            position: relative;
-            overflow: hidden;
+          .original-message {
+            border-left: 4px solid #95a5a6;
           }
-          .reply-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 5px;
-            height: 100%;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          .reply-message {
+            border-left: 4px solid #27ae60;
           }
-          .message-header, .reply-header {
-            color: #4a5568;
+          .message-header {
+            color: #2c3e50;
             font-weight: 600;
-            margin-bottom: 20px;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 8px;
           }
-          .message-content, .reply-content {
-            color: #2d3748;
+          .message-content {
+            color: #34495e;
             line-height: 1.8;
-            font-size: 16px;
+            font-size: 15px;
           }
           .signature-section {
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            background-color: #f1f2f6;
             padding: 30px;
-            border-radius: 15px;
-            text-align: center;
             margin: 30px 0;
+            border: 1px solid #ddd;
           }
           .signature {
-            color: #2d3748;
+            color: #2c3e50;
             font-weight: 600;
-            font-size: 18px;
-          }
-          .role {
-            color: #718096;
-            font-style: italic;
-            margin-top: 5px;
-          }
-          .contact-section {
-            background: #f8fafc;
-            padding: 25px;
-            border-radius: 12px;
-            margin: 25px 0;
+            font-size: 16px;
             text-align: center;
           }
+          .title {
+            color: #7f8c8d;
+            font-style: italic;
+            margin-top: 5px;
+            font-size: 14px;
+          }
+          .contact-section {
+            background-color: #ecf0f1;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+            border: 1px solid #bdc3c7;
+          }
           .contact-section h3 {
-            color: #2d3748;
+            color: #2c3e50;
             margin-bottom: 15px;
+            font-size: 16px;
           }
-          .contact-links {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-          }
-          .contact-link {
-            color: #4facfe;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 8px 16px;
-            border: 2px solid #4facfe;
-            border-radius: 25px;
-            transition: all 0.3s ease;
+          .contact-info {
+            color: #7f8c8d;
+            font-size: 14px;
+            line-height: 1.6;
           }
           .footer {
-            background: #2d3748;
+            background-color: #34495e;
             color: white;
             padding: 30px;
             text-align: center;
@@ -1642,10 +1684,17 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
           .footer h3 {
             margin-bottom: 15px;
             font-size: 18px;
+            font-weight: 600;
           }
           .footer p {
-            opacity: 0.8;
+            opacity: 0.9;
             line-height: 1.6;
+            font-size: 14px;
+          }
+          .divider {
+            height: 1px;
+            background-color: #bdc3c7;
+            margin: 30px 0;
           }
           @media (max-width: 600px) {
             .email-container {
@@ -1654,9 +1703,8 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             .header, .content {
               padding: 25px 20px;
             }
-            .contact-links {
-              flex-direction: column;
-              align-items: center;
+            .header h1 {
+              font-size: 22px;
             }
           }
         </style>
@@ -1664,48 +1712,57 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       <body>
         <div class="email-container">
           <div class="header">
-            <h1>📧 Personal Response</h1>
+            <h1>PERSONAL RESPONSE</h1>
             <p>Thank you for your patience</p>
           </div>
           
           <div class="content">
             <div class="greeting">
-              Hello <strong>${name}</strong> 👋
+              Dear ${name},
             </div>
             
-            <div class="message-section">
-              <div class="message-header">
-                📝 Your Original Message:
+            <p class="intro-text">
+              Thank you for reaching out to me. I have carefully reviewed your message and am pleased to provide you with a detailed response below.
+            </p>
+            
+            <div class="conversation-section">
+              <div class="message-block original-message">
+                <div class="message-header">Your Original Message</div>
+                <div class="message-content">${originalMessage}</div>
               </div>
-              <div class="message-content">
-                ${originalMessage}
+              
+              <div class="message-block reply-message">
+                <div class="message-header">My Response</div>
+                <div class="message-content">${replyContent}</div>
               </div>
             </div>
             
-            <div class="reply-section">
-              <div class="reply-header">
-                💬 My Response:
-              </div>
-              <div class="reply-content">
-                ${replyContent}
-              </div>
-            </div>
+            <div class="divider"></div>
             
-           
+            <p class="intro-text">
+              If you have any follow-up questions or would like to discuss this matter further, please don't hesitate to contact me.
+            </p>
           </div>
           
           <div class="signature-section">
             <div class="signature">
-              Best regards,<br/>
               <strong>Aditya Tyagi</strong>
+              <div class="title">Professional Services</div>
             </div>
-           
+          </div>
+          
+          <div class="contact-section">
+            <h3>Contact Information</h3>
+            <div class="contact-info">
+              For future correspondence, please use the same contact method<br/>
+              or visit my website for additional contact options.
+            </div>
           </div>
           
           <div class="footer">
             <div class="footer-content">
-              <h3>Thank You!</h3>
-              <p>I appreciate your time and interest. Feel free to reach out anytime if you have more questions or just want to chat about technology, projects, or collaborations!</p>
+              <h3>Thank You</h3>
+              <p>I appreciate your time and interest. I look forward to any future opportunities to assist you with your inquiries or discuss potential collaborations.</p>
             </div>
           </div>
         </div>
