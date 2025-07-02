@@ -891,6 +891,34 @@ const generateImagePreview = (contentImages, content) => {
         
         {viewMode === 'analytics' && analyticsId && (
           <div className="blog-analytics-section">
+             {/* Blog Header Info */}
+<div className="analytics-blog-header">
+  <div className="analytics-blog-info">
+    {/* Find and display the current blog's featured image and title */}
+    {blogs.find(blog => blog._id === analyticsId) && (
+      <>
+        {blogs.find(blog => blog._id === analyticsId).featuredImage && (
+          <div className="analytics-featured-image">
+            <img 
+              src={blogs.find(blog => blog._id === analyticsId).featuredImage} 
+              alt={blogs.find(blog => blog._id === analyticsId).title}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/400x200?text=Image+Not+Found';
+              }}
+            />
+          </div>
+        )}
+        <div className="analytics-blog-title">
+          <h2>{blogs.find(blog => blog._id === analyticsId).title}</h2>
+          <span className={`status-badge ${blogs.find(blog => blog._id === analyticsId).status}`}>
+            {blogs.find(blog => blog._id === analyticsId).status === 'published' ? 'Published' : 'Draft'}
+          </span>
+        </div>
+      </>
+    )}
+  </div>
+</div>
             <div className="section-actions">
               <button 
                 className="btn btn-secondary"
