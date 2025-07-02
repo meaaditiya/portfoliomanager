@@ -1275,29 +1275,21 @@ const getConfirmationEmailTemplate = (name, message) => {
             </div>
             
             <div class="info-section">
-              <div class="info-item">
-                <div class="info-icon">1</div>
+             
+                
                 <div class="info-content">
                   <h4>Response Timeline</h4>
                   <p>You can expect a response within 24-48 business hours</p>
                 </div>
-              </div>
-              <div class="info-item">
-                <div class="info-icon">2</div>
-                <div class="info-content">
-                  <h4>Next Steps</h4>
-                  <p>I will review your message and provide a detailed response</p>
-                </div>
-              </div>
+              
+             
             </div>
           </div>
           
           <div class="footer">
             <div class="signature">
               <p>Best regards,<br/>
-              <strong>Aditya Tyagi</strong><br/>
-              <em style="color: #7f8c8d;">Professional Services</em></p>
-            </div>
+              <strong>Aaditiya Tyagi</strong><br/>
             <p class="disclaimer">
               This is an automated confirmation email. Please do not reply to this message.
             </p>
@@ -1532,7 +1524,7 @@ const getAdminNotificationTemplate = (name, email, message) => {
             <div class="action-section">
               <h3>Required Actions</h3>
               <div class="action-buttons">
-                <a href="#" class="btn btn-primary">View in Admin Panel</a>
+                <a href="https://connectwithaaditiyaadmin.onrender.com/message" class="btn btn-primary">View in Admin Panel</a>
                 <a href="mailto:${email}" class="btn btn-secondary">Reply via Email</a>
               </div>
             </div>
@@ -1555,7 +1547,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Response from Aditya Tyagi</title>
+        <title>Response from Aaditiya Tyagi</title>
         <style>
           * {
             margin: 0;
@@ -1576,7 +1568,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           }
           .header {
-            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            background-color: #34495e;
             color: white;
             padding: 40px 30px;
             text-align: center;
@@ -1616,10 +1608,10 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             margin: 20px 0;
           }
           .original-message {
-            border-left: 4px solid #95a5a6;
+            border-left: 4px solid #34495e;
           }
           .reply-message {
-            border-left: 4px solid #27ae60;
+            border-left: 4px solid  #34495e;
           }
           .message-header {
             color: #2c3e50;
@@ -1639,7 +1631,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
           .signature-section {
             background-color: #f1f2f6;
             padding: 30px;
-            margin: 30px 0;
+            margin: 3px 0;
             border: 1px solid #ddd;
           }
           .signature {
@@ -1667,7 +1659,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
             font-size: 16px;
           }
           .contact-info {
-            color: #7f8c8d;
+            color:#ddd;
             font-size: 14px;
             line-height: 1.6;
           }
@@ -1712,7 +1704,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       <body>
         <div class="email-container">
           <div class="header">
-            <h1>PERSONAL RESPONSE</h1>
+            <h1>RESPONSE TO YOUR QUERY</h1>
             <p>Thank you for your patience</p>
           </div>
           
@@ -1746,23 +1738,21 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
           
           <div class="signature-section">
             <div class="signature">
-              <strong>Aditya Tyagi</strong>
-              <div class="title">Professional Services</div>
+              <strong>Best Regards</strong>
+              <div class="title">Aaditiya Tyagi</div>
             </div>
           </div>
           
-          <div class="contact-section">
-            <h3>Contact Information</h3>
-            <div class="contact-info">
-              For future correspondence, please use the same contact method<br/>
-              or visit my website for additional contact options.
-            </div>
-          </div>
+         
           
           <div class="footer">
             <div class="footer-content">
               <h3>Thank You</h3>
               <p>I appreciate your time and interest. I look forward to any future opportunities to assist you with your inquiries or discuss potential collaborations.</p>
+            <div class="contact-info">
+              For future correspondence, please use the same contact method<br/>
+              or visit my website for additional contact options.
+            </div>
             </div>
           </div>
         </div>
