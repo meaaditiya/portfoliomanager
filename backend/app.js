@@ -1788,7 +1788,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       
       // Send enhanced confirmation email to user
       const confirmationEmail = getConfirmationEmailTemplate(name, message);
-      await sendEmail(email, '🚀 Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
+      await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
       
       // Send enhanced notification to admin
       const adminNotification = getAdminNotificationTemplate(name, email, message);
@@ -2016,7 +2016,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
 
     await sendEmail(
       message.email,
-      '📧 Personal Response from Aditya Tyagi',
+      'Response from Aaditiya Tyagi',
       replyEmail
     );
 
