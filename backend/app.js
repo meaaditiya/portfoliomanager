@@ -5127,7 +5127,7 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
       />
       <div class="avatar-fallback" style="display: none;">AT</div>
-      <h1>Project Acknowledgement</h1>
+      <h1>Project Request Received Successfully</h1>
     </div>
 
     <div class="email-content">
