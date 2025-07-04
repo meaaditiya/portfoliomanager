@@ -4990,10 +4990,278 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
 
     // Send acknowledgment email to user
     const acknowledgmentEmail = `
-      <h1>Project Request Acknowledged</h1>
+      <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 40px 20px;
+      color: #1f2937;
+      line-height: 1.6;
+    }
+
+    .email-container {
+      max-width: 640px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+
+    .email-header {
+      background: linear-gradient(135deg, #111827, #1f2937);
+      color: #ffffff;
+      padding: 48px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .email-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+      transform: rotate(30deg);
+    }
+
+    .profile-image {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      margin: 0 auto 24px;
+      border: 4px solid #ffffff;
+      display: block;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .profile-image:hover {
+      transform: scale(1.05);
+    }
+
+    .avatar-fallback {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #6b7280, #9ca3af);
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      color: #ffffff;
+      border: 4px solid #ffffff;
+      text-transform: uppercase;
+    }
+
+    .email-header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -0.025em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .email-content {
+      padding: 40px;
+      background-color: #ffffff;
+    }
+
+    .email-content h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .email-message {
+      background-color: #f9fafb;
+      border-left: 4px solid #374151;
+      padding: 24px;
+      border-radius: 0 12px 12px 0;
+      color: #1f2937;
+      margin: 24px 0;
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    .email-message p {
+      margin: 8px 0;
+    }
+
+    .contact-info {
+      font-size: 15px;
+      color: #374151;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .contact-info p {
+      margin: 8px 0;
+    }
+
+    .contact-info a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .contact-info a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .visit-site {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: linear-gradient(90deg, #374151, #4b5563);
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 14px rgba(55, 65, 81, 0.3);
+      text-align: center;
+    }
+
+    .visit-site:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(55, 65, 81, 0.4);
+      background: linear-gradient(90deg, #4b5563, #6b7280);
+    }
+
+    .email-footer {
+      background: linear-gradient(180deg, #111827, #1f2937);
+      padding: 32px;
+      text-align: center;
+      color: #d1d5db;
+      font-size: 13px;
+      border-top: 1px solid #374151;
+    }
+
+    .email-footer p {
+      margin: 6px 0;
+      line-height: 1.5;
+    }
+
+    .email-footer a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .email-footer a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .social-links {
+      margin-top: 16px;
+    }
+
+    .social-links a {
+      display: inline-block;
+      margin: 0 8px;
+      color: #d1d5db;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+
+    .social-links a:hover {
+      color: #3b82f6;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 20px 10px;
+      }
+
+      .email-container {
+        border-radius: 8px;
+      }
+
+      .email-header {
+        padding: 32px 20px;
+      }
+
+      .email-content {
+        padding: 24px;
+      }
+
+      .email-header h1 {
+        font-size: 24px;
+      }
+
+      .email-content h2 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <img
+        src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
+        alt="Profile"
+        class="profile-image"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+      />
+      <div class="avatar-fallback" style="display: none;">AT</div>
+      <h1>Project Acknowledgement</h1>
+    </div>
+
+    <div class="email-content">
+      <h2>Dear Recipient,</h2>
+      <div class="email-message">
+        <p> <h1>Project Request Acknowledged</h1>
       <p>Hello ${request.name},</p>
       <p>Your project request of type "${request.projectType}" has been acknowledged.</p>
-      <p>Thank you for your submission!</p>
+      <p>Thank you for your submission!</p></p>
+      </div>
+
+      <div class="contact-info">
+        <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
+        <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
+        <p>
+          <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
+            Visit My Site
+          </a>
+        </p>
+      </div>
+    </div>
+
+    <div class="email-footer">
+      <p>This email was generated automatically. Please do not reply directly.</p>
+      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
+      <div class="social-links">
+        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
+        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
+      </div>
+      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
     `;
 
     await sendEmail(request.email, 'Project Request Acknowledged', acknowledgmentEmail);
@@ -5290,7 +5558,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
   <div class="email-container">
     <div class="email-header">
       <img
-        src="https://i.postimg.cc/bvzZtKNb/Screenshot-2025-06-10-162118.png"
+        src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
         alt="Profile"
         class="profile-image"
         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
