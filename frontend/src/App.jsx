@@ -10,6 +10,7 @@ import Adminpost from './Components/Adminpost';
 import SocialPost from './Components/SocialPost';
 import Project from './Components/Project';
 import Welcome from './Components/Welcome';
+import AdminMail from './Components/Adminmail';
 import './index.css';
 
 function AppContent() {
@@ -72,6 +73,7 @@ function AppContent() {
           <Route path="/socialpost" element={<SocialPost />} />
           <Route path="/project" element={<Project />} />
           <Route path="/welcome" element={<Welcome />} />
+          <Route path="/adminmail" element={<AdminMail/>}/>
         </Routes>
       </main>
     </div>

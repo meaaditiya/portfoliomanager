@@ -8,6 +8,9 @@ const cors = require('cors');
 const sgMail = require('@sendgrid/mail');
 require('dotenv').config();
 const { body, validationResult } = require('express-validator');
+const path = require('path');
+const fs = require('fs');
+
 
 // Initialize Express app
 const app = express();
@@ -117,7 +120,7 @@ const generateOTP = () => {
 };
 
 // Helper function to send emails
-const sendEmail = async (email, subject, html) => {
+const sendEmail = async (email, subject, html, attachments = []) => {
   if (!process.env.SENDGRID_API_KEY) {
     console.warn('SendGrid API key not set. Email would have been sent to:', email);
     return true;
@@ -129,6 +132,16 @@ const sendEmail = async (email, subject, html) => {
     subject,
     html
   };
+
+  // Add attachments if provided
+  if (attachments && attachments.length > 0) {
+    msg.attachments = attachments.map(att => ({
+      content: att.data.toString('base64'),
+      filename: att.filename,
+      type: att.contentType,
+      disposition: 'attachment'
+    }));
+  }
 
   try {
     await sgMail.send(msg);
@@ -142,7 +155,6 @@ const sendEmail = async (email, subject, html) => {
     throw error;
   }
 };
-
 // Routes
 // Register new admin
 app.post('/api/admin/register', async (req, res) => {
@@ -5027,6 +5039,628 @@ app.delete('/api/admin/project/requests', authenticateToken, async (req, res) =>
     res.status(500).json({ message: error.message });
   }
 });
+
+// Email Schema for MongoDB (add this to your models)
+const emailSchema = new mongoose.Schema({
+  to: { type: String, required: true },
+  subject: { type: String, required: true },
+  message: { type: String, required: true },
+  attachments: [{
+    filename: String,
+    contentType: String,
+    data: Buffer,
+    size: Number
+  }],
+  sentAt: { type: Date, default: Date.now },
+  sentBy: { type: String, required: true }, // admin email or ID
+  status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
+});
+
+const Email = mongoose.model('Email', emailSchema);
+app.use('/public', express.static(path.join(__dirname, 'public')));
+const getEmailTemplate = (subject, message, senderName = 'Admin') => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 40px 20px;
+      color: #1f2937;
+      line-height: 1.6;
+    }
+
+    .email-container {
+      max-width: 640px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+
+    .email-header {
+      background: linear-gradient(135deg, #111827, #1f2937);
+      color: #ffffff;
+      padding: 48px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .email-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+      transform: rotate(30deg);
+    }
+
+    .profile-image {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      margin: 0 auto 24px;
+      border: 4px solid #ffffff;
+      display: block;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .profile-image:hover {
+      transform: scale(1.05);
+    }
+
+    .avatar-fallback {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #6b7280, #9ca3af);
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      color: #ffffff;
+      border: 4px solid #ffffff;
+      text-transform: uppercase;
+    }
+
+    .email-header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -0.025em;
+      position: relative;
+      z-index: 1;
+    }
+
+    .email-content {
+      padding: 40px;
+      background-color: #ffffff;
+    }
+
+    .email-content h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .email-message {
+      background-color: #f9fafb;
+      border-left: 4px solid #374151;
+      padding: 24px;
+      border-radius: 0 12px 12px 0;
+      color: #1f2937;
+      margin: 24px 0;
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    .email-message p {
+      margin: 8px 0;
+    }
+
+    .contact-info {
+      font-size: 15px;
+      color: #374151;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .contact-info p {
+      margin: 8px 0;
+    }
+
+    .contact-info a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .contact-info a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .visit-site {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: linear-gradient(90deg, #374151, #4b5563);
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 14px rgba(55, 65, 81, 0.3);
+      text-align: center;
+    }
+
+    .visit-site:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(55, 65, 81, 0.4);
+      background: linear-gradient(90deg, #4b5563, #6b7280);
+    }
+
+    .email-footer {
+      background: linear-gradient(180deg, #111827, #1f2937);
+      padding: 32px;
+      text-align: center;
+      color: #d1d5db;
+      font-size: 13px;
+      border-top: 1px solid #374151;
+    }
+
+    .email-footer p {
+      margin: 6px 0;
+      line-height: 1.5;
+    }
+
+    .email-footer a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .email-footer a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .social-links {
+      margin-top: 16px;
+    }
+
+    .social-links a {
+      display: inline-block;
+      margin: 0 8px;
+      color: #d1d5db;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+
+    .social-links a:hover {
+      color: #3b82f6;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 20px 10px;
+      }
+
+      .email-container {
+        border-radius: 8px;
+      }
+
+      .email-header {
+        padding: 32px 20px;
+      }
+
+      .email-content {
+        padding: 24px;
+      }
+
+      .email-header h1 {
+        font-size: 24px;
+      }
+
+      .email-content h2 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <img
+        src="https://i.postimg.cc/bvzZtKNb/Screenshot-2025-06-10-162118.png"
+        alt="Profile"
+        class="profile-image"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+      />
+      <div class="avatar-fallback" style="display: none;">AT</div>
+      <h1>${subject}</h1>
+    </div>
+
+    <div class="email-content">
+      <h2>Dear Recipient,</h2>
+      <div class="email-message">
+        <p>${message.replace(/\n/g, '</p><p>')}</p>
+      </div>
+
+      <div class="contact-info">
+        <p><strong>Best regards,</strong><br>${senderName}</p>
+        <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
+        <p>
+          <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
+            Visit My Site
+          </a>
+        </p>
+      </div>
+    </div>
+
+    <div class="email-footer">
+      <p>This email was generated automatically. Please do not reply directly.</p>
+      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
+      <div class="social-links">
+        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
+        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
+      </div>
+      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+};
+
+// Route 1: Send single email with attachments
+app.post('/api/admin/send-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
+  try {
+    const { to, subject, message, senderName } = req.body;
+    
+    // Validation
+    if (!to || !subject || !message) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email, subject, and message are required' 
+      });
+    }
+
+    // Process attachments
+    const attachments = req.files ? req.files.map(file => ({
+      filename: file.originalname,
+      contentType: file.mimetype,
+      data: file.buffer,
+      size: file.size
+    })) : [];
+     const imageUrl = `${req.protocol}://${req.get('host')}/public/profile.png`;
+    // Generate professional HTML template
+    const htmlTemplate = getEmailTemplate(subject, message, senderName);
+    
+    // Send email
+    await sendEmail(to, subject, htmlTemplate, attachments);
+    
+    // Save email record to MongoDB
+    const emailRecord = new Email({
+      to,
+      subject,
+      message,
+      attachments,
+      sentBy: req.user.email || req.user.id,
+      status: 'sent'
+    });
+    
+    await emailRecord.save();
+    
+    res.json({
+      success: true,
+      message: 'Email sent successfully',
+      emailId: emailRecord._id
+    });
+    
+  } catch (error) {
+    console.error('Send email error:', error);
+    
+    // Save failed email record
+    try {
+      const failedEmailRecord = new Email({
+        to: req.body.to,
+        subject: req.body.subject,
+        message: req.body.message,
+        attachments: req.files ? req.files.map(file => ({
+          filename: file.originalname,
+          contentType: file.mimetype,
+          data: file.buffer,
+          size: file.size
+        })) : [],
+        sentBy: req.user.email || req.user.id,
+        status: 'failed'
+      });
+      
+      await failedEmailRecord.save();
+    } catch (saveError) {
+      console.error('Failed to save email record:', saveError);
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send email', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 2: Send bulk emails with attachments
+app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
+  try {
+    const { recipients, subject, message, senderName } = req.body;
+    
+    // Validation
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Recipients array is required' 
+      });
+    }
+    
+    if (!subject || !message) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Subject and message are required' 
+      });
+    }
+
+    // Process attachments
+    const attachments = req.files ? req.files.map(file => ({
+      filename: file.originalname,
+      contentType: file.mimetype,
+      data: file.buffer,
+      size: file.size
+    })) : [];
+
+    // Generate professional HTML template
+    const htmlTemplate = getEmailTemplate(subject, message, senderName);
+    
+    const results = {
+      successful: [],
+      failed: []
+    };
+    
+    // Send emails to all recipients
+    for (const recipient of recipients) {
+      try {
+        await sendEmail(recipient, subject, htmlTemplate, attachments);
+        results.successful.push(recipient);
+        
+        // Save successful email record
+        const emailRecord = new Email({
+          to: recipient,
+          subject,
+          message,
+          attachments,
+          sentBy: req.user.email || req.user.id,
+          status: 'sent'
+        });
+        
+        await emailRecord.save();
+        
+      } catch (error) {
+        console.error(`Failed to send email to ${recipient}:`, error);
+        results.failed.push({ email: recipient, error: error.message });
+        
+        // Save failed email record
+        const failedEmailRecord = new Email({
+          to: recipient,
+          subject,
+          message,
+          attachments,
+          sentBy: req.user.email || req.user.id,
+          status: 'failed'
+        });
+        
+        await failedEmailRecord.save();
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Bulk email completed. ${results.successful.length} sent, ${results.failed.length} failed`,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Bulk email error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send bulk emails', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 3: Get email history
+app.get('/api/admin/email-history', authenticateToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    const emails = await Email.find()
+      .select('-attachments.data') // Exclude attachment data for performance
+      .sort({ sentAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    
+    const total = await Email.countDocuments();
+    
+    res.json({
+      success: true,
+      emails,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Email history error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve email history', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 4: Get specific email with attachments
+app.get('/api/admin/email/:id', authenticateToken, async (req, res) => {
+  try {
+    const email = await Email.findById(req.params.id);
+    
+    if (!email) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Email not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      email
+    });
+    
+  } catch (error) {
+    console.error('Get email error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve email', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 5: Download attachment
+app.get('/api/admin/email/:id/attachment/:attachmentId', authenticateToken, async (req, res) => {
+  try {
+    const email = await Email.findById(req.params.id);
+    
+    if (!email) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Email not found' 
+      });
+    }
+    
+    const attachment = email.attachments.id(req.params.attachmentId);
+    
+    if (!attachment) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Attachment not found' 
+      });
+    }
+    
+    res.setHeader('Content-Type', attachment.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`);
+    res.send(attachment.data);
+    
+  } catch (error) {
+    console.error('Download attachment error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to download attachment', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 6: Delete email
+app.delete('/api/admin/email/:id', authenticateToken, async (req, res) => {
+  try {
+    const email = await Email.findByIdAndDelete(req.params.id);
+    
+    if (!email) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Email not found' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Email deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Delete email error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete email', 
+      error: error.message 
+    });
+  }
+});
+
+// Route 7: Get email statistics
+app.get('/api/admin/email-stats', authenticateToken, async (req, res) => {
+  try {
+    const stats = await Email.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalEmails: { $sum: 1 },
+          sentEmails: { $sum: { $cond: [{ $eq: ['$status', 'sent'] }, 1, 0] } },
+          failedEmails: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } }
+        }
+      }
+    ]);
+    
+    const recentEmails = await Email.countDocuments({
+      sentAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    });
+    
+    res.json({
+      success: true,
+      stats: {
+        total: stats[0]?.totalEmails || 0,
+        sent: stats[0]?.sentEmails || 0,
+        failed: stats[0]?.failedEmails || 0,
+        last24Hours: recentEmails
+      }
+    });
+    
+  } catch (error) {
+    console.error('Email stats error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve email statistics', 
+      error: error.message 
+    });
+  }
+});
+
+
+
 
 // Start server
 app.listen(PORT, () => {
