@@ -5495,7 +5495,7 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
 
     <div class="email-content">
       <h2>Dear Recipient,</h2>
-      <div class="email-message">
+      <div>
         <p> <h1>Project Request Acknowledged</h1>
       <p>Hello ${request.name},</p>
       <p>Your project request of type "${request.projectType}" has been acknowledged.</p>
@@ -5730,24 +5730,14 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
     }
 
     .visit-site {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: linear-gradient(90deg, #374151, #4b5563);
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 4px 14px rgba(55, 65, 81, 0.3);
-      text-align: center;
+        color:inherit;
+        background-color: white;
+    
     }
 
     .visit-site:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(55, 65, 81, 0.4);
-      background: linear-gradient(90deg, #4b5563, #6b7280);
+        color:black;
+        
     }
 
     .email-footer {
@@ -5833,7 +5823,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
 
     <div class="email-content">
       <h2>Dear Recipient,</h2>
-      <div class="email-message">
+      <div>
         <p>${message.replace(/\n/g, '</p><p>')}</p>
       </div>
 

@@ -31,7 +31,7 @@ const EmailDashboard = () => {
   const [emailHistory, setEmailHistory] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
 
-  const API_BASE = 'http://localhost:5000/api/admin';
+  const API_BASE = 'https://connectwithaaditiyamg.onrender.com/api/admin';
 
   // Check authentication on mount
   useEffect(() => {
