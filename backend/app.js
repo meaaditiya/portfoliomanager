@@ -5931,15 +5931,28 @@ app.post('/api/admin/send-email', authenticateToken, upload.array('attachments',
 });
 
 // Route 2: Send bulk emails with attachments
+
 app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
   try {
-    const { recipients, subject, message, senderName } = req.body;
+    let { recipients, subject, message, senderName } = req.body;
+    
+    // Parse recipients if it's a JSON string
+    if (typeof recipients === 'string') {
+      try {
+        recipients = JSON.parse(recipients);
+      } catch (parseError) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invalid recipients format' 
+        });
+      }
+    }
     
     // Validation
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Recipients array is required' 
+        message: 'Recipients array is required and must contain at least one email' 
       });
     }
     
@@ -5947,6 +5960,17 @@ app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachme
       return res.status(400).json({ 
         success: false, 
         message: 'Subject and message are required' 
+      });
+    }
+
+    // Validate email formats
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = recipients.filter(email => !emailRegex.test(email.trim()));
+    
+    if (invalidEmails.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid email format(s): ${invalidEmails.join(', ')}` 
       });
     }
 
@@ -5969,12 +5993,12 @@ app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachme
     // Send emails to all recipients
     for (const recipient of recipients) {
       try {
-        await sendEmail(recipient, subject, htmlTemplate, attachments);
+        await sendEmail(recipient.trim(), subject, htmlTemplate, attachments);
         results.successful.push(recipient);
         
         // Save successful email record
         const emailRecord = new Email({
-          to: recipient,
+          to: recipient.trim(),
           subject,
           message,
           attachments,
@@ -5990,7 +6014,7 @@ app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachme
         
         // Save failed email record
         const failedEmailRecord = new Email({
-          to: recipient,
+          to: recipient.trim(),
           subject,
           message,
           attachments,

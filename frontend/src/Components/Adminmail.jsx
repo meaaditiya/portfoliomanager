@@ -144,44 +144,90 @@ const EmailDashboard = () => {
       setLoading(false);
     }
   };
+const validateBulkEmailForm = () => {
+  const validRecipients = bulkEmail.recipients.filter(email => email.trim());
+  
+  if (validRecipients.length === 0) {
+    showMessage('Please add at least one recipient', 'error');
+    return false;
+  }
+  
+  if (!bulkEmail.subject.trim()) {
+    showMessage('Subject is required', 'error');
+    return false;
+  }
+  
+  if (!bulkEmail.message.trim()) {
+    showMessage('Message is required', 'error');
+    return false;
+  }
+  
+  // Validate email formats
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const invalidEmails = validRecipients.filter(email => !emailRegex.test(email));
+  
+  if (invalidEmails.length > 0) {
+    showMessage(`Invalid email format(s): ${invalidEmails.join(', ')}`, 'error');
+    return false;
+  }
+  
+  return true;
+};
 
-  const sendBulkEmail = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+const sendBulkEmail = async (e) => {
+  e.preventDefault();
+   if (!validateBulkEmailForm()) {
+    return;
+  }
+  
+  setLoading(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('recipients', JSON.stringify(bulkEmail.recipients.filter(email => email.trim())));
-      formData.append('subject', bulkEmail.subject);
-      formData.append('message', bulkEmail.message);
-      formData.append('senderName', bulkEmail.senderName);
-
-      attachments.forEach(file => {
-        formData.append('attachments', file);
-      });
-
-      const response = await fetch(`${API_BASE}/send-bulk-email`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        showMessage(`Bulk email completed! ${data.results.successful.length} sent, ${data.results.failed.length} failed`, 'success');
-        setBulkEmail({ recipients: [''], subject: '', message: '', senderName: 'Admin' });
-        setAttachments([]);
-        fetchStats();
-        fetchEmailHistory();
-      } else {
-        showMessage(data.message || 'Failed to send bulk email', 'error');
-      }
-    } catch (error) {
-      showMessage('Error sending bulk email', 'error');
-    } finally {
+  try {
+    // Filter out empty emails and validate
+    const validRecipients = bulkEmail.recipients.filter(email => email.trim());
+    
+    if (validRecipients.length === 0) {
+      showMessage('Please add at least one valid recipient', 'error');
       setLoading(false);
+      return;
     }
-  };
+
+    const formData = new FormData();
+    
+    // Send recipients as JSON string (server expects to parse it)
+    formData.append('recipients', JSON.stringify(validRecipients));
+    formData.append('subject', bulkEmail.subject);
+    formData.append('message', bulkEmail.message);
+    formData.append('senderName', bulkEmail.senderName);
+
+    attachments.forEach(file => {
+      formData.append('attachments', file);
+    });
+
+    const response = await fetch(`${API_BASE}/send-bulk-email`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      showMessage(`Bulk email completed! ${data.results.successful.length} sent, ${data.results.failed.length} failed`, 'success');
+      setBulkEmail({ recipients: [''], subject: '', message: '', senderName: 'Admin' });
+      setAttachments([]);
+      fetchStats();
+      fetchEmailHistory();
+    } else {
+      showMessage(data.message || 'Failed to send bulk email', 'error');
+    }
+  } catch (error) {
+    console.error('Bulk email error:', error);
+    showMessage('Error sending bulk email', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const deleteEmail = async (id) => {
     if (!window.confirm('Are you sure you want to delete this email?')) return;
