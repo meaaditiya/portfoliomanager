@@ -4910,7 +4910,8 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
     .email-container {
       width: 100%;
       background-color: #ffffff;
-      border: none;
+      border-left:2px solid  black;
+      border-right: 2px solid  black;
       box-shadow: none;
       overflow: hidden;
       min-height: 100vh;
@@ -5192,11 +5193,11 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
         />
         <div class="avatar-fallback" style="display: none;">AT</div>
-        <h3 class="profile-name">Aaditiya Tyagi</h3>
+        
       </div>
       
       <div class="subject-section">
-        <h1>${subject}</h1>
+        <h1>Project request received successfully</h1>
       </div>
     </div>
 
@@ -5208,7 +5209,7 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       ${fileList}
       <p>We will review your request and get back to you soon.</p>
       <div class="contact-info">
-        <p><strong>Best regards,</strong><br>${senderName}</p>
+        <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
         <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
         <p>
           <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
@@ -5342,7 +5343,8 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
     .email-container {
       width: 100%;
       background-color: #ffffff;
-      border: none;
+       border-left:2px solid  black;
+      border-right: 2px solid  black;
       box-shadow: none;
       overflow: hidden;
       min-height: 100vh;
@@ -5624,11 +5626,11 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
         />
         <div class="avatar-fallback" style="display: none;">AT</div>
-        <h3 class="profile-name">Aaditiya Tyagi</h3>
+        
       </div>
       
       <div class="subject-section">
-        <h1>${subject}</h1>
+        <h1>Project request has been acknowledged!</h1>
       </div>
     </div>
 
@@ -5641,7 +5643,7 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
       <p>Thank you for your submission!</p></p>
       </div>
       <div class="contact-info">
-        <p><strong>Best regards,</strong><br>${senderName}</p>
+        <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
         <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
         <p>
           <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
@@ -5749,7 +5751,8 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
     .email-container {
       width: 100%;
       background-color: #ffffff;
-      border: none;
+      border-left:2px solid  black;
+      border-right: 2px solid  black;
       box-shadow: none;
       overflow: hidden;
       min-height: 100vh;
@@ -6031,7 +6034,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
         />
         <div class="avatar-fallback" style="display: none;">AT</div>
-        <h3 class="profile-name">Aaditiya Tyagi</h3>
+      
       </div>
       
       <div class="subject-section">
