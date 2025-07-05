@@ -4891,37 +4891,38 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       '<p>No files uploaded.</p>';
 
     const confirmationEmail = `
-       <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Project Request Received</title>
+  <title>Your project request hs been received successfully</title>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f7f7f7;
       margin: 0;
-      padding: 40px 20px;
+      padding: 0;
       color: #1f2937;
       line-height: 1.6;
     }
 
     .email-container {
-      max-width: 640px;
-      margin: 0 auto;
+      width: 100%;
       background-color: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      border: none;
+      box-shadow: none;
       overflow: hidden;
-      border: 1px solid #e5e7eb;
+      min-height: 100vh;
     }
 
     .email-header {
       background: linear-gradient(135deg, #111827, #1f2937);
       color: #ffffff;
       padding: 48px 32px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       position: relative;
       overflow: hidden;
     }
@@ -4937,11 +4938,19 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       transform: rotate(30deg);
     }
 
+    .profile-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
     .profile-image {
       width: 96px;
       height: 96px;
       border-radius: 50%;
-      margin: 0 auto 24px;
+      margin-bottom: 16px;
       border: 4px solid #ffffff;
       display: block;
       object-fit: cover;
@@ -4957,7 +4966,7 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       height: 96px;
       border-radius: 50%;
       background: linear-gradient(45deg, #6b7280, #9ca3af);
-      margin: 0 auto 24px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -4968,13 +4977,28 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       text-transform: uppercase;
     }
 
-    .email-header h1 {
-      font-size: 28px;
+    .profile-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      text-align: center;
+      margin: 0;
+    }
+
+    .subject-section {
+      flex: 1;
+      text-align: right;
+      position: relative;
+      z-index: 1;
+      margin-left: 32px;
+    }
+
+    .subject-section h1 {
+      font-size: 32px;
       font-weight: 800;
       margin: 0;
       letter-spacing: -0.025em;
-      position: relative;
-      z-index: 1;
+      color: #ffffff;
     }
 
     .email-content {
@@ -5029,24 +5053,14 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
     }
 
     .visit-site {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: linear-gradient(90deg, #374151, #4b5563);
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 4px 14px rgba(55, 65, 81, 0.3);
-      text-align: center;
+        color:inherit;
+        background-color: white;
+    
     }
 
     .visit-site:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(55, 65, 81, 0.4);
-      background: linear-gradient(90deg, #4b5563, #6b7280);
+        color:black;
+        
     }
 
     .email-footer {
@@ -5090,29 +5104,79 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       color: #3b82f6;
     }
 
-    @media (max-width: 600px) {
-      body {
-        padding: 20px 10px;
-      }
-
-      .email-container {
-        border-radius: 8px;
-      }
-
+    @media (max-width: 768px) {
       .email-header {
         padding: 32px 20px;
+        align-items: flex-start;
+      }
+
+      .profile-section {
+        align-items: flex-start;
+        min-width: 120px;
+      }
+
+      .subject-section {
+        margin-left: 20px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 24px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
       }
 
       .email-content {
         padding: 24px;
       }
 
-      .email-header h1 {
-        font-size: 24px;
+      .profile-name {
+        font-size: 16px;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .email-header {
+        padding: 24px 16px;
+        align-items: flex-start;
       }
 
-      .email-content h2 {
-        font-size: 20px;
+      .profile-section {
+        align-items: flex-start;
+        min-width: 100px;
+      }
+
+      .subject-section {
+        margin-left: 16px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 18px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        line-height: 1.3;
+      }
+
+      .email-content {
+        padding: 20px;
+      }
+
+      .profile-image, .avatar-fallback {
+        width: 70px;
+        height: 70px;
+      }
+
+      .avatar-fallback {
+        font-size: 28px;
+      }
+
+      .profile-name {
+        font-size: 14px;
+        text-align: left;
       }
     }
   </style>
@@ -5120,14 +5184,20 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
 <body>
   <div class="email-container">
     <div class="email-header">
-      <img
-        src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
-        alt="Profile"
-        class="profile-image"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-      />
-      <div class="avatar-fallback" style="display: none;">AT</div>
-      <h1>Project Request Received Successfully</h1>
+      <div class="profile-section">
+        <img
+          src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
+          alt="Profile"
+          class="profile-image"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="avatar-fallback" style="display: none;">AT</div>
+        <h3 class="profile-name">Aaditiya Tyagi</h3>
+      </div>
+      
+      <div class="subject-section">
+        <h1>${subject}</h1>
+      </div>
     </div>
 
     <div class="email-content">
@@ -5137,9 +5207,8 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
       <p>Your project request of type "${projectType}" has been received.</p>
       ${fileList}
       <p>We will review your request and get back to you soon.</p>
-
       <div class="contact-info">
-        <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
+        <p><strong>Best regards,</strong><br>${senderName}</p>
         <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
         <p>
           <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
@@ -5254,37 +5323,38 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
 
     // Send acknowledgment email to user
     const acknowledgmentEmail = `
-      <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Project Request Acknowledgement</title>
+  <title>Your project request has been acknowledged</title>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f7f7f7;
       margin: 0;
-      padding: 40px 20px;
+      padding: 0;
       color: #1f2937;
       line-height: 1.6;
     }
 
     .email-container {
-      max-width: 640px;
-      margin: 0 auto;
+      width: 100%;
       background-color: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      border: none;
+      box-shadow: none;
       overflow: hidden;
-      border: 1px solid #e5e7eb;
+      min-height: 100vh;
     }
 
     .email-header {
       background: linear-gradient(135deg, #111827, #1f2937);
       color: #ffffff;
       padding: 48px 32px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       position: relative;
       overflow: hidden;
     }
@@ -5300,349 +5370,19 @@ app.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, async 
       transform: rotate(30deg);
     }
 
-    .profile-image {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      margin: 0 auto 24px;
-      border: 4px solid #ffffff;
-      display: block;
-      object-fit: cover;
-      transition: transform 0.3s ease;
-    }
-
-    .profile-image:hover {
-      transform: scale(1.05);
-    }
-
-    .avatar-fallback {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      background: linear-gradient(45deg, #6b7280, #9ca3af);
-      margin: 0 auto 24px;
+    .profile-section {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      font-size: 40px;
-      font-weight: 700;
-      color: #ffffff;
-      border: 4px solid #ffffff;
-      text-transform: uppercase;
-    }
-
-    .email-header h1 {
-      font-size: 28px;
-      font-weight: 800;
-      margin: 0;
-      letter-spacing: -0.025em;
       position: relative;
       z-index: 1;
     }
 
-    .email-content {
-      padding: 40px;
-      background-color: #ffffff;
-    }
-
-    .email-content h2 {
-      font-size: 22px;
-      font-weight: 600;
-      color: #111827;
+    .profile-image {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
       margin-bottom: 16px;
-    }
-
-    .email-message {
-      background-color: #f9fafb;
-      border-left: 4px solid #374151;
-      padding: 24px;
-      border-radius: 0 12px 12px 0;
-      color: #1f2937;
-      margin: 24px 0;
-      line-height: 1.8;
-      font-size: 16px;
-    }
-
-    .email-message p {
-      margin: 8px 0;
-    }
-
-    .contact-info {
-      font-size: 15px;
-      color: #374151;
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #e5e7eb;
-    }
-
-    .contact-info p {
-      margin: 8px 0;
-    }
-
-    .contact-info a {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s ease;
-    }
-
-    .contact-info a:hover {
-      color: #1d4ed8;
-      text-decoration: underline;
-    }
-
-    .visit-site {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: linear-gradient(90deg, #374151, #4b5563);
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 4px 14px rgba(55, 65, 81, 0.3);
-      text-align: center;
-    }
-
-    .visit-site:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(55, 65, 81, 0.4);
-      background: linear-gradient(90deg, #4b5563, #6b7280);
-    }
-
-    .email-footer {
-      background: linear-gradient(180deg, #111827, #1f2937);
-      padding: 32px;
-      text-align: center;
-      color: #d1d5db;
-      font-size: 13px;
-      border-top: 1px solid #374151;
-    }
-
-    .email-footer p {
-      margin: 6px 0;
-      line-height: 1.5;
-    }
-
-    .email-footer a {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .email-footer a:hover {
-      color: #1d4ed8;
-      text-decoration: underline;
-    }
-
-    .social-links {
-      margin-top: 16px;
-    }
-
-    .social-links a {
-      display: inline-block;
-      margin: 0 8px;
-      color: #d1d5db;
-      font-size: 14px;
-      transition: color 0.2s ease;
-    }
-
-    .social-links a:hover {
-      color: #3b82f6;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        padding: 20px 10px;
-      }
-
-      .email-container {
-        border-radius: 8px;
-      }
-
-      .email-header {
-        padding: 32px 20px;
-      }
-
-      .email-content {
-        padding: 24px;
-      }
-
-      .email-header h1 {
-        font-size: 24px;
-      }
-
-      .email-content h2 {
-        font-size: 20px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <div class="email-header">
-      <img
-        src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
-        alt="Profile"
-        class="profile-image"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-      />
-      <div class="avatar-fallback" style="display: none;">AT</div>
-      <h1>Project Acknowledgement</h1>
-    </div>
-
-    <div class="email-content">
-      <h2>Dear Recipient,</h2>
-      <div>
-        <p> <h1>Project Request Acknowledged</h1>
-      <p>Hello ${request.name},</p>
-      <p>Your project request of type "${request.projectType}" has been acknowledged.</p>
-      <p>Thank you for your submission!</p></p>
-      </div>
-
-      <div class="contact-info">
-        <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
-        <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
-        <p>
-          <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
-            Visit My Site
-          </a>
-        </p>
-      </div>
-    </div>
-
-    <div class="email-footer">
-      <p>This email was generated automatically. Please do not reply directly.</p>
-      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
-      <div class="social-links">
-        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
-        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
-        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
-      </div>
-      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-
-    await sendEmail(request.email, 'Project Request Acknowledged', acknowledgmentEmail);
-
-    res.json({
-      message: 'Project request acknowledged successfully',
-      request
-    });
-  } catch (error) {
-    console.error('Acknowledge project request error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Delete specific project request (admin only)
-app.delete('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const deletedRequest = await ProjectRequest.findByIdAndDelete(id);
-    if (!deletedRequest) {
-      return res.status(404).json({ message: 'Project request not found' });
-    }
-    
-    res.json({ message: 'Project request deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting project request:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Delete all project requests (admin only)
-app.delete('/api/admin/project/requests', authenticateToken, async (req, res) => {
-  try {
-    const result = await ProjectRequest.deleteMany({});
-    
-    res.json({ 
-      message: 'All project requests deleted successfully',
-      deletedCount: result.deletedCount 
-    });
-  } catch (error) {
-    console.error('Error deleting all project requests:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Email Schema for MongoDB (add this to your models)
-const emailSchema = new mongoose.Schema({
-  to: { type: String, required: true },
-  subject: { type: String, required: true },
-  message: { type: String, required: true },
-  attachments: [{
-    filename: String,
-    contentType: String,
-    data: Buffer,
-    size: Number
-  }],
-  sentAt: { type: Date, default: Date.now },
-  sentBy: { type: String, required: true }, // admin email or ID
-  status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
-});
-
-const Email = mongoose.model('Email', emailSchema);
-app.use('/public', express.static(path.join(__dirname, 'public')));
-const getEmailTemplate = (subject, message, senderName = 'Admin') => {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${subject}</title>
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #f7f7f7;
-      margin: 0;
-      padding: 40px 20px;
-      color: #1f2937;
-      line-height: 1.6;
-    }
-
-    .email-container {
-      max-width: 640px;
-      margin: 0 auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-      border: 1px solid #e5e7eb;
-    }
-
-    .email-header {
-      background: linear-gradient(135deg, #111827, #1f2937);
-      color: #ffffff;
-      padding: 48px 32px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .email-header::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
-      transform: rotate(30deg);
-    }
-
-    .profile-image {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      margin: 0 auto 24px;
       border: 4px solid #ffffff;
       display: block;
       object-fit: cover;
@@ -5658,7 +5398,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
       height: 96px;
       border-radius: 50%;
       background: linear-gradient(45deg, #6b7280, #9ca3af);
-      margin: 0 auto 24px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -5669,13 +5409,28 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
       text-transform: uppercase;
     }
 
-    .email-header h1 {
-      font-size: 28px;
+    .profile-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      text-align: center;
+      margin: 0;
+    }
+
+    .subject-section {
+      flex: 1;
+      text-align: right;
+      position: relative;
+      z-index: 1;
+      margin-left: 32px;
+    }
+
+    .subject-section h1 {
+      font-size: 32px;
       font-weight: 800;
       margin: 0;
       letter-spacing: -0.025em;
-      position: relative;
-      z-index: 1;
+      color: #ffffff;
     }
 
     .email-content {
@@ -5781,29 +5536,79 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
       color: #3b82f6;
     }
 
-    @media (max-width: 600px) {
-      body {
-        padding: 20px 10px;
-      }
-
-      .email-container {
-        border-radius: 8px;
-      }
-
+    @media (max-width: 768px) {
       .email-header {
         padding: 32px 20px;
+        align-items: flex-start;
+      }
+
+      .profile-section {
+        align-items: flex-start;
+        min-width: 120px;
+      }
+
+      .subject-section {
+        margin-left: 20px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 24px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
       }
 
       .email-content {
         padding: 24px;
       }
 
-      .email-header h1 {
-        font-size: 24px;
+      .profile-name {
+        font-size: 16px;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .email-header {
+        padding: 24px 16px;
+        align-items: flex-start;
       }
 
-      .email-content h2 {
-        font-size: 20px;
+      .profile-section {
+        align-items: flex-start;
+        min-width: 100px;
+      }
+
+      .subject-section {
+        margin-left: 16px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 18px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        line-height: 1.3;
+      }
+
+      .email-content {
+        padding: 20px;
+      }
+
+      .profile-image, .avatar-fallback {
+        width: 70px;
+        height: 70px;
+      }
+
+      .avatar-fallback {
+        font-size: 28px;
+      }
+
+      .profile-name {
+        font-size: 14px;
+        text-align: left;
       }
     }
   </style>
@@ -5811,19 +5616,432 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
 <body>
   <div class="email-container">
     <div class="email-header">
-      <img
-        src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
-        alt="Profile"
-        class="profile-image"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-      />
-      <div class="avatar-fallback" style="display: none;">AT</div>
-      <h1>${subject}</h1>
+      <div class="profile-section">
+        <img
+          src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
+          alt="Profile"
+          class="profile-image"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="avatar-fallback" style="display: none;">AT</div>
+        <h3 class="profile-name">Aaditiya Tyagi</h3>
+      </div>
+      
+      <div class="subject-section">
+        <h1>${subject}</h1>
+      </div>
     </div>
 
     <div class="email-content">
       <h2>Dear Recipient,</h2>
-      <div>
+     <div>
+        <p> <h1>Project Request Acknowledged</h1>
+      <p>Hello ${request.name},</p>
+      <p>Your project request of type "${request.projectType}" has been acknowledged.</p>
+      <p>Thank you for your submission!</p></p>
+      </div>
+      <div class="contact-info">
+        <p><strong>Best regards,</strong><br>${senderName}</p>
+        <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
+        <p>
+          <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
+            Visit My Site
+          </a>
+        </p>
+      </div>
+    </div>
+
+    <div class="email-footer">
+      <p>This email was generated automatically. Please do not reply directly.</p>
+      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
+      <div class="social-links">
+        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
+        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
+      </div>
+      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    await sendEmail(request.email, 'Project Request Acknowledged', acknowledgmentEmail);
+
+    res.json({
+      message: 'Project request acknowledged successfully',
+      request
+    });
+  } catch (error) {
+    console.error('Acknowledge project request error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete specific project request (admin only)
+app.delete('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deletedRequest = await ProjectRequest.findByIdAndDelete(id);
+    if (!deletedRequest) {
+      return res.status(404).json({ message: 'Project request not found' });
+    }
+    
+    res.json({ message: 'Project request deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project request:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete all project requests (admin only)
+app.delete('/api/admin/project/requests', authenticateToken, async (req, res) => {
+  try {
+    const result = await ProjectRequest.deleteMany({});
+    
+    res.json({ 
+      message: 'All project requests deleted successfully',
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    console.error('Error deleting all project requests:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Email Schema for MongoDB (add this to your models)
+const emailSchema = new mongoose.Schema({
+  to: { type: String, required: true },
+  subject: { type: String, required: true },
+  message: { type: String, required: true },
+  attachments: [{
+    filename: String,
+    contentType: String,
+    data: Buffer,
+    size: Number
+  }],
+  sentAt: { type: Date, default: Date.now },
+  sentBy: { type: String, required: true }, // admin email or ID
+  status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
+});
+
+const Email = mongoose.model('Email', emailSchema);
+app.use('/public', express.static(path.join(__dirname, 'public')));
+const getEmailTemplate = (subject, message, senderName = 'Admin') => {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+      color: #1f2937;
+      line-height: 1.6;
+    }
+
+    .email-container {
+      width: 100%;
+      background-color: #ffffff;
+      border: none;
+      box-shadow: none;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+
+    .email-header {
+      background: linear-gradient(135deg, #111827, #1f2937);
+      color: #ffffff;
+      padding: 48px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .email-header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 10%, transparent 60%);
+      transform: rotate(30deg);
+    }
+
+    .profile-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .profile-image {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      margin-bottom: 16px;
+      border: 4px solid #ffffff;
+      display: block;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .profile-image:hover {
+      transform: scale(1.05);
+    }
+
+    .avatar-fallback {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #6b7280, #9ca3af);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      color: #ffffff;
+      border: 4px solid #ffffff;
+      text-transform: uppercase;
+    }
+
+    .profile-name {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      text-align: center;
+      margin: 0;
+    }
+
+    .subject-section {
+      flex: 1;
+      text-align: right;
+      position: relative;
+      z-index: 1;
+      margin-left: 32px;
+    }
+
+    .subject-section h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -0.025em;
+      color: #ffffff;
+    }
+
+    .email-content {
+      padding: 40px;
+      background-color: #ffffff;
+    }
+
+    .email-content h2 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .email-message {
+      background-color: #f9fafb;
+      border-left: 4px solid #374151;
+      padding: 24px;
+      border-radius: 0 12px 12px 0;
+      color: #1f2937;
+      margin: 24px 0;
+      line-height: 1.8;
+      font-size: 16px;
+    }
+
+    .email-message p {
+      margin: 8px 0;
+    }
+
+    .contact-info {
+      font-size: 15px;
+      color: #374151;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .contact-info p {
+      margin: 8px 0;
+    }
+
+    .contact-info a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .contact-info a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .visit-site {
+        color:inherit;
+        background-color: white;
+    
+    }
+
+    .visit-site:hover {
+        color:black;
+        
+    }
+
+    .email-footer {
+      background: linear-gradient(180deg, #111827, #1f2937);
+      padding: 32px;
+      text-align: center;
+      color: #d1d5db;
+      font-size: 13px;
+      border-top: 1px solid #374151;
+    }
+
+    .email-footer p {
+      margin: 6px 0;
+      line-height: 1.5;
+    }
+
+    .email-footer a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .email-footer a:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+
+    .social-links {
+      margin-top: 16px;
+    }
+
+    .social-links a {
+      display: inline-block;
+      margin: 0 8px;
+      color: #d1d5db;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+
+    .social-links a:hover {
+      color: #3b82f6;
+    }
+
+    @media (max-width: 768px) {
+      .email-header {
+        padding: 32px 20px;
+        align-items: flex-start;
+      }
+
+      .profile-section {
+        align-items: flex-start;
+        min-width: 120px;
+      }
+
+      .subject-section {
+        margin-left: 20px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 24px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+
+      .email-content {
+        padding: 24px;
+      }
+
+      .profile-name {
+        font-size: 16px;
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .email-header {
+        padding: 24px 16px;
+        align-items: flex-start;
+      }
+
+      .profile-section {
+        align-items: flex-start;
+        min-width: 100px;
+      }
+
+      .subject-section {
+        margin-left: 16px;
+        text-align: left;
+      }
+
+      .subject-section h1 {
+        font-size: 18px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        line-height: 1.3;
+      }
+
+      .email-content {
+        padding: 20px;
+      }
+
+      .profile-image, .avatar-fallback {
+        width: 70px;
+        height: 70px;
+      }
+
+      .avatar-fallback {
+        font-size: 28px;
+      }
+
+      .profile-name {
+        font-size: 14px;
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="profile-section">
+        <img
+          src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555"
+          alt="Profile"
+          class="profile-image"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="avatar-fallback" style="display: none;">AT</div>
+        <h3 class="profile-name">Aaditiya Tyagi</h3>
+      </div>
+      
+      <div class="subject-section">
+        <h1>${subject}</h1>
+      </div>
+    </div>
+
+    <div class="email-content">
+      <h2>Dear Recipient,</h2>
+      <div >
         <p>${message.replace(/\n/g, '</p><p>')}</p>
       </div>
 
