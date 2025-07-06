@@ -470,10 +470,7 @@ app.get('/api/admin/profile', authenticateToken, async (req, res) => {
   }
 });
 
-
-
-
-// Blog Model with Inline Image Support
+// Updated Blog Schema with Video Support
 const blogSchema = new mongoose.Schema({
     title: { 
       type: String, 
@@ -503,8 +500,50 @@ const blogSchema = new mongoose.Schema({
         enum: ['left', 'right', 'center', 'full-width'],
         default: 'center'
       },
-      // Unique identifier to reference in content
       imageId: {
+        type: String,
+        required: true,
+        unique: true
+      }
+    }],
+    // Array to store inline videos used in content
+    contentVideos: [{
+      url: {
+        type: String,
+        required: true
+      },
+      videoId: {
+        type: String,
+        required: true
+      },
+      platform: {
+        type: String,
+        enum: ['youtube', 'vimeo', 'dailymotion'],
+        default: 'youtube'
+      },
+      title: {
+        type: String,
+        default: ''
+      },
+      caption: {
+        type: String,
+        default: ''
+      },
+      position: {
+        type: String,
+        enum: ['left', 'right', 'center', 'full-width'],
+        default: 'center'
+      },
+      autoplay: {
+        type: Boolean,
+        default: false
+      },
+      muted: {
+        type: Boolean,
+        default: false
+      },
+      // Unique identifier to reference in content
+      embedId: {
         type: String,
         required: true,
         unique: true
@@ -564,49 +603,59 @@ const blogSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
-  });
+});
+
+// Updated pre-save middleware to handle videos
+blogSchema.pre('save', function(next) {
+  if (this.isModified('title')) {
+    this.slug = this.title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, '-');
+  }
   
-  // Create slug from title and generate unique image IDs
-  blogSchema.pre('save', function(next) {
-    if (this.isModified('title')) {
-      this.slug = this.title
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, '-');
-    }
-    
-    // Generate unique IDs for new content images
-    if (this.isModified('contentImages')) {
-      this.contentImages.forEach(image => {
-        if (!image.imageId) {
-          image.imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        }
-      });
-    }
-    
-    if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-      this.publishedAt = new Date();
-    }
-    
-    this.updatedAt = new Date();
-    next();
-  });
+  // Generate unique IDs for new content images
+  if (this.isModified('contentImages')) {
+    this.contentImages.forEach(image => {
+      if (!image.imageId) {
+        image.imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      }
+    });
+  }
   
-  const Blog = mongoose.model('Blog', blogSchema);
+  // Generate unique IDs for new content videos
+  if (this.isModified('contentVideos')) {
+    this.contentVideos.forEach(video => {
+      if (!video.embedId) {
+        video.embedId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      }
+    });
+  }
+  
+  if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
+    this.publishedAt = new Date();
+  }
+  
+  this.updatedAt = new Date();
+  next();
+});
+
+const Blog = mongoose.model('Blog', blogSchema);
   
   // Blog Routes
   // Create a new blog post
 app.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
-    const { title, content, summary, status, tags, featuredImage, contentImages } = req.body;
+    const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;
     
     // Validate required fields
     if (!title || !content || !summary) {
       return res.status(400).json({ message: 'Title, content, and summary are required' });
     }
     
-    // Clean up contentImages to only include those referenced in content
+    // Clean up unused images and videos
     const cleanedImages = cleanupUnusedImages(content, contentImages || []);
+    const cleanedVideos = cleanupUnusedVideos(content, contentVideos || []);
     
     const newBlog = new Blog({
       title,
@@ -616,7 +665,8 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
       status: status || 'draft',
       tags: tags || [],
       featuredImage,
-      contentImages: cleanedImages
+      contentImages: cleanedImages,
+      contentVideos: cleanedVideos
     });
     
     await newBlog.save();
@@ -630,6 +680,7 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
   // Add image to blog content
   app.post('/api/blogs/:id/images', authenticateToken, async (req, res) => {
     try {
@@ -751,143 +802,129 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
   });
   
   // Get all blog posts (with pagination and filtering)
-  app.get('/api/blogs', async (req, res) => {
-    try {
-      const { 
-        page = 1, 
-        limit = 10, 
-        status, 
-        tag,
-        search,
-        sortBy = 'createdAt',
-        sortOrder = 'desc'
-      } = req.query;
-      
-      // Build filter object
-      const filter = {};
-      
-      // Add status filter if specified
-      if (status) {
-        filter.status = status;
-      } else {
-        // By default, public API only shows published posts
-        const isAuthenticated = req.user?.admin_id;
-        if (!isAuthenticated) {
-          filter.status = 'published';
-        }
-      }
-      
-      // Add tag filter if specified
-      if (tag) {
-        filter.tags = tag;
-      }
-      
-      // Add search filter if specified
-      if (search) {
-        filter.$or = [
-          { title: { $regex: search, $options: 'i' } },
-          { content: { $regex: search, $options: 'i' } },
-          { summary: { $regex: search, $options: 'i' } }
-        ];
-      }
-      
-      // Build sort object
-      const sort = {};
-      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-      
-      // Calculate pagination
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-      
-      // Execute query with pagination
-      const blogs = await Blog.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit))
-        .populate('author', 'name email')
-        .exec();
-      
-      // Process content to replace image placeholders with actual images
-      const processedBlogs = blogs.map(blog => {
-        const blogObj = blog.toObject();
-        blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
-        return blogObj;
-      });
-      
-      // Get total count for pagination info
-      const total = await Blog.countDocuments(filter);
-      
-      res.json({
-        blogs: processedBlogs,
-        pagination: {
-          total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching blogs:', error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-  
-  // Get a single blog post by ID or slug
-  app.get('/api/blogs/:identifier', async (req, res) => {
-    try {
-      const { identifier } = req.params;
-      
-      // Determine if identifier is ObjectId or slug
-      const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
-      
-      // Build query based on identifier type
-      const query = isObjectId 
-        ? { _id: identifier }
-        : { slug: identifier };
-      
-      // Add status check for non-authenticated users
+app.get('/api/blogs', async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      tag,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    // Build filter object
+    const filter = {};
+    
+    if (status) {
+      filter.status = status;
+    } else {
       const isAuthenticated = req.user?.admin_id;
       if (!isAuthenticated) {
-        query.status = 'published';
+        filter.status = 'published';
       }
-      
-      const blog = await Blog.findOne(query)
-        .populate('author', 'name email')
-        .exec();
-      
-      if (!blog) {
-        return res.status(404).json({ message: 'Blog post not found' });
-      }
-      
-      const blogObj = blog.toObject();
-      blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
-      
-      res.json(blogObj);
-    } catch (error) {
-      console.error('Error fetching blog:', error);
-      res.status(500).json({ message: error.message });
     }
-  });
+    
+    if (tag) {
+      filter.tags = tag;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { content: { $regex: search, $options: 'i' } },
+        { summary: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const blogs = await Blog.find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('author', 'name email')
+      .exec();
+    
+    // Process content to replace both image and video placeholders
+    const processedBlogs = blogs.map(blog => {
+      const blogObj = blog.toObject();
+      blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
+      return blogObj;
+    });
+    
+    const total = await Blog.countDocuments(filter);
+    
+    res.json({
+      blogs: processedBlogs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching blogs:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
   
-  // Update a blog post
- app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
+  // Get a single blog post (updated to process videos)
+app.get('/api/blogs/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const isAuthenticated = req.user?.admin_id;
+    if (!isAuthenticated) {
+      query.status = 'published';
+    }
+    
+    const blog = await Blog.findOne(query)
+      .populate('author', 'name email')
+      .exec();
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    const blogObj = blog.toObject();
+    blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
+    
+    res.json(blogObj);
+  } catch (error) {
+    console.error('Error fetching blog:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update a blog post (updated to handle videos)
+app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
     
-    // Find blog post
     const blog = await Blog.findById(id);
     
     if (!blog) {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check if user is the author or has admin rights
     if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to update this blog post' });
     }
     
-    // Update only allowed fields
-    const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages'];
+    const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages', 'contentVideos'];
     
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {
@@ -895,15 +932,16 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
       }
     });
     
-    // Clean up unused images if content was updated
+    // Clean up unused media if content was updated
     if (updates.content !== undefined) {
       blog.contentImages = cleanupUnusedImages(updates.content, blog.contentImages);
+      blog.contentVideos = cleanupUnusedVideos(updates.content, blog.contentVideos);
     }
     
     await blog.save();
     
     const blogObj = blog.toObject();
-    blogObj.processedContent = processContentImages(blogObj.content, blogObj.contentImages);
+    blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
     
     res.json({
       message: 'Blog post updated successfully',
@@ -914,6 +952,8 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+  
+  
   // Delete a blog post
   app.delete('/api/blogs/:id', authenticateToken, async (req, res) => {
     try {
@@ -1038,6 +1078,374 @@ function cleanupUnusedImages(content, contentImages) {
       res.status(500).json({ message: error.message });
     }
   });
+
+
+
+
+  // Video Routes for Blog Posts
+
+// Add video to blog content
+app.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { url, title, caption, position, autoplay, muted } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ message: 'Video URL is required' });
+    }
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check authorization
+    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+    
+    // Extract video info from URL
+    const videoInfo = extractVideoInfo(url);
+    
+    if (!videoInfo) {
+      return res.status(400).json({ message: 'Invalid video URL. Currently supported: YouTube, Vimeo, Dailymotion' });
+    }
+    
+    // Generate unique embed ID
+    const embedId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const newVideo = {
+      url: videoInfo.url,
+      videoId: videoInfo.videoId,
+      platform: videoInfo.platform,
+      title: title || '',
+      caption: caption || '',
+      position: position || 'center',
+      autoplay: autoplay || false,
+      muted: muted || false,
+      embedId
+    };
+    
+    blog.contentVideos.push(newVideo);
+    await blog.save();
+    
+    res.status(201).json({
+      message: 'Video added successfully',
+      video: newVideo,
+      embedId: embedId,
+      embedCode: `[VIDEO:${embedId}]`
+    });
+  } catch (error) {
+    console.error('Error adding video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update content video
+app.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res) => {
+  try {
+    const { id, embedId } = req.params;
+    const { url, title, caption, position, autoplay, muted } = req.body;
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check authorization
+    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+    
+    const videoIndex = blog.contentVideos.findIndex(vid => vid.embedId === embedId);
+    
+    if (videoIndex === -1) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    
+    // Update video properties
+    if (url) {
+      const videoInfo = extractVideoInfo(url);
+      if (!videoInfo) {
+        return res.status(400).json({ message: 'Invalid video URL' });
+      }
+      blog.contentVideos[videoIndex].url = videoInfo.url;
+      blog.contentVideos[videoIndex].videoId = videoInfo.videoId;
+      blog.contentVideos[videoIndex].platform = videoInfo.platform;
+    }
+    
+    if (title !== undefined) blog.contentVideos[videoIndex].title = title;
+    if (caption !== undefined) blog.contentVideos[videoIndex].caption = caption;
+    if (position) blog.contentVideos[videoIndex].position = position;
+    if (autoplay !== undefined) blog.contentVideos[videoIndex].autoplay = autoplay;
+    if (muted !== undefined) blog.contentVideos[videoIndex].muted = muted;
+    
+    await blog.save();
+    
+    res.json({
+      message: 'Video updated successfully',
+      video: blog.contentVideos[videoIndex]
+    });
+  } catch (error) {
+    console.error('Error updating video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete content video
+app.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res) => {
+  try {
+    const { id, embedId } = req.params;
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check authorization
+    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+    
+    const videoIndex = blog.contentVideos.findIndex(vid => vid.embedId === embedId);
+    
+    if (videoIndex === -1) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    
+    blog.contentVideos.splice(videoIndex, 1);
+    await blog.save();
+    
+    res.json({ message: 'Video deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all videos for a specific blog post
+app.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check authorization
+    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view this blog post videos' });
+    }
+    
+    res.json({
+      videos: blog.contentVideos,
+      totalVideos: blog.contentVideos.length
+    });
+  } catch (error) {
+    console.error('Error fetching blog videos:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+// Helper Functions for Video Processing
+
+// Extract video information from URL
+function extractVideoInfo(url) {
+  // YouTube URL patterns
+  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+  const youtubeMatch = url.match(youtubeRegex);
+  
+  if (youtubeMatch) {
+    return {
+      platform: 'youtube',
+      videoId: youtubeMatch[1],
+      url: url
+    };
+  }
+  
+  // Vimeo URL patterns
+  const vimeoRegex = /(?:vimeo\.com\/)([0-9]+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  
+  if (vimeoMatch) {
+    return {
+      platform: 'vimeo',
+      videoId: vimeoMatch[1],
+      url: url
+    };
+  }
+  
+  // Dailymotion URL patterns
+  const dailymotionRegex = /(?:dailymotion\.com\/video\/)([a-zA-Z0-9]+)/;
+  const dailymotionMatch = url.match(dailymotionRegex);
+  
+  if (dailymotionMatch) {
+    return {
+      platform: 'dailymotion',
+      videoId: dailymotionMatch[1],
+      url: url
+    };
+  }
+  
+  return null;
+}
+
+// Process content to replace video placeholders with embeds
+function processContentVideos(content, contentVideos) {
+  // Add safety checks
+  if (!content || typeof content !== 'string') {
+    return content || '';
+  }
+  
+  if (!contentVideos || !Array.isArray(contentVideos) || contentVideos.length === 0) {
+    return content;
+  }
+  
+  let processedContent = content;
+  
+  try {
+    contentVideos.forEach(video => {
+      // Safety checks for video object
+      if (!video || !video.embedId) {
+        return; // Skip invalid video objects
+      }
+      
+      const placeholder = `[VIDEO:${video.embedId}]`;
+      
+      // Check if placeholder exists in content before attempting replacement
+      if (!processedContent.includes(placeholder)) {
+        return; // Skip if placeholder doesn't exist
+      }
+      
+      // Generate embed HTML based on platform
+      const embedHtml = generateVideoEmbed(video);
+      
+      // Replace ALL occurrences of the placeholder
+      processedContent = processedContent.replace(new RegExp(escapeRegExp(placeholder), 'g'), embedHtml);
+    });
+    
+    return processedContent;
+    
+  } catch (error) {
+    console.error('Error processing content videos:', error);
+    // Return original content if processing fails
+    return content;
+  }
+}
+
+// Generate video embed HTML
+function generateVideoEmbed(video) {
+  const safeTitle = (video.title || '').replace(/"/g, '&quot;');
+  const safeCaption = (video.caption || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safePosition = (video.position || 'center').replace(/[^a-zA-Z-]/g, '');
+  
+  let embedCode = '';
+  
+  switch (video.platform) {
+    case 'youtube':
+      const youtubeParams = new URLSearchParams({
+        ...(video.autoplay && { autoplay: '1' }),
+        ...(video.muted && { mute: '1' }),
+        rel: '0',
+        modestbranding: '1'
+      });
+      
+      embedCode = `<iframe 
+        width="560" 
+        height="315" 
+        src="https://www.youtube.com/embed/${video.videoId}?${youtubeParams}" 
+        title="${safeTitle}" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+        allowfullscreen>
+      </iframe>`;
+      break;
+      
+    case 'vimeo':
+      const vimeoParams = new URLSearchParams({
+        ...(video.autoplay && { autoplay: '1' }),
+        ...(video.muted && { muted: '1' }),
+        title: '0',
+        byline: '0',
+        portrait: '0'
+      });
+      
+      embedCode = `<iframe 
+        width="560" 
+        height="315" 
+        src="https://player.vimeo.com/video/${video.videoId}?${vimeoParams}" 
+        title="${safeTitle}" 
+        frameborder="0" 
+        allow="autoplay; fullscreen; picture-in-picture" 
+        allowfullscreen>
+      </iframe>`;
+      break;
+      
+    case 'dailymotion':
+      const dailymotionParams = new URLSearchParams({
+        ...(video.autoplay && { autoplay: '1' }),
+        ...(video.muted && { mute: '1' }),
+        'ui-highlight': '444444',
+        'ui-logo': '0'
+      });
+      
+      embedCode = `<iframe 
+        width="560" 
+        height="315" 
+        src="https://www.dailymotion.com/embed/video/${video.videoId}?${dailymotionParams}" 
+        title="${safeTitle}" 
+        frameborder="0" 
+        allow="autoplay; fullscreen" 
+        allowfullscreen>
+      </iframe>`;
+      break;
+      
+    default:
+      return `<p class="video-error">Unsupported video platform: ${video.platform}</p>`;
+  }
+  
+  return `<div class="blog-video blog-video-${safePosition}">
+    <div class="video-wrapper">
+      ${embedCode}
+    </div>
+    ${safeCaption ? `<p class="video-caption">${safeCaption}</p>` : ''}
+  </div>`;
+}
+
+// Clean up unused videos
+function cleanupUnusedVideos(content, contentVideos) {
+  if (!content || !Array.isArray(contentVideos) || contentVideos.length === 0) {
+    return contentVideos;
+  }
+  
+  // Filter out videos that are not referenced in content
+  return contentVideos.filter(video => {
+    if (!video || !video.embedId) {
+      return false; // Remove invalid videos
+    }
+    
+    const placeholder = `[VIDEO:${video.embedId}]`;
+    return content.includes(placeholder);
+  });
+}
+
+// Updated processContent function to handle both images and videos
+function processContent(content, contentImages, contentVideos) {
+  let processedContent = content;
+  
+  // Process images first
+  processedContent = processContentImages(processedContent, contentImages);
+  
+  // Process videos
+  processedContent = processContentVideos(processedContent, contentVideos);
+  
+  return processedContent;
+}
+
 const MessageSchema = new mongoose.Schema({
     name: {
       type: String,

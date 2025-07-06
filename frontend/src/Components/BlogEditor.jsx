@@ -32,7 +32,8 @@ const BlogManagementPanel = () => {
     tags: '',
     status: 'draft',
     featuredImage: '',
-    contentImages: []
+    contentImages: [],
+    contentVideos: []
   });
   const [successMessage, setSuccessMessage] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
@@ -47,6 +48,18 @@ const BlogManagementPanel = () => {
     position: 'center'
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Video embedding state
+  const [videoModal, setVideoModal] = useState({
+    isOpen: false,
+    url: '',
+    title: '',
+    caption: '',
+    position: 'center',
+    autoplay: false,
+    muted: false
+  });
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   
   // Fetch blogs from API
   const fetchBlogs = async () => {
@@ -128,59 +141,105 @@ const BlogManagementPanel = () => {
   
   // Handle form input changes
   const handleInputChange = (e) => {
-  const { name, value } = e.target;
-  
-  if (name === 'content') {
-    // Clean up contentImages when content changes
-    const updatedImages = cleanupContentImages(value, formData.contentImages);
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-      contentImages: updatedImages
-    }));
-  } else {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }
-};
+    const { name, value } = e.target;
+    
+    if (name === 'content') {
+      // Clean up contentImages and contentVideos when content changes
+      const updatedImages = cleanupContentImages(value, formData.contentImages);
+      const updatedVideos = cleanupContentVideos(value, formData.contentVideos);
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        contentImages: updatedImages,
+        contentVideos: updatedVideos
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
   const cleanupContentImages = (content, contentImages) => {
-  if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
-    return contentImages;
-  }
-  
-  // Filter out images that are not referenced in content
-  return contentImages.filter(image => {
-    if (!image || !image.imageId) {
-      return false; // Remove invalid images
+    if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
+      return contentImages;
     }
     
-    const placeholder = `[IMAGE:${image.imageId}]`;
-    return content.includes(placeholder);
-  });
-};
-const generateImagePreview = (contentImages, content) => {
-  if (!Array.isArray(contentImages) || contentImages.length === 0) {
-    return [];
-  }
-  
-  // Only show images that are actually used in content
-  return contentImages.filter(image => {
-    if (!image || !image.imageId || !content) {
-      return false;
+    // Filter out images that are not referenced in content
+    return contentImages.filter(image => {
+      if (!image || !image.imageId) {
+        return false; // Remove invalid images
+      }
+      
+      const placeholder = `[IMAGE:${image.imageId}]`;
+      return content.includes(placeholder);
+    });
+  };
+
+  const cleanupContentVideos = (content, contentVideos) => {
+    if (!content || !Array.isArray(contentVideos) || contentVideos.length === 0) {
+      return contentVideos;
     }
     
-    const placeholder = `[IMAGE:${image.imageId}]`;
-    return content.includes(placeholder);
-  });
-};
+    // Filter out videos that are not referenced in content
+    return contentVideos.filter(video => {
+      if (!video || !video.embedId) {
+        return false; // Remove invalid videos
+      }
+      
+      const placeholder = `[VIDEO:${video.embedId}]`;
+      return content.includes(placeholder);
+    });
+  };
+
+  const generateImagePreview = (contentImages, content) => {
+    if (!Array.isArray(contentImages) || contentImages.length === 0) {
+      return [];
+    }
+    
+    // Only show images that are actually used in content
+    return contentImages.filter(image => {
+      if (!image || !image.imageId || !content) {
+        return false;
+      }
+      
+      const placeholder = `[IMAGE:${image.imageId}]`;
+      return content.includes(placeholder);
+    });
+  };
+
+  const generateVideoPreview = (contentVideos, content) => {
+    if (!Array.isArray(contentVideos) || contentVideos.length === 0) {
+      return [];
+    }
+    
+    // Only show videos that are actually used in content
+    return contentVideos.filter(video => {
+      if (!video || !video.embedId || !content) {
+        return false;
+      }
+      
+      const placeholder = `[VIDEO:${video.embedId}]`;
+      return content.includes(placeholder);
+    });
+  };
+
   // Handle image modal input changes
   const handleImageModalChange = (e) => {
     const { name, value } = e.target;
     setImageModal(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  // Handle video modal input changes
+  const handleVideoModalChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setVideoModal(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
   
@@ -218,13 +277,15 @@ const generateImagePreview = (contentImages, content) => {
         .map(tag => tag.trim())
         .filter(tag => tag !== '');
       
-      // Clean up contentImages to only include those referenced in content
+      // Clean up contentImages and contentVideos to only include those referenced in content
       const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
+      const cleanedVideos = cleanupContentVideos(formData.content, formData.contentVideos);
       
       const blogData = {
         ...formData,
         tags: tagsArray,
-        contentImages: cleanedImages
+        contentImages: cleanedImages,
+        contentVideos: cleanedVideos
       };
       
       let response;
@@ -327,6 +388,9 @@ const generateImagePreview = (contentImages, content) => {
       case 'image':
         setImageModal(prev => ({ ...prev, isOpen: true }));
         return;
+      case 'video':
+        setVideoModal(prev => ({ ...prev, isOpen: true }));
+        return;
       default:
         return;
     }
@@ -367,6 +431,15 @@ const generateImagePreview = (contentImages, content) => {
       caption: '',
       position: 'center'
     });
+    setVideoModal({
+      isOpen: false,
+      url: '',
+      title: '',
+      caption: '',
+      position: 'center',
+      autoplay: false,
+      muted: false
+    });
   };
   
   const handleEdit = async (blog) => {
@@ -380,7 +453,8 @@ const generateImagePreview = (contentImages, content) => {
       tags: blog.tags.join(', '),
       status: blog.status,
       featuredImage: blog.featuredImage || '',
-      contentImages: blog.contentImages || []
+      contentImages: blog.contentImages || [],
+      contentVideos: blog.contentVideos || []
     });
     
     // Scroll to top for better UX
@@ -398,13 +472,152 @@ const generateImagePreview = (contentImages, content) => {
       tags: '',
       status: 'draft',
       featuredImage: '',
-      contentImages: []
+      contentImages: [],
+      contentVideos: []
     });
     
     // Scroll to top for better UX
     window.scrollTo(0, 0);
   };
+
+  // Extract video information from URL
+  const extractVideoInfo = (url) => {
+    // YouTube URL patterns
+    const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+    const youtubeMatch = url.match(youtubeRegex);
+    
+    if (youtubeMatch) {
+      return {
+        platform: 'youtube',
+        videoId: youtubeMatch[1],
+        url: url
+      };
+    }
+    
+    // Vimeo URL patterns
+    const vimeoRegex = /(?:vimeo\.com\/)([0-9]+)/;
+    const vimeoMatch = url.match(vimeoRegex);
+    
+    if (vimeoMatch) {
+      return {
+        platform: 'vimeo',
+        videoId: vimeoMatch[1],
+        url: url
+      };
+    }
+    
+    // Dailymotion URL patterns
+    const dailymotionRegex = /(?:dailymotion\.com\/video\/)([a-zA-Z0-9]+)/;
+    const dailymotionMatch = url.match(dailymotionRegex);
+    
+    if (dailymotionMatch) {
+      return {
+        platform: 'dailymotion',
+        videoId: dailymotionMatch[1],
+        url: url
+      };
+    }
+    
+    return null;
+  };
   
+  // Handle video addition
+  const handleAddVideo = async () => {
+    if (!videoModal.url.trim()) {
+      setError('Please enter a video URL');
+      return;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(videoModal.url);
+      const videoInfo = extractVideoInfo(videoModal.url);
+      if (!videoInfo) {
+        setError('Invalid video URL. Currently supported: YouTube, Vimeo, Dailymotion');
+        return;
+      }
+    } catch {
+      setError('Please enter a valid URL');
+      return;
+    }
+    
+    try {
+      setUploadingVideo(true);
+      setError(null);
+      
+      // If we're editing an existing blog, add video via API
+      if (selectedBlog) {
+        const response = await axios.post(
+          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/videos`,
+          {
+            url: videoModal.url,
+            title: videoModal.title,
+            caption: videoModal.caption,
+            position: videoModal.position,
+            autoplay: videoModal.autoplay,
+            muted: videoModal.muted
+          },
+          { withCredentials: true }
+        );
+        
+        const { embedId, embedCode } = response.data;
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentVideos in formData
+        setFormData(prev => ({
+          ...prev,
+          contentVideos: [...prev.contentVideos, response.data.video]
+        }));
+      } else {
+        // For new blogs, generate temporary embed ID and add to contentVideos
+        const embedId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const embedCode = `[VIDEO:${embedId}]`;
+        
+        const videoInfo = extractVideoInfo(videoModal.url);
+        const newVideo = {
+          url: videoModal.url,
+          title: videoModal.title,
+          caption: videoModal.caption,
+          position: videoModal.position,
+          autoplay: videoModal.autoplay,
+          muted: videoModal.muted,
+          embedId: embedId,
+          videoId: videoInfo.videoId,
+          platform: videoInfo.platform
+        };
+        
+        // Insert embed code at cursor position
+        insertTextAtCursor(embedCode);
+        
+        // Update contentVideos in formData
+        setFormData(prev => ({
+          ...prev,
+          contentVideos: [...prev.contentVideos, newVideo]
+        }));
+      }
+      
+      // Close modal and reset
+      setVideoModal({
+        isOpen: false,
+        url: '',
+        title: '',
+        caption: '',
+        position: 'center',
+        autoplay: false,
+        muted: false
+      });
+      
+    } catch (err) {
+      console.error('Error adding video:', err);
+      setError(err.response?.data?.message || 'Failed to add video. Please try again.');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  // Content Images Section
   const ContentImagesSection = ({ contentImages, content }) => {
     const activeImages = generateImagePreview(contentImages, content);
     
@@ -451,6 +664,83 @@ const generateImagePreview = (contentImages, content) => {
     );
   };
 
+  // Content Videos Section
+  const ContentVideosSection = ({ contentVideos, content }) => {
+    const activeVideos = generateVideoPreview(contentVideos, content);
+    
+    if (!activeVideos || activeVideos.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="form-group">
+        <label>Content Videos ({activeVideos.length})</label>
+        <div className="content-videos-list">
+          {activeVideos.map((video, index) => (
+            <div key={video.embedId || index} className="content-video-item">
+              <div className="content-video-thumb">
+                {video.platform === 'youtube' && (
+                  <img
+                    src={`https://img.youtube.com/vi/${video.videoId}/default.jpg`}
+                    alt={video.title || 'Video thumbnail'}
+                    className="content-video-thumb-img"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/50x50?text=Video';
+                    }}
+                  />
+                )}
+                {video.platform === 'vimeo' && (
+                  <img
+                    src={`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(video.url)}&maxwidth=50`}
+                    alt={video.title || 'Video thumbnail'}
+                    className="content-video-thumb-img"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/50x50?text=Video';
+                    }}
+                  />
+                )}
+                {video.platform === 'dailymotion' && (
+                  <img
+                    src={`https://www.dailymotion.com/thumbnail/video/${video.videoId}`}
+                    alt={video.title || 'Video thumbnail'}
+                    className="content-video-thumb-img"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/50x50?text=Video';
+                    }}
+                  />
+                )}
+              </div>
+              <div className="content-video-info">
+                <span className="video-id">[VIDEO:{video.embedId}]</span>
+                <span className="video-position">{video.position}</span>
+                {video.title && <span className="video-title">{video.title}</span>}
+                {video.caption && <span className="video-caption">{video.caption}</span>}
+                <span className="video-options">
+                  {video.autoplay ? 'Autoplay: On' : 'Autoplay: Off'}, {video.muted ? 'Muted: On' : 'Muted: Off'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-small btn-delete"
+                onClick={() => removeVideoFromContent(video.embedId)}
+                title="Remove this video from content"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="helper-text">
+          Only videos referenced in your content are shown above. 
+          Remove the [VIDEO:embedId] placeholder from your content to remove a video.
+        </div>
+      </div>
+    );
+  };
+
   // Function to remove image placeholder from content
   const removeImageFromContent = (imageId) => {
     const placeholder = `[IMAGE:${imageId}]`;
@@ -463,6 +753,21 @@ const generateImagePreview = (contentImages, content) => {
       ...prev,
       content: newContent,
       contentImages: updatedImages
+    }));
+  };
+
+  // Function to remove video placeholder from content
+  const removeVideoFromContent = (embedId) => {
+    const placeholder = `[VIDEO:${embedId}]`;
+    const newContent = formData.content.replace(new RegExp(escapeRegExp(placeholder), 'g'), '');
+    
+    // Update content and let handleInputChange clean up the videos array
+    const updatedVideos = cleanupContentVideos(newContent, formData.contentVideos);
+    
+    setFormData(prev => ({
+      ...prev,
+      content: newContent,
+      contentVideos: updatedVideos
     }));
   };
 
@@ -700,6 +1005,149 @@ const generateImagePreview = (contentImages, content) => {
           </div>
         )}
         
+        {/* Video Modal */}
+        {videoModal.isOpen && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>Add Video to Content</h3>
+                <button 
+                  className="modal-close"
+                  onClick={() => setVideoModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="videoUrl">Video URL * (YouTube, Vimeo, Dailymotion)</label>
+                  <input
+                    type="url"
+                    id="videoUrl"
+                    name="url"
+                    value={videoModal.url}
+                    onChange={handleVideoModalChange}
+                    placeholder="https://youtube.com/watch?v=videoId"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="videoTitle">Video Title</label>
+                  <input
+                    type="text"
+                    id="videoTitle"
+                    name="title"
+                    value={videoModal.title}
+                    onChange={handleVideoModalChange}
+                    placeholder="Video title (optional)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="videoCaption">Caption</label>
+                  <input
+                    type="text"
+                    id="videoCaption"
+                    name="caption"
+                    value={videoModal.caption}
+                    onChange={handleVideoModalChange}
+                    placeholder="Video caption (optional)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="videoPosition">Position</label>
+                  <select
+                    id="videoPosition"
+                    name="position"
+                    value={videoModal.position}
+                    onChange={handleVideoModalChange}
+                  >
+                    <option value="left">Left</option>
+                    <option value="center">Center</option>
+                    <option value="right">Right</option>
+                    <option value="full-width">Full Width</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="autoplay"
+                      checked={videoModal.autoplay}
+                      onChange={handleVideoModalChange}
+                    />
+                    Autoplay
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="muted"
+                      checked={videoModal.muted}
+                      onChange={handleVideoModalChange}
+                    />
+                    Muted
+                  </label>
+                </div>
+                {videoModal.url && extractVideoInfo(videoModal.url) && (
+                  <div className="video-preview">
+                    <p>Preview:</p>
+                    <div className="video-preview-wrapper">
+                      {extractVideoInfo(videoModal.url).platform === 'youtube' && (
+                        <img
+                          src={`https://img.youtube.com/vi/${extractVideoInfo(videoModal.url).videoId}/default.jpg`}
+                          alt="Video preview"
+                          style={{ maxWidth: '100%', maxHeight: '200px' }}
+                        />
+                      )}
+                      {extractVideoInfo(videoModal.url).platform === 'vimeo' && (
+                        <img
+                          src={`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(videoModal.url)}&maxwidth=200`}
+                          alt="Video preview"
+                          style={{ maxWidth: '100%', maxHeight: '200px' }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/400x200?text=Video+Preview';
+                          }}
+                        />
+                      )}
+                      {extractVideoInfo(videoModal.url).platform === 'dailymotion' && (
+                        <img
+                          src={`https://www.dailymotion.com/thumbnail/video/${extractVideoInfo(videoModal.url).videoId}`}
+                          alt="Video preview"
+                          style={{ maxWidth: '100%', maxHeight: '200px' }}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/400x200?text=Video+Preview';
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setVideoModal(prev => ({ ...prev, isOpen: false }))}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAddVideo}
+                  disabled={uploadingVideo || !videoModal.url.trim()}
+                >
+                  {uploadingVideo && <span className="spinner"></span>}
+                  Add Video
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Blog editor */}
         {viewMode === 'edit' && (
           <div className="blog-editor-section">
@@ -791,6 +1239,14 @@ const generateImagePreview = (contentImages, content) => {
                   >
                     <span>🖼️ Image</span>
                   </button>
+                  <button 
+                    type="button" 
+                    onClick={(e) => formatText(e, 'video')}
+                    className="toolbar-btn"
+                    title="Insert Video"
+                  >
+                    <span>🎥 Video</span>
+                  </button>
                 </div>
                 <textarea
                   id="content"
@@ -799,11 +1255,11 @@ const generateImagePreview = (contentImages, content) => {
                   onChange={handleInputChange}
                   required
                   rows={15}
-                  placeholder="Write your blog content here... Use the toolbar to format your text or use Markdown directly. Click the Image button to embed images within your content."
+                  placeholder="Write your blog content here... Use the toolbar to format your text or use Markdown directly. Click the Image or Video button to embed images or videos within your content."
                 ></textarea>
                 <span className="helper-text">
                   Markdown is supported. You can use **bold**, *italic*, # headings, etc. 
-                  Use [IMAGE:imageId] placeholders to embed images within content.
+                  Use [IMAGE:imageId] or [VIDEO:embedId] placeholders to embed images or videos within content.
                 </span>
               </div>
               
@@ -868,6 +1324,14 @@ const generateImagePreview = (contentImages, content) => {
                 />
               )}
               
+              {/* Content Videos Summary */}
+              {formData.contentVideos && formData.contentVideos.length > 0 && (
+                <ContentVideosSection 
+                  contentVideos={formData.contentVideos} 
+                  content={formData.content} 
+                />
+              )}
+              
               <div className="form-actions">
                 <button
                   type="button"
@@ -891,34 +1355,32 @@ const generateImagePreview = (contentImages, content) => {
         
         {viewMode === 'analytics' && analyticsId && (
           <div className="blog-analytics-section">
-             {/* Blog Header Info */}
-<div className="analytics-blog-header">
-  <div className="analytics-blog-info">
-    {/* Find and display the current blog's featured image and title */}
-    {blogs.find(blog => blog._id === analyticsId) && (
-      <>
-        {blogs.find(blog => blog._id === analyticsId).featuredImage && (
-          <div className="analytics-featured-image">
-            <img 
-              src={blogs.find(blog => blog._id === analyticsId).featuredImage} 
-              alt={blogs.find(blog => blog._id === analyticsId).title}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://via.placeholder.com/400x200?text=Image+Not+Found';
-              }}
-            />
-          </div>
-        )}
-        <div className="analytics-blog-title">
-          <h2>{blogs.find(blog => blog._id === analyticsId).title}</h2>
-          <span className={`status-badge ${blogs.find(blog => blog._id === analyticsId).status}`}>
-            {blogs.find(blog => blog._id === analyticsId).status === 'published' ? 'Published' : 'Draft'}
-          </span>
-        </div>
-      </>
-    )}
-  </div>
-</div>
+            <div className="analytics-blog-header">
+              <div className="analytics-blog-info">
+                {blogs.find(blog => blog._id === analyticsId) && (
+                  <>
+                    {blogs.find(blog => blog._id === analyticsId).featuredImage && (
+                      <div className="analytics-featured-image">
+                        <img 
+                          src={blogs.find(blog => blog._id === analyticsId).featuredImage} 
+                          alt={blogs.find(blog => blog._id === analyticsId).title}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/400x200?text=Image+Not+Found';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="analytics-blog-title">
+                      <h2>{blogs.find(blog => blog._id === analyticsId).title}</h2>
+                      <span className={`status-badge ${blogs.find(blog => blog._id === analyticsId).status}`}>
+                        {blogs.find(blog => blog._id === analyticsId).status === 'published' ? 'Published' : 'Draft'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             <div className="section-actions">
               <button 
                 className="btn btn-secondary"
@@ -1018,12 +1480,19 @@ const generateImagePreview = (contentImages, content) => {
                           </div>
                         )}
                         
-                        {/* Content Images Count */}
-                        {blog.contentImages && blog.contentImages.length > 0 && (
+                        {/* Content Images and Videos Count */}
+                        {(blog.contentImages?.length > 0 || blog.contentVideos?.length > 0) && (
                           <div className="card-images-count">
-                            <span className="images-count">
-                              🖼️ {blog.contentImages.length} embedded image{blog.contentImages.length !== 1 ? 's' : ''}
-                            </span>
+                            {blog.contentImages?.length > 0 && (
+                              <span className="images-count">
+                                🖼️ {blog.contentImages.length} embedded image{blog.contentImages.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {blog.contentVideos?.length > 0 && (
+                              <span className="videos-count">
+                                🎥 {blog.contentVideos.length} embedded video{blog.contentVideos.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
                           </div>
                         )}
                         
