@@ -31,7 +31,6 @@ app.use(cors({
       'https://connectwithaaditiya.onrender.com', 'https://connectwithaaditiyamg.onrender.com',
       'https://connectwithaaditiyaadmin.onrender.com',
       'http://192.168.1.38:5174','http://192.168.1.38:5173','https://aaditiyatyagi.vercel.app'];
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
@@ -6834,9 +6833,411 @@ app.get('/api/admin/email-stats', authenticateToken, async (req, res) => {
   }
 });
 
+const profileImageSchema = new mongoose.Schema({
+  imageData: {
+    type: Buffer,
+    required: true
+  },
+  contentType: {
+    type: String,
+    required: true,
+    enum: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+  },
+  filename: {
+    type: String,
+    required: true
+  },
+  size: {
+    type: Number,
+    required: true
+  },
+  uploadedBy: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
 
+const ProfileImage = mongoose.model('ProfileImage', profileImageSchema);
 
+app.post(
+  '/api/profile-image/upload',
+  authenticateToken,
+  upload.single('profileImage'),
+  [
+    body('filename').optional().trim().isLength({ min: 1, max: 100 })
+      .withMessage('Filename must be between 1 and 100 characters')
+  ],
+  async (req, res) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
 
+      // Check if file was uploaded
+      if (!req.file) {
+        return res.status(400).json({ message: 'Profile image file is required' });
+      }
+
+      // Validate file type
+      const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+      if (!allowedImageTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ message: 'Invalid file type. Only images are allowed.' });
+      }
+
+      // Deactivate previous active profile image
+      await ProfileImage.updateMany(
+        { isActive: true },
+        { isActive: false }
+      );
+
+      // Create new profile image
+      const newProfileImage = new ProfileImage({
+        imageData: req.file.buffer,
+        contentType: req.file.mimetype,
+        filename: req.body.filename || req.file.originalname,
+        size: req.file.size,
+        uploadedBy: {
+          name: req.user.name || 'Aaditiya Tyagi',
+          email: req.user.email
+        },
+        isActive: true
+      });
+
+      await newProfileImage.save();
+
+      res.status(201).json({
+        message: 'Profile image uploaded successfully',
+        profileImage: {
+          id: newProfileImage._id,
+          filename: newProfileImage.filename,
+          contentType: newProfileImage.contentType,
+          size: newProfileImage.size,
+          uploadedAt: newProfileImage.uploadedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// PUBLIC ROUTE: Get active profile image
+app.get('/api/profile-image/active', async (req, res) => {
+  try {
+    const profileImage = await ProfileImage.findOne({ isActive: true });
+    
+    if (!profileImage) {
+      return res.status(404).json({ message: 'No active profile image found' });
+    }
+
+    res.set({
+      'Content-Type': profileImage.contentType,
+      'Content-Length': profileImage.imageData.length,
+      'Cache-Control': 'public, max-age=3600'
+    });
+
+    res.send(profileImage.imageData);
+
+  } catch (error) {
+    console.error('Error fetching profile image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// PUBLIC ROUTE: Get profile image by ID
+app.get('/api/profile-image/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const profileImage = await ProfileImage.findById(id);
+    
+    if (!profileImage) {
+      return res.status(404).json({ message: 'Profile image not found' });
+    }
+
+    res.set({
+      'Content-Type': profileImage.contentType,
+      'Content-Length': profileImage.imageData.length,
+      'Cache-Control': 'public, max-age=3600'
+    });
+
+    res.send(profileImage.imageData);
+
+  } catch (error) {
+    console.error('Error fetching profile image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ADMIN ROUTE: Get all profile images info
+app.get('/api/profile-images', authenticateToken, async (req, res) => {
+  try {
+    const profileImages = await ProfileImage.find()
+      .select('-imageData') // Exclude binary data
+      .sort({ uploadedAt: -1 });
+
+    res.json({
+      message: 'Profile images retrieved successfully',
+      profileImages
+    });
+
+  } catch (error) {
+    console.error('Error fetching profile images:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ADMIN ROUTE: Delete profile image
+app.delete('/api/profile-image/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const profileImage = await ProfileImage.findByIdAndDelete(id);
+    
+    if (!profileImage) {
+      return res.status(404).json({ message: 'Profile image not found' });
+    }
+
+    res.json({
+      message: 'Profile image deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting profile image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+const quoteSchema = new mongoose.Schema({
+  content: {
+    type: String,
+    required: true,
+    trim: true,
+    maxLength: 500
+  },
+  author: {
+    type: String,
+    default: 'Aaditiya Tyagi',
+    trim: true,
+    maxLength: 100
+  },
+  addedBy: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+const Quote = mongoose.model('Quote', quoteSchema);
+
+//==================== QUOTE ROUTES (SINGLE QUOTE SYSTEM) ====================
+
+// ADMIN ROUTE: Set/Update the single quote
+app.post(
+  '/api/quote',
+  authenticateToken,
+  [
+    body('content').trim().notEmpty().withMessage('Quote content is required')
+      .isLength({ max: 500 }).withMessage('Quote cannot exceed 500 characters'),
+    body('author').optional().trim().isLength({ max: 100 })
+      .withMessage('Author name cannot exceed 100 characters')
+  ],
+  async (req, res) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { content, author } = req.body;
+
+      // Delete existing quote and create new one
+      await Quote.deleteMany({});
+      
+      const newQuote = new Quote({
+        content,
+        author: author || 'Aaditiya Tyagi',
+        addedBy: {
+          name: req.user.name || 'Aaditiya Tyagi',
+          email: req.user.email
+        }
+      });
+
+      await newQuote.save();
+
+      res.status(201).json({
+        message: 'Quote updated successfully',
+        quote: newQuote
+      });
+
+    } catch (error) {
+      console.error('Error updating quote:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// PUBLIC ROUTE: Get the current quote
+app.get('/api/quote', async (req, res) => {
+  try {
+    const quote = await Quote.findOne({ isActive: true })
+      .select('-addedBy'); // Don't expose admin info publicly
+
+    if (!quote) {
+      return res.status(404).json({ message: 'No quote found' });
+    }
+
+    res.json({
+      message: 'Quote retrieved successfully',
+      quote
+    });
+
+  } catch (error) {
+    console.error('Error fetching quote:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ADMIN ROUTE: Get quote with admin info
+app.get('/api/admin/quote', authenticateToken, async (req, res) => {
+  try {
+    const quote = await Quote.findOne();
+
+    if (!quote) {
+      return res.status(404).json({ message: 'No quote found' });
+    }
+
+    res.json({
+      message: 'Quote retrieved successfully',
+      quote
+    });
+
+  } catch (error) {
+    console.error('Error fetching quote:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ADMIN ROUTE: Update the current quote
+app.put(
+  '/api/quote',
+  authenticateToken,
+  [
+    body('content').optional().trim().notEmpty().withMessage('Quote content cannot be empty')
+      .isLength({ max: 500 }).withMessage('Quote cannot exceed 500 characters'),
+    body('author').optional().trim().isLength({ max: 100 })
+      .withMessage('Author name cannot exceed 100 characters'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
+  ],
+  async (req, res) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const updateData = { ...req.body, updatedAt: Date.now() };
+
+      const updatedQuote = await Quote.findOneAndUpdate(
+        {},
+        updateData,
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedQuote) {
+        return res.status(404).json({ message: 'Quote not found' });
+      }
+
+      res.json({
+        message: 'Quote updated successfully',
+        quote: updatedQuote
+      });
+
+    } catch (error) {
+      console.error('Error updating quote:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// ADMIN ROUTE: Delete the current quote
+app.delete('/api/quote', authenticateToken, async (req, res) => {
+  try {
+    const deletedQuote = await Quote.findOneAndDelete({});
+    
+    if (!deletedQuote) {
+      return res.status(404).json({ message: 'Quote not found' });
+    }
+
+    res.json({
+      message: 'Quote deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting quote:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ADMIN ROUTE: Toggle quote active status
+app.patch('/api/quote/toggle', authenticateToken, async (req, res) => {
+  try {
+    const quote = await Quote.findOne();
+    
+    if (!quote) {
+      return res.status(404).json({ message: 'Quote not found' });
+    }
+
+    quote.isActive = !quote.isActive;
+    quote.updatedAt = Date.now();
+    await quote.save();
+
+    res.json({
+      message: `Quote ${quote.isActive ? 'activated' : 'deactivated'} successfully`,
+      quote
+    });
+
+  } catch (error) {
+    console.error('Error toggling quote status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

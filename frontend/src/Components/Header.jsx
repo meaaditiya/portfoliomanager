@@ -35,6 +35,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     { name: 'Projects', path: '/project' },
     { name: 'Social Posts', path: '/socialpost' },
     {name: 'AdminMail', path:'/adminmail'},
+    {name: 'Set Profile', path: '/profile'},
   ];
 
   const handleLogout = async () => {
