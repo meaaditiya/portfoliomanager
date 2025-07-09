@@ -12,7 +12,7 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const API_BASE = 'http://localhost:5000';
+  const API_BASE = 'https://connectwithaaditiyamg.onrender.com';
   const token = localStorage.getItem('token');
 
   useEffect(() => {
