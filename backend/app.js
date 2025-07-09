@@ -7025,7 +7025,44 @@ app.delete('/api/profile-image/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+// ADMIN ROUTE: Set profile image as active
+app.patch('/api/profile-image/:id/activate', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    // Deactivate all images
+    await ProfileImage.updateMany(
+      { isActive: true },
+      { isActive: false }
+    );
+
+    // Activate the selected image
+    const profileImage = await ProfileImage.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true }
+    );
+
+    if (!profileImage) {
+      return res.status(404).json({ message: 'Profile image not found' });
+    }
+
+    res.json({
+      message: 'Profile image set as active successfully',
+      profileImage: {
+        id: profileImage._id,
+        filename: profileImage.filename,
+        contentType: profileImage.contentType,
+        size: profileImage.size,
+        uploadedAt: profileImage.uploadedAt,
+        isActive: profileImage.isActive,
+      },
+    });
+  } catch (error) {
+    console.error('Error setting active profile image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 const quoteSchema = new mongoose.Schema({
   content: {
     type: String,

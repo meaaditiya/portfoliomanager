@@ -574,3 +574,82 @@ body {
    background-color: #333333;
     cursor: pointer;
 }
+.profile-images-history {
+  margin-top: 2rem;
+}
+
+.profile-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.profile-image-item {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fff;
+}
+
+.profile-image-thumbnail {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.image-meta {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.image-meta p {
+  margin: 0.2rem 0;
+}
+
+.image-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.set-active-button {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.set-active-button:hover {
+  background: #45a049;
+}
+
+.delete-button12, .edit-button12, .save-button, .cancel-button, .toggle-button12 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-button12 {
+  background: #f44336;
+  color: white;
+  border: none;
+}
+
+.delete-button12:hover {
+  background: #d32f2f;
+}
+
+.profile-image-wrapper {
+  position: relative;
+}
+
+.profile-actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}

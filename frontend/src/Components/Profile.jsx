@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Upload, Edit, Save, X, Image, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import './Profile.css';
 
 const AdminDashboard = () => {
   const [profileImage, setProfileImage] = useState(null);
+  const [profileImages, setProfileImages] = useState([]);
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -17,19 +19,43 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchProfileImage();
+    fetchAllProfileImages();
     fetchQuote();
   }, []);
 
   const fetchProfileImage = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/profile-image/active`);
+      // Add cache-busting query parameter to prevent stale images
+      const response = await fetch(`${API_BASE}/api/profile-image/active?t=${Date.now()}`);
       if (response.ok) {
         const blob = await response.blob();
         const imageUrl = URL.createObjectURL(blob);
         setProfileImage(imageUrl);
+      } else {
+        setProfileImage(null);
       }
     } catch (error) {
       console.error('Error fetching profile image:', error);
+      setError('Failed to load profile image');
+    }
+  };
+
+  const fetchAllProfileImages = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/profile-images`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProfileImages(data.profileImages);
+      } else {
+        setError('Failed to fetch profile images');
+      }
+    } catch (error) {
+      console.error('Error fetching all profile images:', error);
+      setError('Failed to load profile images list');
     }
   };
 
@@ -37,21 +63,22 @@ const AdminDashboard = () => {
     try {
       const response = await fetch(`${API_BASE}/api/admin/quote`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+        },
       });
       if (response.ok) {
         const data = await response.json();
         setQuote(data.quote);
         setQuoteData({
-          content: data.quote.content,
-          author: data.quote.author
+          content: data.quote?.content || '',
+          author: data.quote?.author || 'Aaditiya Tyagi',
         });
       } else if (response.status === 404) {
         setQuote(null);
       }
     } catch (error) {
       console.error('Error fetching quote:', error);
+      setError('Failed to load quote');
     } finally {
       setLoading(false);
     }
@@ -73,14 +100,14 @@ const AdminDashboard = () => {
       const response = await fetch(`${API_BASE}/api/profile-image/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
         },
-        body: formData
+        body: formData,
       });
 
       if (response.ok) {
         setSuccess('Profile image uploaded successfully!');
-        fetchProfileImage();
+        await Promise.all([fetchProfileImage(), fetchAllProfileImages()]);
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to upload image');
@@ -89,6 +116,54 @@ const AdminDashboard = () => {
       setError('Error uploading image: ' + error.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDeleteProfileImage = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this profile image?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/profile-image/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setSuccess('Profile image deleted successfully!');
+        await Promise.all([fetchProfileImage(), fetchAllProfileImages()]);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to delete profile image');
+      }
+    } catch (error) {
+      setError('Error deleting profile image: ' + error.message);
+    }
+  };
+
+  const handleSetActiveProfileImage = async (id) => {
+    try {
+      // Note: The backend doesn't have a direct route to set an existing image as active.
+      // For this to work, you'd need to modify the backend to add a PATCH route like `/api/profile-image/:id/activate`.
+      // Below is a placeholder implementation assuming such a route exists.
+      const response = await fetch(`${API_BASE}/api/profile-image/${id}/activate`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        setSuccess('Profile image set as active!');
+        await Promise.all([fetchProfileImage(), fetchAllProfileImages()]);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to set active profile image');
+      }
+    } catch (error) {
+      setError('Error setting active profile image: ' + error.message);
     }
   };
 
@@ -106,18 +181,18 @@ const AdminDashboard = () => {
       const method = quote ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
-        method: method,
+        method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(quoteData)
+        body: JSON.stringify(quoteData),
       });
 
       if (response.ok) {
         setSuccess(quote ? 'Quote updated successfully!' : 'Quote created successfully!');
         setIsEditingQuote(false);
-        fetchQuote();
+        await fetchQuote();
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to save quote');
@@ -134,13 +209,13 @@ const AdminDashboard = () => {
       const response = await fetch(`${API_BASE}/api/quote/toggle`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {
         setSuccess(`Quote ${quote.isActive ? 'deactivated' : 'activated'} successfully!`);
-        fetchQuote();
+        await fetchQuote();
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to toggle quote status');
@@ -157,8 +232,8 @@ const AdminDashboard = () => {
       const response = await fetch(`${API_BASE}/api/quote`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {
@@ -179,8 +254,10 @@ const AdminDashboard = () => {
     if (quote) {
       setQuoteData({
         content: quote.content,
-        author: quote.author
+        author: quote.author,
       });
+    } else {
+      setQuoteData({ content: '', author: 'Aaditiya Tyagi' });
     }
     setIsEditingQuote(false);
   };
@@ -215,14 +292,26 @@ const AdminDashboard = () => {
         <h2>Profile Image</h2>
         <div className="profile-image-container">
           {profileImage ? (
-            <img src={profileImage} alt="Profile" className="profile-image" />
+            <div className="profile-image-wrapper">
+              <img src={profileImage} alt="Profile" className="profile-image" />
+              <div className="profile-actions">
+                <button
+                  onClick={() => handleDeleteProfileImage(profileImages.find(img => img.isActive)?._id)}
+                  className="delete-button12"
+                  disabled={!profileImages.find(img => img.isActive)}
+                >
+                  <Trash2 size={16} />
+                  Delete Active Image
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="profile-image-placeholder">
               <Image size={48} />
               <p>No profile image</p>
             </div>
           )}
-          
+
           <div className="upload-controls">
             <label htmlFor="profile-upload" className="upload-button">
               <Upload size={20} />
@@ -237,6 +326,49 @@ const AdminDashboard = () => {
               className="file-input"
             />
           </div>
+        </div>
+
+        {/* Profile Images History */}
+        <div className="profile-images-history">
+          <h3>Uploaded Images</h3>
+          {profileImages.length > 0 ? (
+            <div className="profile-images-grid">
+              {profileImages.map((img) => (
+                <div key={img._id} className="profile-image-item">
+                  <img
+                    src={`${API_BASE}/api/profile-image/${img._id}?t=${Date.now()}`}
+                    alt={img.filename}
+                    className="profile-image-thumbnail"
+                  />
+                  <div className="image-meta">
+                    <p>{img.filename}</p>
+                    <p>Size: {(img.size / 1024).toFixed(2)} KB</p>
+                    <p>Uploaded: {new Date(img.uploadedAt).toLocaleDateString()}</p>
+                    <p>Status: {img.isActive ? 'Active' : 'Inactive'}</p>
+                  </div>
+                  <div className="image-actions">
+                    {!img.isActive && (
+                      <button
+                        onClick={() => handleSetActiveProfileImage(img._id)}
+                        className="set-active-button"
+                      >
+                        Set as Active
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteProfileImage(img._id)}
+                      className="delete-button12"
+                    >
+                      <Trash2 size={16} />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No images uploaded yet.</p>
+          )}
         </div>
       </div>
 
@@ -280,17 +412,17 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="quote-actions">
               <div className="view-actions">
-                <button 
+                <button
                   onClick={() => setIsEditingQuote(true)}
                   className="edit-button12"
                 >
                   <Edit size={16} />
                   Edit
                 </button>
-                <button 
+                <button
                   onClick={handleDeleteQuote}
                   className="delete-button12"
                 >
@@ -312,7 +444,7 @@ const AdminDashboard = () => {
               maxLength="500"
             />
             <p className="character-count">{quoteData.content.length}/500 characters</p>
-            
+
             <input
               type="text"
               value={quoteData.author}
@@ -321,15 +453,15 @@ const AdminDashboard = () => {
               className="author-input"
               maxLength="100"
             />
-            
+
             <div className="form-buttons">
               <button onClick={handleSaveQuote} className="save-button">
                 <Save size={16} />
                 {quote ? 'Update Quote' : 'Create Quote'}
               </button>
               {quote && (
-                <button 
-                  onClick={handleCancelEdit} 
+                <button
+                  onClick={handleCancelEdit}
                   className="cancel-button"
                 >
                   <X size={16} />
