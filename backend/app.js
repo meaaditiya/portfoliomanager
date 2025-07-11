@@ -7294,7 +7294,7 @@ const communityPostSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: true
+    required: false
   },
   // For image posts
   images: [{
@@ -7308,7 +7308,10 @@ const communityPostSchema = new mongoose.Schema({
     contentType: String,
     filename: String
   },
-  caption: String,
+  caption:{
+     type: String,
+    required: false
+  } ,
   // For poll posts
   pollOptions: [{
     option: String,
@@ -7463,7 +7466,7 @@ const CommunityShare = mongoose.model('CommunityShare', communityShareSchema);
 
 // ROUTES
 
-// Create a new community post
+// Create a new community post - FIXED
 app.post('/api/community/posts', authenticateToken, upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'video', maxCount: 1 }
@@ -7476,69 +7479,130 @@ app.post('/api/community/posts', authenticateToken, upload.fields([
 
     const { postType, description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
     
+    // Validate required fields
+    if (!postType) {
+      return res.status(400).json({ message: 'Post type is required' });
+    }
+
     const postData = {
       author: req.user.admin_id,
-      postType,
-      description
+      postType
     };
+
+    // Add description only if provided
+    if (description && description.trim()) {
+      postData.description = description.trim();
+    }
 
     // Handle different post types
     switch (postType) {
       case 'image':
-        if (req.files && req.files.images) {
-          postData.images = req.files.images.map(file => ({
-            data: file.buffer,
-            contentType: file.mimetype,
-            filename: file.originalname
-          }));
+        if (!req.files || !req.files.images || req.files.images.length === 0) {
+          return res.status(400).json({ message: 'At least one image is required for image posts' });
         }
+        postData.images = req.files.images.map(file => ({
+          data: file.buffer,
+          contentType: file.mimetype,
+          filename: file.originalname
+        }));
         break;
 
       case 'video':
-        if (req.files && req.files.video) {
-          postData.video = {
-            data: req.files.video[0].buffer,
-            contentType: req.files.video[0].mimetype,
-            filename: req.files.video[0].originalname
-          };
+        if (!req.files || !req.files.video || req.files.video.length === 0) {
+          return res.status(400).json({ message: 'Video is required for video posts' });
         }
-        postData.caption = caption;
+        postData.video = {
+          data: req.files.video[0].buffer,
+          contentType: req.files.video[0].mimetype,
+          filename: req.files.video[0].originalname
+        };
+        // Caption is optional for video posts
+        if (caption && caption.trim()) {
+          postData.caption = caption.trim();
+        }
         break;
 
       case 'poll':
-        postData.pollOptions = JSON.parse(pollOptions || '[]').map(option => ({
-          option,
+        if (!pollOptions) {
+          return res.status(400).json({ message: 'Poll options are required for poll posts' });
+        }
+        let parsedPollOptions;
+        try {
+          parsedPollOptions = typeof pollOptions === 'string' ? JSON.parse(pollOptions) : pollOptions;
+        } catch (error) {
+          return res.status(400).json({ message: 'Invalid poll options format' });
+        }
+        
+        if (!Array.isArray(parsedPollOptions) || parsedPollOptions.length < 2) {
+          return res.status(400).json({ message: 'At least 2 poll options are required' });
+        }
+        
+        postData.pollOptions = parsedPollOptions.map(option => ({
+          option: option.trim(),
           votes: []
         }));
+        
         if (pollExpiresAt) {
           postData.pollExpiresAt = new Date(pollExpiresAt);
+        }
+        
+        // Add description for poll posts if provided
+        if (description && description.trim()) {
+          postData.description = description.trim();
         }
         break;
 
       case 'quiz':
-        postData.quizQuestions = JSON.parse(quizQuestions || '[]');
+        if (!quizQuestions) {
+          return res.status(400).json({ message: 'Quiz questions are required for quiz posts' });
+        }
+        let parsedQuizQuestions;
+        try {
+          parsedQuizQuestions = typeof quizQuestions === 'string' ? JSON.parse(quizQuestions) : quizQuestions;
+        } catch (error) {
+          return res.status(400).json({ message: 'Invalid quiz questions format' });
+        }
+        
+        if (!Array.isArray(parsedQuizQuestions) || parsedQuizQuestions.length === 0) {
+          return res.status(400).json({ message: 'At least one quiz question is required' });
+        }
+        
+        postData.quizQuestions = parsedQuizQuestions;
         break;
 
       case 'link':
-        postData.linkUrl = linkUrl;
-        postData.linkTitle = linkTitle;
-        postData.linkDescription = linkDescription;
+        if (!linkUrl || !linkUrl.trim()) {
+          return res.status(400).json({ message: 'Link URL is required for link posts' });
+        }
+        postData.linkUrl = linkUrl.trim();
+        if (linkTitle && linkTitle.trim()) {
+          postData.linkTitle = linkTitle.trim();
+        }
+        if (linkDescription && linkDescription.trim()) {
+          postData.linkDescription = linkDescription.trim();
+        }
         break;
+
+      default:
+        return res.status(400).json({ message: 'Invalid post type' });
     }
 
     const post = new CommunityPost(postData);
     await post.save();
 
+    // Populate author details for response
+    const populatedPost = await CommunityPost.findById(post._id)
+      .populate('author', 'username email');
+
     res.status(201).json({
       message: 'Community post created successfully',
-      post: await post.populate('author', 'username email')
+      post: populatedPost
     });
   } catch (error) {
     console.error('Error creating community post:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // Get all community posts - FIXED POPULATE QUERIES
 app.get('/api/community/posts', async (req, res) => {
   try {
