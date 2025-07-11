@@ -136,58 +136,69 @@ const AdminCommunity = () => {
     }
   };
 
-  // Update post
-  const updatePost = async () => {
-    setLoading(true);
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('description', formData.description);
+ const updatePost = async () => {
+  setLoading(true);
+  try {
+    const formDataToSend = new FormData();
+    
+    // Always include description (even if empty)
+    formDataToSend.append('description', formData.description || '');
 
-      if (formData.postType === 'image' && selectedImages.length > 0) {
+    if (formData.postType === 'image') {
+      // Only add new images if selected
+      if (selectedImages.length > 0) {
         selectedImages.forEach(image => {
           formDataToSend.append('images', image);
         });
       }
-
-      if (formData.postType === 'video' && selectedVideo) {
-        formDataToSend.append('video', selectedVideo);
-        formDataToSend.append('caption', formData.caption);
-      }
-
-      if (formData.postType === 'poll') {
-        formDataToSend.append('pollOptions', JSON.stringify(formData.pollOptions.filter(opt => opt.trim())));
-        if (formData.pollExpiresAt) {
-          formDataToSend.append('pollExpiresAt', formData.pollExpiresAt);
-        }
-      }
-
-      if (formData.postType === 'quiz') {
-        formDataToSend.append('quizQuestions', JSON.stringify(formData.quizQuestions));
-      }
-
-      if (formData.postType === 'link') {
-        formDataToSend.append('linkUrl', formData.linkUrl);
-        formDataToSend.append('linkTitle', formData.linkTitle);
-        formDataToSend.append('linkDescription', formData.linkDescription);
-      }
-
-      await apiCall(`/community/posts/${selectedPost._id}`, {
-        method: 'PUT',
-        body: formDataToSend
-      });
-
-      setSuccess('Post updated successfully!');
-      setShowEditForm(false);
-      setSelectedPost(null);
-      resetForm();
-      fetchPosts();
-    } catch (error) {
-      setError('Failed to update post');
-    } finally {
-      setLoading(false);
     }
-  };
 
+    if (formData.postType === 'video') {
+      // Only add new video if selected
+      if (selectedVideo) {
+        formDataToSend.append('video', selectedVideo);
+      }
+      // Always include caption for video posts
+      formDataToSend.append('caption', formData.caption || '');
+    }
+
+    if (formData.postType === 'poll') {
+      const validOptions = formData.pollOptions.filter(opt => opt.trim());
+      if (validOptions.length >= 2) {
+        formDataToSend.append('pollOptions', JSON.stringify(validOptions));
+      }
+      if (formData.pollExpiresAt) {
+        formDataToSend.append('pollExpiresAt', formData.pollExpiresAt);
+      }
+    }
+
+    if (formData.postType === 'quiz') {
+      formDataToSend.append('quizQuestions', JSON.stringify(formData.quizQuestions));
+    }
+
+    if (formData.postType === 'link') {
+      formDataToSend.append('linkUrl', formData.linkUrl || '');
+      formDataToSend.append('linkTitle', formData.linkTitle || '');
+      formDataToSend.append('linkDescription', formData.linkDescription || '');
+    }
+
+    const response = await apiCall(`/community/posts/${selectedPost._id}`, {
+      method: 'PUT',
+      body: formDataToSend
+    });
+
+    setSuccess('Post updated successfully!');
+    setShowEditForm(false);
+    setSelectedPost(null);
+    resetForm();
+    fetchPosts();
+  } catch (error) {
+    console.error('Update error:', error);
+    setError(error.message || 'Failed to update post');
+  } finally {
+    setLoading(false);
+  }
+};
   // Delete post
   const deletePost = async (postId) => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
@@ -206,23 +217,23 @@ const AdminCommunity = () => {
     }
   };
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      postType: 'image',
-      description: '',
-      caption: '',
-      pollOptions: ['', ''],
-      pollExpiresAt: '',
-      quizQuestions: [{ question: '', options: ['', '', '', ''], correctAnswer: 0, explanation: '' }],
-      linkUrl: '',
-      linkTitle: '',
-      linkDescription: ''
-    });
-    setSelectedImages([]);
-    setSelectedVideo(null);
-  };
-
+const resetForm = () => {
+  setFormData({
+    postType: 'image',
+    description: '',
+    caption: '',
+    pollOptions: ['', ''],
+    pollExpiresAt: '',
+    quizQuestions: [{ question: '', options: ['', '', '', ''], correctAnswer: 0, explanation: '' }],
+    linkUrl: '',
+    linkTitle: '',
+    linkDescription: ''
+  });
+  setSelectedImages([]);
+  setSelectedVideo(null);
+  setError('');
+  setSuccess('');
+};
   // Handle form input changes
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -309,21 +320,32 @@ const AdminCommunity = () => {
   };
 
   // Edit post handler
-  const handleEditPost = (post) => {
-    setSelectedPost(post);
-    setFormData({
-      postType: post.postType,
-      description: post.description,
-      caption: post.caption || '',
-      pollOptions: post.pollOptions?.map(opt => opt.option) || ['', ''],
-      pollExpiresAt: post.pollExpiresAt ? new Date(post.pollExpiresAt).toISOString().slice(0, 16) : '',
-      quizQuestions: post.quizQuestions || [{ question: '', options: ['', '', '', ''], correctAnswer: 0, explanation: '' }],
-      linkUrl: post.linkUrl || '',
-      linkTitle: post.linkTitle || '',
-      linkDescription: post.linkDescription || ''
-    });
-    setShowEditForm(true);
-  };
+// Replace your handleEditPost function with this:
+const handleEditPost = (post) => {
+  setSelectedPost(post);
+  
+  // Properly populate form data
+  setFormData({
+    postType: post.postType,
+    description: post.description || '',
+    caption: post.caption || '',
+    pollOptions: post.pollOptions?.map(opt => opt.option) || ['', ''],
+    pollExpiresAt: post.pollExpiresAt ? 
+      new Date(post.pollExpiresAt).toISOString().slice(0, 16) : '',
+    quizQuestions: post.quizQuestions?.length > 0 ? 
+      post.quizQuestions : 
+      [{ question: '', options: ['', '', '', ''], correctAnswer: 0, explanation: '' }],
+    linkUrl: post.linkUrl || '',
+    linkTitle: post.linkTitle || '',
+    linkDescription: post.linkDescription || ''
+  });
+  
+  // Reset file selections for editing
+  setSelectedImages([]);
+  setSelectedVideo(null);
+  setShowEditForm(true);
+};
+
 
   // Format date
   const formatDate = (dateString) => {

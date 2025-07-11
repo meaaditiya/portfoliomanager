@@ -7659,7 +7659,7 @@ app.get('/api/community/posts/:id', async (req, res) => {
   }
 });
 
-// Update a community post
+// Replace your PUT route with this corrected version:
 app.put('/api/community/posts/:id', authenticateToken, upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'video', maxCount: 1 }
@@ -7679,13 +7679,16 @@ app.put('/api/community/posts/:id', authenticateToken, upload.fields([
 
     const { description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
 
-    // Update common fields
-    if (description) post.description = description;
-    
+    // Update description - always update this field
+    if (description !== undefined) {
+      post.description = description.trim();
+    }
+
     // Update type-specific fields
     switch (post.postType) {
       case 'image':
-        if (req.files && req.files.images) {
+        // Only update images if new ones are provided
+        if (req.files && req.files.images && req.files.images.length > 0) {
           post.images = req.files.images.map(file => ({
             data: file.buffer,
             contentType: file.mimetype,
@@ -7695,47 +7698,78 @@ app.put('/api/community/posts/:id', authenticateToken, upload.fields([
         break;
 
       case 'video':
-        if (req.files && req.files.video) {
+        // Only update video if new one is provided
+        if (req.files && req.files.video && req.files.video.length > 0) {
           post.video = {
             data: req.files.video[0].buffer,
             contentType: req.files.video[0].mimetype,
             filename: req.files.video[0].originalname
           };
         }
-        if (caption) post.caption = caption;
+        // Always update caption for video posts
+        if (caption !== undefined) {
+          post.caption = caption.trim();
+        }
         break;
 
       case 'poll':
         if (pollOptions) {
-          post.pollOptions = JSON.parse(pollOptions).map(option => ({
-            option,
-            votes: []
-          }));
+          try {
+            const parsedOptions = typeof pollOptions === 'string' ? JSON.parse(pollOptions) : pollOptions;
+            if (Array.isArray(parsedOptions) && parsedOptions.length >= 2) {
+              // Preserve existing votes when updating options
+              const existingVotes = {};
+              post.pollOptions.forEach((option, index) => {
+                existingVotes[option.option] = option.votes;
+              });
+
+              post.pollOptions = parsedOptions.map(option => ({
+                option: option.trim(),
+                votes: existingVotes[option.trim()] || []
+              }));
+            }
+          } catch (error) {
+            return res.status(400).json({ message: 'Invalid poll options format' });
+          }
         }
-        if (pollExpiresAt) {
-          post.pollExpiresAt = new Date(pollExpiresAt);
+        if (pollExpiresAt !== undefined) {
+          post.pollExpiresAt = pollExpiresAt ? new Date(pollExpiresAt) : null;
         }
         break;
 
       case 'quiz':
         if (quizQuestions) {
-          post.quizQuestions = JSON.parse(quizQuestions);
+          try {
+            const parsedQuestions = typeof quizQuestions === 'string' ? JSON.parse(quizQuestions) : quizQuestions;
+            if (Array.isArray(parsedQuestions)) {
+              post.quizQuestions = parsedQuestions;
+            }
+          } catch (error) {
+            return res.status(400).json({ message: 'Invalid quiz questions format' });
+          }
         }
         break;
 
       case 'link':
-        if (linkUrl) post.linkUrl = linkUrl;
-        if (linkTitle) post.linkTitle = linkTitle;
-        if (linkDescription) post.linkDescription = linkDescription;
+        if (linkUrl !== undefined) post.linkUrl = linkUrl.trim();
+        if (linkTitle !== undefined) post.linkTitle = linkTitle.trim();
+        if (linkDescription !== undefined) post.linkDescription = linkDescription.trim();
         break;
     }
 
     post.updatedAt = new Date();
     await post.save();
 
+    // Populate and return the updated post
+    const updatedPost = await CommunityPost.findById(post._id)
+      .populate('author', 'username email')
+      .populate('likes')
+      .populate('comments')
+      .populate('shares');
+
     res.json({
       message: 'Community post updated successfully',
-      post: await post.populate('author', 'username email')
+      post: updatedPost
     });
   } catch (error) {
     console.error('Error updating community post:', error);
