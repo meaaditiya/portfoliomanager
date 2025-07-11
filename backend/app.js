@@ -8035,7 +8035,48 @@ app.delete('/api/community/comments/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, res) => {
+  try {
+    const { commentId, replyId } = req.params;
+    const { userEmail } = req.body;
 
+    if (!userEmail) {
+      return res.status(400).json({ message: 'User email is required' });
+    }
+
+    // Find the reply
+    const reply = await CommunityComment.findById(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+
+    // Check if this is actually a reply to the specified comment
+    if (reply.parentComment?.toString() !== commentId) {
+      return res.status(400).json({ message: 'Reply does not belong to the specified comment' });
+    }
+
+    // Check authorization - only reply owner can delete
+    if (reply.userEmail !== userEmail) {
+      return res.status(403).json({ message: 'Not authorized to delete this reply' });
+    }
+
+    // Soft delete the reply
+    reply.isActive = false;
+    await reply.save();
+
+    // Remove the reply from parent comment's replies array
+    const parentComment = await CommunityComment.findById(commentId);
+    if (parentComment) {
+      parentComment.replies.pull(replyId);
+      await parentComment.save();
+    }
+
+    res.json({ message: 'Reply deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // Like a comment - FIXED
 app.post('/api/community/comments/:id/like', async (req, res) => {
   try {
