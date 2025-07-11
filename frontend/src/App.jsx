@@ -7,6 +7,7 @@ import Login from './Components/Login';
 import BlogEditor from './Components/BlogEditor';
 import Messages from './Components/Messages';
 import Adminpost from './Components/Adminpost';
+import Admincommunitypost from './Components/Community';
 import SocialPost from './Components/SocialPost';
 import Project from './Components/Project';
 import Welcome from './Components/Welcome';
@@ -76,6 +77,7 @@ function AppContent() {
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/adminmail" element={<AdminMail/>}/>
           <Route path="/profile" element={<Profile/>}/>
+          <Route path="/admincommunitypost" element={<Admincommunitypost/>}/>
         </Routes>
       </main>
     </div>

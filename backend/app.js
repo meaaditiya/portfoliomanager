@@ -4088,10 +4088,11 @@ const multer = require('multer');
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Allow various file types
   const allowedTypes = [
     // Images
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+    // Videos
+    'video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm',
     // Documents
     'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     // Spreadsheets
@@ -4117,11 +4118,10 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit per file
-    files: 5 // Maximum 5 files
+    fileSize: 50 * 1024 * 1024, // 50MB limit per file for videos
+    files: 10 // Maximum 10 files
   }
 });
-
 // Image Post Schema
 const imagePostSchema = new mongoose.Schema({
   caption: {
@@ -5161,7 +5161,7 @@ app.get('/api/social-embeds/platform/:platform', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Multer configuration for multiple file types (store in memory)
+
 
 // Updated Project Request Schema with multiple files support
 const projectRequestSchema = new mongoose.Schema({
@@ -7275,6 +7275,851 @@ app.patch('/api/quote/toggle', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+
+
+
+
+// Updated MongoDB Schemas - Fixed to match email/name approach
+const communityPostSchema = new mongoose.Schema({
+  author: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    required: true
+  },
+  postType: {
+    type: String,
+    enum: ['image', 'poll', 'video', 'quiz', 'link'],
+    required: true
+  },
+  description: {
+    type: String,
+    required: true
+  },
+  // For image posts
+  images: [{
+    data: Buffer,
+    contentType: String,
+    filename: String
+  }],
+  // For video posts
+  video: {
+    data: Buffer,
+    contentType: String,
+    filename: String
+  },
+  caption: String,
+  // For poll posts
+  pollOptions: [{
+    option: String,
+    votes: [{
+      userEmail: String,
+      userName: String,
+      votedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
+  }],
+  pollExpiresAt: Date,
+  // For quiz posts
+  quizQuestions: [{
+    question: String,
+    options: [String],
+    correctAnswer: Number,
+    explanation: String
+  }],
+  // For link posts
+  linkUrl: String,
+  linkTitle: String,
+  linkDescription: String,
+  linkThumbnail: {
+    data: Buffer,
+    contentType: String
+  },
+  // Common fields
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityLike'
+  }],
+  comments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityComment'
+  }],
+  shares: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityShare'
+  }],
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Fixed CommunityLike schema
+const communityLikeSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityPost',
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  likedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Fixed CommunityComment schema
+const communityCommentSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityPost',
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  comment: {
+    type: String,
+    required: true
+  },
+  parentComment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityComment'
+  },
+  replies: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityComment'
+  }],
+  likes: [{
+    userEmail: String,
+    userName: String,
+    likedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Fixed CommunityShare schema
+const communityShareSchema = new mongoose.Schema({
+  post: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CommunityPost',
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  sharedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Create models
+const CommunityPost = mongoose.model('CommunityPost', communityPostSchema);
+const CommunityLike = mongoose.model('CommunityLike', communityLikeSchema);
+const CommunityComment = mongoose.model('CommunityComment', communityCommentSchema);
+const CommunityShare = mongoose.model('CommunityShare', communityShareSchema);
+
+// ROUTES
+
+// Create a new community post
+app.post('/api/community/posts', authenticateToken, upload.fields([
+  { name: 'images', maxCount: 10 },
+  { name: 'video', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can create community posts' });
+    }
+
+    const { postType, description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
+    
+    const postData = {
+      author: req.user.admin_id,
+      postType,
+      description
+    };
+
+    // Handle different post types
+    switch (postType) {
+      case 'image':
+        if (req.files && req.files.images) {
+          postData.images = req.files.images.map(file => ({
+            data: file.buffer,
+            contentType: file.mimetype,
+            filename: file.originalname
+          }));
+        }
+        break;
+
+      case 'video':
+        if (req.files && req.files.video) {
+          postData.video = {
+            data: req.files.video[0].buffer,
+            contentType: req.files.video[0].mimetype,
+            filename: req.files.video[0].originalname
+          };
+        }
+        postData.caption = caption;
+        break;
+
+      case 'poll':
+        postData.pollOptions = JSON.parse(pollOptions || '[]').map(option => ({
+          option,
+          votes: []
+        }));
+        if (pollExpiresAt) {
+          postData.pollExpiresAt = new Date(pollExpiresAt);
+        }
+        break;
+
+      case 'quiz':
+        postData.quizQuestions = JSON.parse(quizQuestions || '[]');
+        break;
+
+      case 'link':
+        postData.linkUrl = linkUrl;
+        postData.linkTitle = linkTitle;
+        postData.linkDescription = linkDescription;
+        break;
+    }
+
+    const post = new CommunityPost(postData);
+    await post.save();
+
+    res.status(201).json({
+      message: 'Community post created successfully',
+      post: await post.populate('author', 'username email')
+    });
+  } catch (error) {
+    console.error('Error creating community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all community posts - FIXED POPULATE QUERIES
+app.get('/api/community/posts', async (req, res) => {
+  try {
+    const { page = 1, limit = 10, postType } = req.query;
+    const skip = (page - 1) * limit;
+
+    const filter = { isActive: true };
+    if (postType) {
+      filter.postType = postType;
+    }
+
+    const posts = await CommunityPost.find(filter)
+      .populate('author', 'username email')
+      .populate('likes') // Just populate the likes documents
+      .populate('comments') // Just populate the comments documents
+      .populate('shares') // Just populate the shares documents
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalPosts = await CommunityPost.countDocuments(filter);
+
+    res.json({
+      posts,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalPosts / limit),
+      totalPosts
+    });
+  } catch (error) {
+    console.error('Error fetching community posts:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get a specific community post - FIXED POPULATE QUERIES
+app.get('/api/community/posts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const post = await CommunityPost.findById(id)
+      .populate('author', 'username email')
+      .populate('likes') // Just populate the likes documents
+      .populate('comments') // Just populate the comments documents
+      .populate('shares'); // Just populate the shares documents
+
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    res.json(post);
+  } catch (error) {
+    console.error('Error fetching community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update a community post
+app.put('/api/community/posts/:id', authenticateToken, upload.fields([
+  { name: 'images', maxCount: 10 },
+  { name: 'video', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await CommunityPost.findById(id);
+
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    // Check authorization
+    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update this post' });
+    }
+
+    const { description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
+
+    // Update common fields
+    if (description) post.description = description;
+    
+    // Update type-specific fields
+    switch (post.postType) {
+      case 'image':
+        if (req.files && req.files.images) {
+          post.images = req.files.images.map(file => ({
+            data: file.buffer,
+            contentType: file.mimetype,
+            filename: file.originalname
+          }));
+        }
+        break;
+
+      case 'video':
+        if (req.files && req.files.video) {
+          post.video = {
+            data: req.files.video[0].buffer,
+            contentType: req.files.video[0].mimetype,
+            filename: req.files.video[0].originalname
+          };
+        }
+        if (caption) post.caption = caption;
+        break;
+
+      case 'poll':
+        if (pollOptions) {
+          post.pollOptions = JSON.parse(pollOptions).map(option => ({
+            option,
+            votes: []
+          }));
+        }
+        if (pollExpiresAt) {
+          post.pollExpiresAt = new Date(pollExpiresAt);
+        }
+        break;
+
+      case 'quiz':
+        if (quizQuestions) {
+          post.quizQuestions = JSON.parse(quizQuestions);
+        }
+        break;
+
+      case 'link':
+        if (linkUrl) post.linkUrl = linkUrl;
+        if (linkTitle) post.linkTitle = linkTitle;
+        if (linkDescription) post.linkDescription = linkDescription;
+        break;
+    }
+
+    post.updatedAt = new Date();
+    await post.save();
+
+    res.json({
+      message: 'Community post updated successfully',
+      post: await post.populate('author', 'username email')
+    });
+  } catch (error) {
+    console.error('Error updating community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete a community post
+app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await CommunityPost.findById(id);
+
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    // Check authorization
+    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete this post' });
+    }
+
+    // Soft delete
+    post.isActive = false;
+    await post.save();
+
+    res.json({ message: 'Community post deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get comments for a community post - FIXED POPULATE QUERIES
+app.get('/api/community/posts/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const comments = await CommunityComment.find({ 
+      post: id, 
+      isActive: true, 
+      parentComment: null 
+    })
+      .populate({
+        path: 'replies',
+        match: { isActive: true }
+      })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalComments = await CommunityComment.countDocuments({ 
+      post: id, 
+      isActive: true, 
+      parentComment: null 
+    });
+
+    res.json({
+      comments,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalComments / limit),
+      totalComments
+    });
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get community post media (images/videos)
+app.get('/api/community/posts/:id/media/:type/:index', async (req, res) => {
+  try {
+    const { id, type, index } = req.params;
+    
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    let media;
+    if (type === 'image' && post.images && post.images[index]) {
+      media = post.images[index];
+    } else if (type === 'video' && post.video) {
+      media = post.video;
+    } else {
+      return res.status(404).json({ message: 'Media not found' });
+    }
+
+    res.set('Content-Type', media.contentType);
+    res.send(media.data);
+  } catch (error) {
+    console.error('Error fetching media:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Like a community post - FIXED
+app.post('/api/community/posts/:id/like', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    // Check if user already liked the post
+    const existingLike = await CommunityLike.findOne({ post: id, userEmail });
+        
+    if (existingLike) {
+      // Unlike the post
+      await CommunityLike.findByIdAndDelete(existingLike._id);
+      post.likes.pull(existingLike._id);
+      await post.save();
+            
+      res.json({ message: 'Post unliked successfully', liked: false });
+    } else {
+      // Like the post
+      const newLike = new CommunityLike({
+        post: id,
+        userEmail,
+        userName
+      });
+      await newLike.save();
+            
+      post.likes.push(newLike._id);
+      await post.save();
+            
+      res.json({ message: 'Post liked successfully', liked: true });
+    }
+  } catch (error) {
+    console.error('Error liking/unliking community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Comment on a community post - FIXED
+app.post('/api/community/posts/:id/comment', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, parentComment, userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({ message: 'Comment text is required' });
+    }
+
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    const newComment = new CommunityComment({
+      post: id,
+      userEmail,
+      userName,
+      comment: comment.trim(),
+      parentComment: parentComment || null
+    });
+
+    await newComment.save();
+        
+    // Add comment to post
+    post.comments.push(newComment._id);
+    await post.save();
+
+    // If this is a reply, add to parent comment's replies
+    if (parentComment) {
+      const parentCommentDoc = await CommunityComment.findById(parentComment);
+      if (parentCommentDoc) {
+        parentCommentDoc.replies.push(newComment._id);
+        await parentCommentDoc.save();
+      }
+    }
+
+    res.status(201).json({
+      message: 'Comment added successfully',
+      comment: newComment
+    });
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Share a community post - FIXED
+app.post('/api/community/posts/:id/share', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    // Check if user already shared the post
+    const existingShare = await CommunityShare.findOne({ post: id, userEmail });
+        
+    if (existingShare) {
+      return res.status(400).json({ message: 'Post already shared' });
+    }
+
+    const newShare = new CommunityShare({
+      post: id,
+      userEmail,
+      userName
+    });
+
+    await newShare.save();
+        
+    post.shares.push(newShare._id);
+    await post.save();
+
+    res.json({ message: 'Post shared successfully' });
+  } catch (error) {
+    console.error('Error sharing community post:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Vote on a poll - FIXED
+app.post('/api/community/posts/:id/vote', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { optionIndex, userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    if (post.postType !== 'poll') {
+      return res.status(400).json({ message: 'This post is not a poll' });
+    }
+
+    // Check if poll has expired
+    if (post.pollExpiresAt && new Date() > post.pollExpiresAt) {
+      return res.status(400).json({ message: 'Poll has expired' });
+    }
+
+    // Check if user already voted
+    const hasVoted = post.pollOptions.some(option => 
+      option.votes.some(vote => vote.userEmail === userEmail)
+    );
+
+    if (hasVoted) {
+      return res.status(400).json({ message: 'You have already voted on this poll' });
+    }
+
+    if (optionIndex < 0 || optionIndex >= post.pollOptions.length) {
+      return res.status(400).json({ message: 'Invalid option index' });
+    }
+
+    post.pollOptions[optionIndex].votes.push({
+      userEmail,
+      userName,
+      votedAt: new Date()
+    });
+
+    await post.save();
+
+    res.json({ message: 'Vote recorded successfully' });
+  } catch (error) {
+    console.error('Error voting on poll:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Submit quiz answer - FIXED
+app.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { answers, userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    if (post.postType !== 'quiz') {
+      return res.status(400).json({ message: 'This post is not a quiz' });
+    }
+
+    let score = 0;
+    const results = post.quizQuestions.map((question, index) => {
+      const userAnswer = answers[index];
+      const isCorrect = userAnswer === question.correctAnswer;
+      if (isCorrect) score++;
+
+      return {
+        question: question.question,
+        userAnswer,
+        correctAnswer: question.correctAnswer,
+        isCorrect,
+        explanation: question.explanation
+      };
+    });
+
+    res.json({
+      message: 'Quiz submitted successfully',
+      score,
+      totalQuestions: post.quizQuestions.length,
+      results
+    });
+  } catch (error) {
+    console.error('Error submitting quiz:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete a comment - FIXED
+app.delete('/api/community/comments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userEmail } = req.body;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: 'User email is required' });
+    }
+
+    const comment = await CommunityComment.findById(id);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Check authorization - only comment owner can delete
+    if (comment.userEmail !== userEmail) {
+      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+    }
+
+    // Soft delete
+    comment.isActive = false;
+    await comment.save();
+
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Like a comment - FIXED
+app.post('/api/community/comments/:id/like', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userEmail, userName } = req.body;
+
+    if (!userEmail || !userName) {
+      return res.status(400).json({ message: 'User email and name are required' });
+    }
+
+    const comment = await CommunityComment.findById(id);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Check if user already liked the comment
+    const existingLikeIndex = comment.likes.findIndex(
+      like => like.userEmail === userEmail
+    );
+
+    if (existingLikeIndex > -1) {
+      // Unlike the comment
+      comment.likes.splice(existingLikeIndex, 1);
+      await comment.save();
+            
+      res.json({ message: 'Comment unliked successfully', liked: false });
+    } else {
+      // Like the comment
+      comment.likes.push({
+        userEmail,
+        userName,
+        likedAt: new Date()
+      });
+      await comment.save();
+            
+      res.json({ message: 'Comment liked successfully', liked: true });
+    }
+  } catch (error) {
+    console.error('Error liking/unliking comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get user's activity (optional - for user dashboard)
+app.get('/api/community/user/:userEmail/activity', async (req, res) => {
+  try {
+    const { userEmail } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Get user's likes
+    const likes = await CommunityLike.find({ userEmail })
+      .populate('post', 'description postType createdAt')
+      .sort({ likedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get user's comments
+    const comments = await CommunityComment.find({ userEmail, isActive: true })
+      .populate('post', 'description postType createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get user's shares
+    const shares = await CommunityShare.find({ userEmail })
+      .populate('post', 'description postType createdAt')
+      .sort({ sharedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      likes,
+      comments,
+      shares,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(Math.max(likes.length, comments.length, shares.length) / limit)
+    });
+  } catch (error) {
+    console.error('Error fetching user activity:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

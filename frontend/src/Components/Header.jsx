@@ -30,12 +30,14 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
 
   const adminNavItems = [
     { name: 'Posts', path: '/adminpost' },
+    { name: 'Community Posts', path: '/admincommunitypost' },
     { name: 'Blog Editor', path: '/blog-editor' },
     { name: 'Messages', path: '/message' },
     { name: 'Projects', path: '/project' },
     { name: 'Social Posts', path: '/socialpost' },
     {name: 'AdminMail', path:'/adminmail'},
     {name: 'Set Profile', path: '/profile'},
+    
   ];
 
   const handleLogout = async () => {
