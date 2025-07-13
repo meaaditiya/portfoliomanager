@@ -7603,7 +7603,6 @@ app.post('/api/community/posts', authenticateToken, upload.fields([
     res.status(500).json({ message: error.message });
   }
 });
-// Get all community posts - FIXED POPULATE QUERIES
 app.get('/api/community/posts', async (req, res) => {
   try {
     const { page = 1, limit = 10, postType } = req.query;
@@ -7616,9 +7615,18 @@ app.get('/api/community/posts', async (req, res) => {
 
     const posts = await CommunityPost.find(filter)
       .populate('author', 'username email')
-      .populate('likes') // Just populate the likes documents
-      .populate('comments') // Just populate the comments documents
-      .populate('shares') // Just populate the shares documents
+      .populate({
+        path: 'likes',
+        // No additional filtering needed for likes since they don't have isActive
+      })
+      .populate({
+        path: 'comments',
+        match: { isActive: true }, // FIXED: Only populate active comments
+      })
+      .populate({
+        path: 'shares',
+        // No additional filtering needed for shares since they don't have isActive
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -7637,16 +7645,24 @@ app.get('/api/community/posts', async (req, res) => {
   }
 });
 
-// Get a specific community post - FIXED POPULATE QUERIES
 app.get('/api/community/posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const post = await CommunityPost.findById(id)
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }) // FIXED: Only get active posts
       .populate('author', 'username email')
-      .populate('likes') // Just populate the likes documents
-      .populate('comments') // Just populate the comments documents
-      .populate('shares'); // Just populate the shares documents
+      .populate({
+        path: 'likes',
+        // No additional filtering needed for likes
+      })
+      .populate({
+        path: 'comments',
+        match: { isActive: true }, // FIXED: Only populate active comments
+      })
+      .populate({
+        path: 'shares',
+        // No additional filtering needed for shares
+      });
 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
@@ -7658,7 +7674,6 @@ app.get('/api/community/posts/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 // Replace your PUT route with this corrected version:
 app.put('/api/community/posts/:id', authenticateToken, upload.fields([
   { name: 'images', maxCount: 10 },
@@ -7777,11 +7792,11 @@ app.put('/api/community/posts/:id', authenticateToken, upload.fields([
   }
 });
 
-// Delete a community post
-app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
+// FIXED: Delete a community post - Better cleanup
+app.delete('/api/community/posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only find active posts
 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
@@ -7792,9 +7807,21 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
 
-    // Soft delete
+    // Soft delete the post
     post.isActive = false;
     await post.save();
+
+    // FIXED: Also soft delete all comments and replies associated with this post
+    await CommunityComment.updateMany(
+      { post: id, isActive: true },
+      { $set: { isActive: false } }
+    );
+
+    // FIXED: Delete all likes associated with this post
+    await CommunityLike.deleteMany({ post: id });
+
+    // FIXED: Delete all shares associated with this post
+    await CommunityShare.deleteMany({ post: id });
 
     res.json({ message: 'Community post deleted successfully' });
   } catch (error) {
@@ -7803,12 +7830,18 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get comments for a community post - FIXED POPULATE QUERIES
+// FIXED: Get comments for a community post - Already correctly filtered
 app.get('/api/community/posts/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
+
+    // First check if the post exists and is active
+    const post = await CommunityPost.findOne({ _id: id, isActive: true });
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
+    }
 
     const comments = await CommunityComment.find({ 
       post: id, 
@@ -7817,7 +7850,7 @@ app.get('/api/community/posts/:id/comments', async (req, res) => {
     })
       .populate({
         path: 'replies',
-        match: { isActive: true }
+        match: { isActive: true } // FIXED: Only populate active replies
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -7840,6 +7873,7 @@ app.get('/api/community/posts/:id/comments', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // Get community post media (images/videos)
 app.get('/api/community/posts/:id/media/:type/:index', async (req, res) => {
@@ -7868,7 +7902,7 @@ app.get('/api/community/posts/:id/media/:type/:index', async (req, res) => {
   }
 });
 
-// Like a community post - FIXED
+// FIXED: Like a community post - Check if post is active
 app.post('/api/community/posts/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
@@ -7878,7 +7912,7 @@ app.post('/api/community/posts/:id/like', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow liking active posts
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -7913,7 +7947,7 @@ app.post('/api/community/posts/:id/like', async (req, res) => {
   }
 });
 
-// Comment on a community post - FIXED
+// FIXED: Comment on a community post - Check if post is active
 app.post('/api/community/posts/:id/comment', async (req, res) => {
   try {
     const { id } = req.params;
@@ -7927,9 +7961,20 @@ app.post('/api/community/posts/:id/comment', async (req, res) => {
       return res.status(400).json({ message: 'Comment text is required' });
     }
 
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow commenting on active posts
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
+    }
+
+    // FIXED: If replying to a comment, check if parent comment is active
+    if (parentComment) {
+      const parentCommentDoc = await CommunityComment.findOne({ 
+        _id: parentComment, 
+        isActive: true 
+      });
+      if (!parentCommentDoc) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
     }
 
     const newComment = new CommunityComment({
@@ -7948,7 +7993,10 @@ app.post('/api/community/posts/:id/comment', async (req, res) => {
 
     // If this is a reply, add to parent comment's replies
     if (parentComment) {
-      const parentCommentDoc = await CommunityComment.findById(parentComment);
+      const parentCommentDoc = await CommunityComment.findOne({ 
+        _id: parentComment, 
+        isActive: true 
+      });
       if (parentCommentDoc) {
         parentCommentDoc.replies.push(newComment._id);
         await parentCommentDoc.save();
@@ -7965,7 +8013,7 @@ app.post('/api/community/posts/:id/comment', async (req, res) => {
   }
 });
 
-// Share a community post - FIXED
+// FIXED: Share a community post - Check if post is active
 app.post('/api/community/posts/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
@@ -7975,7 +8023,7 @@ app.post('/api/community/posts/:id/share', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow sharing active posts
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -8005,7 +8053,7 @@ app.post('/api/community/posts/:id/share', async (req, res) => {
   }
 });
 
-// Vote on a poll - FIXED
+// FIXED: Vote on a poll - Check if post is active
 app.post('/api/community/posts/:id/vote', async (req, res) => {
   try {
     const { id } = req.params;
@@ -8015,7 +8063,7 @@ app.post('/api/community/posts/:id/vote', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow voting on active posts
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -8057,7 +8105,7 @@ app.post('/api/community/posts/:id/vote', async (req, res) => {
   }
 });
 
-// Submit quiz answer - FIXED
+// FIXED: Submit quiz answer - Check if post is active
 app.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
   try {
     const { id } = req.params;
@@ -8067,7 +8115,7 @@ app.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findById(id);
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow quiz submission on active posts
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -8103,7 +8151,7 @@ app.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
   }
 });
 
-// Delete a comment - FIXED
+// FIXED: Delete a comment - Also remove from post's comments array
 app.delete('/api/community/comments/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -8113,7 +8161,7 @@ app.delete('/api/community/comments/:id', async (req, res) => {
       return res.status(400).json({ message: 'User email is required' });
     }
 
-    const comment = await CommunityComment.findById(id);
+    const comment = await CommunityComment.findOne({ _id: id, isActive: true }); // FIXED: Only find active comments
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
@@ -8123,9 +8171,21 @@ app.delete('/api/community/comments/:id', async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this comment' });
     }
 
-    // Soft delete
+    // Soft delete the comment
     comment.isActive = false;
     await comment.save();
+
+    // FIXED: Remove comment from post's comments array
+    await CommunityPost.updateOne(
+      { _id: comment.post },
+      { $pull: { comments: id } }
+    );
+
+    // FIXED: Also soft delete all replies to this comment
+    await CommunityComment.updateMany(
+      { parentComment: id, isActive: true },
+      { $set: { isActive: false } }
+    );
 
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {
@@ -8133,6 +8193,8 @@ app.delete('/api/community/comments/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// FIXED: Delete a reply - Better validation and cleanup
 app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, res) => {
   try {
     const { commentId, replyId } = req.params;
@@ -8142,8 +8204,8 @@ app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, re
       return res.status(400).json({ message: 'User email is required' });
     }
 
-    // Find the reply
-    const reply = await CommunityComment.findById(replyId);
+    // Find the reply and ensure it's active
+    const reply = await CommunityComment.findOne({ _id: replyId, isActive: true }); // FIXED: Only find active replies
     if (!reply) {
       return res.status(404).json({ message: 'Reply not found' });
     }
@@ -8162,12 +8224,17 @@ app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, re
     reply.isActive = false;
     await reply.save();
 
-    // Remove the reply from parent comment's replies array
-    const parentComment = await CommunityComment.findById(commentId);
-    if (parentComment) {
-      parentComment.replies.pull(replyId);
-      await parentComment.save();
-    }
+    // FIXED: Remove the reply from parent comment's replies array
+    await CommunityComment.updateOne(
+      { _id: commentId },
+      { $pull: { replies: replyId } }
+    );
+
+    // FIXED: Also remove from post's comments array
+    await CommunityPost.updateOne(
+      { _id: reply.post },
+      { $pull: { comments: replyId } }
+    );
 
     res.json({ message: 'Reply deleted successfully' });
   } catch (error) {
@@ -8175,7 +8242,10 @@ app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, re
     res.status(500).json({ message: error.message });
   }
 });
-// Like a comment - FIXED
+
+
+
+// FIXED: Like a comment - Check if comment is active
 app.post('/api/community/comments/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
@@ -8185,7 +8255,7 @@ app.post('/api/community/comments/:id/like', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const comment = await CommunityComment.findById(id);
+    const comment = await CommunityComment.findOne({ _id: id, isActive: true }); // FIXED: Only allow liking active comments
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
@@ -8217,41 +8287,61 @@ app.post('/api/community/comments/:id/like', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-// Get user's activity (optional - for user dashboard)
+// FIXED: Get user's activity - Filter out deleted items
 app.get('/api/community/user/:userEmail/activity', async (req, res) => {
   try {
     const { userEmail } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    // Get user's likes
+    // Get user's likes (only for active posts)
     const likes = await CommunityLike.find({ userEmail })
-      .populate('post', 'description postType createdAt')
+      .populate({
+        path: 'post',
+        match: { isActive: true }, // FIXED: Only populate active posts
+        select: 'description postType createdAt'
+      })
       .sort({ likedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Get user's comments
+    // Filter out likes where post is null (deleted posts)
+    const activeLikes = likes.filter(like => like.post !== null);
+
+    // Get user's comments (only active comments on active posts)
     const comments = await CommunityComment.find({ userEmail, isActive: true })
-      .populate('post', 'description postType createdAt')
+      .populate({
+        path: 'post',
+        match: { isActive: true }, // FIXED: Only populate active posts
+        select: 'description postType createdAt'
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Get user's shares
+    // Filter out comments where post is null (deleted posts)
+    const activeComments = comments.filter(comment => comment.post !== null);
+
+    // Get user's shares (only for active posts)
     const shares = await CommunityShare.find({ userEmail })
-      .populate('post', 'description postType createdAt')
+      .populate({
+        path: 'post',
+        match: { isActive: true }, // FIXED: Only populate active posts
+        select: 'description postType createdAt'
+      })
       .sort({ sharedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
+    // Filter out shares where post is null (deleted posts)
+    const activeShares = shares.filter(share => share.post !== null);
+
     res.json({
-      likes,
-      comments,
-      shares,
+      likes: activeLikes,
+      comments: activeComments,
+      shares: activeShares,
       currentPage: parseInt(page),
-      totalPages: Math.ceil(Math.max(likes.length, comments.length, shares.length) / limit)
+      totalPages: Math.ceil(Math.max(activeLikes.length, activeComments.length, activeShares.length) / limit)
     });
   } catch (error) {
     console.error('Error fetching user activity:', error);
