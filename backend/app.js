@@ -7792,11 +7792,11 @@ app.put('/api/community/posts/:id', authenticateToken, upload.fields([
   }
 });
 
-// FIXED: Delete a community post - Better cleanup
-app.delete('/api/community/posts/:id', async (req, res) => {
+// Delete a community post - PERMANENT DELETION
+app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only find active posts
+    const post = await CommunityPost.findById(id);
 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
@@ -7807,29 +7807,125 @@ app.delete('/api/community/posts/:id', async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
 
-    // Soft delete the post
-    post.isActive = false;
-    await post.save();
-
-    // FIXED: Also soft delete all comments and replies associated with this post
-    await CommunityComment.updateMany(
-      { post: id, isActive: true },
-      { $set: { isActive: false } }
-    );
-
-    // FIXED: Delete all likes associated with this post
+    // PERMANENT DELETE: Remove all associated data first
+    
+    // 1. Delete all likes for this post
     await CommunityLike.deleteMany({ post: id });
 
-    // FIXED: Delete all shares associated with this post
+    // 2. Delete all comments and replies for this post
+    await CommunityComment.deleteMany({ post: id });
+
+    // 3. Delete all shares for this post
     await CommunityShare.deleteMany({ post: id });
 
-    res.json({ message: 'Community post deleted successfully' });
+    // 4. Finally delete the post itself
+    await CommunityPost.findByIdAndDelete(id);
+
+    res.json({ message: 'Community post permanently deleted successfully' });
   } catch (error) {
     console.error('Error deleting community post:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
+// Delete a comment - PERMANENT DELETION
+app.delete('/api/community/comments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userEmail } = req.body;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: 'User email is required' });
+    }
+
+    const comment = await CommunityComment.findById(id);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Check authorization - only comment owner can delete
+    if (comment.userEmail !== userEmail) {
+      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+    }
+
+    // PERMANENT DELETE: Remove all associated data
+    
+    // 1. Delete all replies to this comment
+    await CommunityComment.deleteMany({ parentComment: id });
+
+    // 2. Remove this comment from the post's comments array
+    await CommunityPost.updateOne(
+      { _id: comment.post },
+      { $pull: { comments: id } }
+    );
+
+    // 3. Remove this comment from parent comment's replies array (if it's a reply)
+    if (comment.parentComment) {
+      await CommunityComment.updateOne(
+        { _id: comment.parentComment },
+        { $pull: { replies: id } }
+      );
+    }
+
+    // 4. Finally delete the comment itself
+    await CommunityComment.findByIdAndDelete(id);
+
+    res.json({ message: 'Comment permanently deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete a reply - PERMANENT DELETION
+app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, res) => {
+  try {
+    const { commentId, replyId } = req.params;
+    const { userEmail } = req.body;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: 'User email is required' });
+    }
+
+    // Find the reply
+    const reply = await CommunityComment.findById(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: 'Reply not found' });
+    }
+
+    // Check if this is actually a reply to the specified comment
+    if (reply.parentComment?.toString() !== commentId) {
+      return res.status(400).json({ message: 'Reply does not belong to the specified comment' });
+    }
+
+    // Check authorization - only reply owner can delete
+    if (reply.userEmail !== userEmail) {
+      return res.status(403).json({ message: 'Not authorized to delete this reply' });
+    }
+
+    // PERMANENT DELETE: Remove all references
+    
+    // 1. Remove the reply from parent comment's replies array
+    await CommunityComment.updateOne(
+      { _id: commentId },
+      { $pull: { replies: replyId } }
+    );
+
+    // 2. Remove from post's comments array
+    await CommunityPost.updateOne(
+      { _id: reply.post },
+      { $pull: { comments: replyId } }
+    );
+
+    // 3. Finally delete the reply itself
+    await CommunityComment.findByIdAndDelete(replyId);
+
+    res.json({ message: 'Reply permanently deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // FIXED: Get comments for a community post - Already correctly filtered
 app.get('/api/community/posts/:id/comments', async (req, res) => {
   try {
@@ -8151,8 +8247,8 @@ app.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
   }
 });
 
-// FIXED: Delete a comment - Also remove from post's comments array
-app.delete('/api/community/comments/:id', async (req, res) => {
+// BONUS: Unlike a post (removes like from database)
+app.delete('/api/community/posts/:id/unlike', async (req, res) => {
   try {
     const { id } = req.params;
     const { userEmail } = req.body;
@@ -8161,89 +8257,143 @@ app.delete('/api/community/comments/:id', async (req, res) => {
       return res.status(400).json({ message: 'User email is required' });
     }
 
-    const comment = await CommunityComment.findOne({ _id: id, isActive: true }); // FIXED: Only find active comments
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check authorization - only comment owner can delete
-    if (comment.userEmail !== userEmail) {
-      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+    // Find and delete the like
+    const like = await CommunityLike.findOneAndDelete({ post: id, userEmail });
+    
+    if (!like) {
+      return res.status(404).json({ message: 'Like not found' });
     }
 
-    // Soft delete the comment
-    comment.isActive = false;
-    await comment.save();
+    // Remove like reference from post
+    post.likes.pull(like._id);
+    await post.save();
 
-    // FIXED: Remove comment from post's comments array
-    await CommunityPost.updateOne(
-      { _id: comment.post },
-      { $pull: { comments: id } }
-    );
-
-    // FIXED: Also soft delete all replies to this comment
-    await CommunityComment.updateMany(
-      { parentComment: id, isActive: true },
-      { $set: { isActive: false } }
-    );
-
-    res.json({ message: 'Comment deleted successfully' });
+    res.json({ message: 'Like permanently removed' });
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    console.error('Error removing like:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// FIXED: Delete a reply - Better validation and cleanup
-app.delete('/api/community/comments/:commentId/replies/:replyId', async (req, res) => {
+// BONUS: Remove share (permanent deletion)
+app.delete('/api/community/posts/:id/unshare', async (req, res) => {
   try {
-    const { commentId, replyId } = req.params;
+    const { id } = req.params;
     const { userEmail } = req.body;
 
     if (!userEmail) {
       return res.status(400).json({ message: 'User email is required' });
     }
 
-    // Find the reply and ensure it's active
-    const reply = await CommunityComment.findOne({ _id: replyId, isActive: true }); // FIXED: Only find active replies
-    if (!reply) {
-      return res.status(404).json({ message: 'Reply not found' });
+    const post = await CommunityPost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check if this is actually a reply to the specified comment
-    if (reply.parentComment?.toString() !== commentId) {
-      return res.status(400).json({ message: 'Reply does not belong to the specified comment' });
+    // Find and delete the share
+    const share = await CommunityShare.findOneAndDelete({ post: id, userEmail });
+    
+    if (!share) {
+      return res.status(404).json({ message: 'Share not found' });
     }
 
-    // Check authorization - only reply owner can delete
-    if (reply.userEmail !== userEmail) {
-      return res.status(403).json({ message: 'Not authorized to delete this reply' });
-    }
+    // Remove share reference from post
+    post.shares.pull(share._id);
+    await post.save();
 
-    // Soft delete the reply
-    reply.isActive = false;
-    await reply.save();
-
-    // FIXED: Remove the reply from parent comment's replies array
-    await CommunityComment.updateOne(
-      { _id: commentId },
-      { $pull: { replies: replyId } }
-    );
-
-    // FIXED: Also remove from post's comments array
-    await CommunityPost.updateOne(
-      { _id: reply.post },
-      { $pull: { comments: replyId } }
-    );
-
-    res.json({ message: 'Reply deleted successfully' });
+    res.json({ message: 'Share permanently removed' });
   } catch (error) {
-    console.error('Error deleting reply:', error);
+    console.error('Error removing share:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
+// BONUS: Admin route to permanently delete any user's comment
+app.delete('/api/community/admin/comments/:id', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can delete any comment' });
+    }
 
+    const { id } = req.params;
+    const comment = await CommunityComment.findById(id);
+    
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // PERMANENT DELETE: Remove all associated data
+    
+    // 1. Delete all replies to this comment
+    await CommunityComment.deleteMany({ parentComment: id });
+
+    // 2. Remove this comment from the post's comments array
+    await CommunityPost.updateOne(
+      { _id: comment.post },
+      { $pull: { comments: id } }
+    );
+
+    // 3. Remove this comment from parent comment's replies array (if it's a reply)
+    if (comment.parentComment) {
+      await CommunityComment.updateOne(
+        { _id: comment.parentComment },
+        { $pull: { replies: id } }
+      );
+    }
+
+    // 4. Finally delete the comment itself
+    await CommunityComment.findByIdAndDelete(id);
+
+    res.json({ message: 'Comment permanently deleted by admin' });
+  } catch (error) {
+    console.error('Error deleting comment (admin):', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// BONUS: Bulk delete - Admin can delete multiple posts at once
+app.delete('/api/community/admin/posts/bulk', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can bulk delete posts' });
+    }
+
+    const { postIds } = req.body;
+
+    if (!postIds || !Array.isArray(postIds) || postIds.length === 0) {
+      return res.status(400).json({ message: 'Post IDs array is required' });
+    }
+
+    // PERMANENT DELETE: Remove all associated data for all posts
+    
+    // 1. Delete all likes for these posts
+    await CommunityLike.deleteMany({ post: { $in: postIds } });
+
+    // 2. Delete all comments and replies for these posts
+    await CommunityComment.deleteMany({ post: { $in: postIds } });
+
+    // 3. Delete all shares for these posts
+    await CommunityShare.deleteMany({ post: { $in: postIds } });
+
+    // 4. Finally delete the posts themselves
+    const result = await CommunityPost.deleteMany({ _id: { $in: postIds } });
+
+    res.json({ 
+      message: 'Posts permanently deleted successfully',
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error bulk deleting posts:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // FIXED: Like a comment - Check if comment is active
 app.post('/api/community/comments/:id/like', async (req, res) => {
