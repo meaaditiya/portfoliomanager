@@ -18,6 +18,7 @@ body {
   margin: 0 auto;
   padding: 20px;
   min-height: 100vh;
+  margin-top:20px;
 }
 
 /* Header */
@@ -581,14 +582,16 @@ body {
   align-items: center;
   z-index: 1000;
   padding: 20px;
+  margin-top:50px;
+  
 }
 
 .jk-modal-content {
   background: white;
   border-radius: 8px;
   width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
+  max-width: 1000px;
+  max-height: 70vh;
   overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
@@ -782,7 +785,7 @@ body {
   
   .jk-modal-content {
     margin: 10px;
-    max-height: calc(100vh - 40px);
+    max-height: 60vh;
   }
   
   .jk-modal-footer {
@@ -862,55 +865,6 @@ body {
   }
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #1f2937;
-    color: #f9fafb;
-  }
-  
-  .jk-post {
-    background-color: #374151;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-  
-  .jk-post-header,
-  .jk-post-stats {
-    background-color: #4b5563;
-    border-color: #6b7280;
-  }
-  
-  .jk-comments {
-    background-color: #4b5563;
-  }
-  
-  .jk-comment {
-    background-color: #374151;
-    border-color: #6b7280;
-  }
-  
-  .jk-modal-content {
-    background-color: #374151;
-  }
-  
-  .jk-modal-header,
-  .jk-modal-footer {
-    border-color: #6b7280;
-  }
-  
-  .jk-input,
-  .jk-textarea,
-  .jk-select {
-    background-color: #4b5563;
-    border-color: #6b7280;
-    color: #f9fafb;
-  }
-  
-  .jk-quiz-question-group {
-    background-color: #4b5563;
-    border-color: #6b7280;
-  }
-}
 
 /* Accessibility improvements */
 .jk-button-create:focus,
