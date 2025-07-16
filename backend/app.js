@@ -6450,7 +6450,7 @@ const getEmailTemplate = (subject, message, senderName = 'Aaditiya Tyagi', recei
     </div>
 
     <div class="email-content">
-      <h2>${receiverName},</h2>
+      <h2>Dear ${receiverName},</h2>
       <div >
         <p>${message.replace(/\n/g, '</p><p>')}</p>
       </div>
@@ -6562,7 +6562,7 @@ app.post('/api/admin/send-email', authenticateToken, upload.array('attachments',
 
 app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
   try {
-    let { recipients, subject, message, senderName } = req.body;
+    let { recipients, subject, message, senderName ,receiverName} = req.body;
     
     // Parse recipients if it's a JSON string
     if (typeof recipients === 'string') {
@@ -6611,7 +6611,7 @@ app.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachme
     })) : [];
 
     // Generate professional HTML template
-    const htmlTemplate = getEmailTemplate(subject, message, senderName);
+    const htmlTemplate = getEmailTemplate(subject, message, senderName,receiverName);
     
     const results = {
       successful: [],
