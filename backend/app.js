@@ -6450,7 +6450,7 @@ const getEmailTemplate = (subject, message, senderName = 'Aaditiya Tyagi', recei
     </div>
 
     <div class="email-content">
-      <h2>${recepient},</h2>
+      <h2>${receiverName},</h2>
       <div >
         <p>${message.replace(/\n/g, '</p><p>')}</p>
       </div>

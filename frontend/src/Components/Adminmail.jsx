@@ -17,14 +17,16 @@ const EmailDashboard = () => {
     to: '',
     subject: '',
     message: '',
-    senderName: 'Admin'
+    senderName: 'Aaditiya Tyagi',
+    receiverName:''
   });
 
   const [bulkEmail, setBulkEmail] = useState({
     recipients: [''],
     subject: '',
     message: '',
-    senderName: 'Admin'
+    senderName: 'Admin',
+    receiverName:'Recepient'
   });
 
   const [attachments, setAttachments] = useState([]);
@@ -117,6 +119,7 @@ const EmailDashboard = () => {
       formData.append('subject', singleEmail.subject);
       formData.append('message', singleEmail.message);
       formData.append('senderName', singleEmail.senderName);
+      formData.append('receiverName',singleEmail.receiverName);
 
       attachments.forEach(file => {
         formData.append('attachments', file);
@@ -131,7 +134,7 @@ const EmailDashboard = () => {
       const data = await response.json();
       if (data.success) {
         showMessage('Email sent successfully!', 'success');
-        setSingleEmail({ to: '', subject: '', message: '', senderName: 'Admin' });
+        setSingleEmail({ to: '', subject: '', message: '', senderName: 'Admin' , receiverName: ''});
         setAttachments([]);
         fetchStats();
         fetchEmailHistory();
@@ -343,6 +346,15 @@ const sendBulkEmail = async (e) => {
                   type="text"
                   value={singleEmail.senderName}
                   onChange={(e) => setSingleEmail({...singleEmail, senderName: e.target.value})}
+                  className="input"
+                />
+              </div>
+               <div className="form-group">
+                <label className="label">Receiver Name:</label>
+                <input
+                  type="text"
+                  value={singleEmail.receiverName}
+                  onChange={(e) => setSingleEmail({...singleEmail, receiverName: e.target.value})}
                   className="input"
                 />
               </div>
