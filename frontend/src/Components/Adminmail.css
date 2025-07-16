@@ -138,6 +138,7 @@
 }
 
 .file-input {
+  margin-bottom:30px;
   padding: 0.5rem;
   border: 2px solid #000000;
   border-radius: 0.5rem;

@@ -248,6 +248,9 @@ html {
     padding: 0 1rem;
   }
   .main-navigation {
+    overflow-x: auto;
+      scrollbar-width: none;
+    -ms-overflow-style: none;
     gap: 0.25rem;
     padding: 0.375rem;
   }
