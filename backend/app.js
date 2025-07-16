@@ -6137,7 +6137,7 @@ const emailSchema = new mongoose.Schema({
 
 const Email = mongoose.model('Email', emailSchema);
 app.use('/public', express.static(path.join(__dirname, 'public')));
-const getEmailTemplate = (subject, message, senderName = 'Admin') => {
+const getEmailTemplate = (subject, message, senderName = 'Aaditiya Tyagi', receiverName) => {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -6450,7 +6450,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
     </div>
 
     <div class="email-content">
-      <h2>Dear Recipient,</h2>
+      <h2>${recepient},</h2>
       <div >
         <p>${message.replace(/\n/g, '</p><p>')}</p>
       </div>
@@ -6484,7 +6484,7 @@ const getEmailTemplate = (subject, message, senderName = 'Admin') => {
 // Route 1: Send single email with attachments
 app.post('/api/admin/send-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
   try {
-    const { to, subject, message, senderName } = req.body;
+    const { to, subject, message, senderName, receiverName } = req.body;
     
     // Validation
     if (!to || !subject || !message) {
@@ -6503,7 +6503,7 @@ app.post('/api/admin/send-email', authenticateToken, upload.array('attachments',
     })) : [];
      const imageUrl = `${req.protocol}://${req.get('host')}/public/profile.png`;
     // Generate professional HTML template
-    const htmlTemplate = getEmailTemplate(subject, message, senderName);
+    const htmlTemplate = getEmailTemplate(subject, message, senderName, receiverName);
     
     // Send email
     await sendEmail(to, subject, htmlTemplate, attachments);
