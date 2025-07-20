@@ -341,25 +341,55 @@ const ImagePostManager = () => {
             </div>
             
             <div className="form-group">
-              <label className="label">Image:</label>
-              <input 
-                type="file" 
-                name="image"
-                onChange={handleInputChange}
-                className="file-input"
-                accept="image/*"
-                required={formMode === 'create'}
-              />
-              {imagePreview && (
-                <div className="image-preview">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
-                    className="image"
-                  />
-                </div>
-              )}
-            </div>
+  <label className="label">Image:</label>
+
+  {/* Hidden file input */}
+  <input
+    type="file"
+    id="singleFileInput"
+    name="image"
+    onChange={handleInputChange}
+    className="file-input"
+    accept="image/*"
+    required={formMode === 'create'}
+    style={{ display: 'none' }}
+  />
+
+  {/* Styled button triggers file input */}
+  <button
+    type="button"
+    onClick={() => document.getElementById('singleFileInput').click()}
+    style={{
+      padding: '10px 20px',
+      backgroundColor: '#007bff',
+      color: 'white',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    }}
+  >
+   
+    Choose Files
+  </button>
+
+  {/* Image Preview */}
+  {imagePreview && (
+    <div className="image-preview" style={{ marginTop: '10px' }}>
+      <img
+        src={imagePreview}
+        alt="Preview"
+        className="image"
+        style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
+      />
+    </div>
+  )}
+</div>
+
             
             <div className="checkbox-group">
               <input 
