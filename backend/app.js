@@ -1500,6 +1500,447 @@ const ReplySchema = new mongoose.Schema({
 
 const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Initialize Gemini AI with your API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Updated model names - use current available models:
+// Primary option: Latest Gemini 2.0 Flash (matches your curl example)
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Alternative models you can try:
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+// const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+
+// Helper function to clean HTML tags and extract plain text
+function extractPlainText(htmlContent) {
+  // Remove HTML tags and decode HTML entities
+  return htmlContent
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'") // Added single quote entity
+    .replace(/\[IMAGE:[^\]]+\]/g, '') // Remove image placeholders
+    .replace(/\[VIDEO:[^\]]+\]/g, '') // Remove video placeholders
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
+}
+
+// Validate API key configuration
+function validateApiKey() {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  if (process.env.GEMINI_API_KEY.length < 20) {
+    throw new Error('GEMINI_API_KEY appears to be invalid (too short)');
+  }
+}
+
+// Generate summary for a blog post (Public route)
+app.post('/api/blogs/:id/generate-summary', async (req, res) => {
+  try {
+    // Validate API key first
+    validateApiKey();
+    
+    const { id } = req.params;
+    const { wordLimit = 300, temperature = 0.7 } = req.body; // Made wordLimit configurable
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Extract plain text from blog content
+    const plainTextContent = extractPlainText(blog.content);
+    
+    if (plainTextContent.length < 100) {
+      return res.status(400).json({ 
+        message: 'Blog content is too short to generate a meaningful summary' 
+      });
+    }
+    
+    // Create the prompt for Gemini with better structure
+    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
+    - Be approximately ${wordLimit} words long
+    - Capture the main points and key insights
+    - Be engaging and well-structured with clear paragraphs
+    - Maintain the tone and style of the original content
+    - Be suitable for readers who want a quick overview
+    - Focus on the most important information and actionable insights
+    
+    Blog Title: "${blog.title}"
+    
+    Blog Content:
+    ${plainTextContent}
+    
+    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+    
+    // Configure generation parameters for better results
+    const generationConfig = {
+      temperature: temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: Math.ceil(wordLimit * 1.5), // Allow some flexibility
+    };
+    
+    const modelWithConfig = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: generationConfig
+    });
+    
+    // Generate summary using Gemini with retry logic
+    let result;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        result = await modelWithConfig.generateContent(prompt);
+        break;
+      } catch (retryError) {
+        attempts++;
+        if (attempts >= maxAttempts) throw retryError;
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+      }
+    }
+    
+    const response = await result.response;
+    let generatedSummary = response.text().trim();
+    
+    // Clean up any unwanted formatting that might be added
+    generatedSummary = generatedSummary
+      .replace(/^\*\*Summary\*\*:?\s*/i, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim();
+    
+    // Validate generated summary length (rough word count)
+    const wordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
+    
+    if (wordCount < Math.floor(wordLimit * 0.7)) {
+      console.warn(`Generated summary word count (${wordCount}) is significantly below target (${wordLimit})`);
+    }
+    
+    if (wordCount > wordLimit * 1.5) {
+      console.warn(`Generated summary word count (${wordCount}) is significantly above target (${wordLimit})`);
+    }
+    
+    res.json({
+      message: 'Summary generated successfully',
+      summary: generatedSummary,
+      wordCount: wordCount,
+      targetWordLimit: wordLimit,
+      blogId: blog._id,
+      blogTitle: blog.title,
+      generatedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error generating blog summary:', error);
+    
+    // Enhanced error handling with more specific cases
+    if (error.message.includes('API_KEY') || error.message.includes('key')) {
+      return res.status(500).json({ 
+        message: 'Gemini API configuration error. Please check your API key.',
+        code: 'API_KEY_ERROR'
+      });
+    }
+    
+    if (error.message.includes('quota') || error.message.includes('limit') || error.status === 429) {
+      return res.status(429).json({ 
+        message: 'API quota exceeded. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    if (error.status === 404 || error.message.includes('model not found')) {
+      return res.status(500).json({ 
+        message: 'Gemini model not found. Please check the model configuration.',
+        code: 'MODEL_NOT_FOUND'
+      });
+    }
+    
+    if (error.status === 400) {
+      return res.status(400).json({ 
+        message: 'Invalid request to Gemini API. Please check the content format.',
+        code: 'INVALID_REQUEST'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to generate summary. Please try again.',
+      code: 'GENERATION_FAILED',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update blog with AI-generated summary (Public route)
+app.put('/api/blogs/:id/update-summary', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { summary, replaceExisting = false } = req.body;
+    
+    if (!summary || typeof summary !== 'string') {
+      return res.status(400).json({ message: 'Valid summary is required' });
+    }
+    
+    if (summary.length > 2000) { // Increased limit for better summaries
+      return res.status(400).json({ 
+        message: 'Summary is too long. Maximum 2000 characters allowed.' 
+      });
+    }
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check if summary already exists and replaceExisting is false
+    if (blog.summary && blog.summary.trim() !== '' && !replaceExisting) {
+      return res.status(409).json({ 
+        message: 'Blog already has a summary. Set replaceExisting to true to overwrite.',
+        currentSummary: blog.summary 
+      });
+    }
+    
+    // Update the summary with metadata
+    blog.summary = summary.trim();
+    blog.summaryUpdatedAt = new Date();
+    blog.summaryWordCount = summary.trim().split(/\s+/).filter(word => word.length > 0).length;
+    
+    await blog.save();
+    
+    res.json({
+      message: 'Blog summary updated successfully',
+      blog: {
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        summaryWordCount: blog.summaryWordCount,
+        summaryUpdatedAt: blog.summaryUpdatedAt,
+        updatedAt: blog.updatedAt
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error updating blog summary:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate and auto-update summary in one step (Public route)
+app.post('/api/blogs/:id/auto-summary', async (req, res) => {
+  try {
+    validateApiKey();
+    
+    const { id } = req.params;
+    const { wordLimit = 300, forceUpdate = false, temperature = 0.7 } = req.body;
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check if summary already exists
+    if (blog.summary && blog.summary.trim() !== '' && !forceUpdate) {
+      return res.status(409).json({ 
+        message: 'Blog already has a summary. Set forceUpdate to true to regenerate.',
+        currentSummary: blog.summary 
+      });
+    }
+    
+    // Generate summary (reuse logic from generate-summary route)
+    const plainTextContent = extractPlainText(blog.content);
+    
+    if (plainTextContent.length < 100) {
+      return res.status(400).json({ 
+        message: 'Blog content is too short to generate a meaningful summary' 
+      });
+    }
+    
+    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
+    - Be approximately ${wordLimit} words long
+    - Capture the main points and key insights
+    - Be engaging and well-structured with clear paragraphs
+    - Maintain the tone and style of the original content
+    - Be suitable for readers who want a quick overview
+    - Focus on the most important information and actionable insights
+    
+    Blog Title: "${blog.title}"
+    
+    Blog Content:
+    ${plainTextContent}
+    
+    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+    
+    const generationConfig = {
+      temperature: temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: Math.ceil(wordLimit * 1.5),
+    };
+    
+    const modelWithConfig = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: generationConfig
+    });
+    
+    const result = await modelWithConfig.generateContent(prompt);
+    const response = await result.response;
+    let generatedSummary = response.text().trim();
+    
+    // Clean up formatting
+    generatedSummary = generatedSummary
+      .replace(/^\*\*Summary\*\*:?\s*/i, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim();
+    
+    // Update the blog with generated summary and metadata
+    blog.summary = generatedSummary;
+    blog.summaryUpdatedAt = new Date();
+    blog.summaryWordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
+    
+    await blog.save();
+    
+    res.json({
+      message: 'Summary generated and updated successfully',
+      blog: {
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        summaryWordCount: blog.summaryWordCount,
+        summaryUpdatedAt: blog.summaryUpdatedAt,
+        updatedAt: blog.updatedAt
+      },
+      targetWordLimit: wordLimit
+    });
+    
+  } catch (error) {
+    console.error('Error in auto-summary generation:', error);
+    
+    // Apply same error handling as generate-summary route
+    if (error.message.includes('API_KEY') || error.message.includes('key')) {
+      return res.status(500).json({ 
+        message: 'Gemini API configuration error. Please check your API key.',
+        code: 'API_KEY_ERROR'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to generate and update summary. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get summary status for multiple blogs (batch check) - Public route
+app.post('/api/blogs/summary-status', async (req, res) => {
+  try {
+    const { blogIds } = req.body;
+    
+    if (!Array.isArray(blogIds) || blogIds.length === 0) {
+      return res.status(400).json({ message: 'Blog IDs array is required' });
+    }
+    
+    if (blogIds.length > 100) { // Increased limit
+      return res.status(400).json({ message: 'Maximum 100 blog IDs allowed per request' });
+    }
+    
+    const blogs = await Blog.find({
+      _id: { $in: blogIds }
+    }).select('_id title summary summaryWordCount summaryUpdatedAt createdAt updatedAt');
+    
+    const summaryStatus = blogs.map(blog => ({
+      blogId: blog._id,
+      title: blog.title,
+      hasSummary: !!(blog.summary && blog.summary.trim() !== ''),
+      summaryLength: blog.summary ? blog.summary.length : 0,
+      summaryWordCount: blog.summaryWordCount || (blog.summary ? blog.summary.split(/\s+/).length : 0),
+      lastUpdated: blog.updatedAt,
+      summaryUpdatedAt: blog.summaryUpdatedAt || null
+    }));
+    
+    res.json({
+      summaryStatus,
+      totalBlogs: summaryStatus.length,
+      blogsWithSummary: summaryStatus.filter(status => status.hasSummary).length,
+      blogsWithoutSummary: summaryStatus.filter(status => !status.hasSummary).length,
+      checkedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error checking summary status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Health check endpoint for API connectivity
+app.get('/api/gemini/health', async (req, res) => {
+  try {
+    validateApiKey();
+    
+    // Test with a simple generation request
+    const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const testResult = await testModel.generateContent("Say 'API is working' in exactly 3 words.");
+    const testResponse = await testResult.response;
+    
+    res.json({
+      status: 'healthy',
+      model: 'gemini-2.0-flash',
+      apiKeyConfigured: true,
+      testResponse: testResponse.text().trim(),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      apiKeyConfigured: !!process.env.GEMINI_API_KEY,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Optional: Function to list available models (for debugging)
+async function listAvailableModels() {
+  try {
+    validateApiKey();
+    
+    // Note: The SDK might not have a direct listModels method
+    // You can manually test available models or check documentation
+    const availableModels = [
+      'gemini-2.0-flash', // Latest model (matches your curl)
+      'gemini-1.5-flash', 
+      'gemini-1.5-pro',
+      'gemini-1.0-pro'
+    ];
+    
+    console.log('Available Gemini models for testing:');
+    availableModels.forEach(modelName => {
+      console.log(`- ${modelName}`);
+    });
+    
+    return availableModels;
+    
+  } catch (error) {
+    console.error('Error with model configuration:', error);
+    return [];
+  }
+}
+
+
+
 // Professional Email Templates
 const getConfirmationEmailTemplate = (name, message) => {
     return `
@@ -8499,6 +8940,475 @@ app.get('/api/community/user/:userEmail/activity', async (req, res) => {
   }
 });
 
+// Audio Recording Schema (add this with your other schemas)
+const audioRecordingSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    lowercase: true,
+    trim: true
+  },
+  audioData: {
+    type: Buffer,
+    required: true
+  },
+  mimeType: {
+    type: String,
+    required: true
+  },
+  originalName: {
+    type: String,
+    required: true
+  },
+  fileSize: {
+    type: Number,
+    required: true
+  },
+  duration: {
+    type: Number, // in seconds
+    required: true
+  },
+  transcription: {
+    type: String,
+    default: ''
+  },
+  status: {
+    type: String,
+    enum: ['unread', 'read', 'replied'],
+    default: 'unread'
+  },
+  replied: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const AudioRecording = mongoose.model('AudioRecording', audioRecordingSchema);
+
+// Audio Reply Schema
+const audioReplySchema = new mongoose.Schema({
+  recordingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AudioRecording',
+    required: true
+  },
+  replyContent: {
+    type: String,
+    required: true
+  },
+  repliedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    required: true
+  },
+  repliedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const AudioReply = mongoose.model('AudioReply', audioReplySchema);
+
+// Update multer configuration for audio files
+const audioFileFilter = (req, file, cb) => {
+  const allowedAudioTypes = [
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/aac', 
+    'audio/ogg', 'audio/webm', 'audio/flac', 'audio/x-m4a'
+  ];
+  
+  if (allowedAudioTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only audio files are allowed'), false);
+  }
+};
+
+const audioUpload = multer({
+  storage: storage,
+  fileFilter: audioFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit for audio files
+  }
+});
+
+// PUBLIC ROUTES
+
+// Submit audio recording (for public users)
+app.post('/api/audio-contact', audioUpload.single('audioFile'), async (req, res) => {
+  try {
+    const { name, email, duration, transcription = '' } = req.body;
+    
+    // Validate inputs
+    if (!name || !email || !duration || !req.file) {
+      return res.status(400).json({ 
+        message: 'Name, email, duration, and audio file are required' 
+      });
+    }
+    
+    // Validate email format
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+    
+    // Create new audio recording with file data stored in MongoDB
+    const newRecording = new AudioRecording({
+      name,
+      email,
+      audioData: req.file.buffer,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+      fileSize: req.file.size,
+      duration: parseFloat(duration),
+      transcription
+    });
+    
+    await newRecording.save();
+    
+    // Send confirmation email to user
+    const confirmationMessage = `Thank you for your audio message! I've received your recording and will listen to it shortly. I'll get back to you via email soon.
+
+Duration: ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')} minutes
+File Size: ${(req.file.size / (1024 * 1024)).toFixed(2)} MB
+
+I appreciate you taking the time to reach out through this personal medium.`;
+
+    const confirmationEmail = getEmailTemplate(
+      'Audio Message Received - Thank You!',
+      confirmationMessage,
+      'Aaditiya Tyagi',
+      name
+    );
+    
+    await sendEmail(email, 'Audio Message Received - Thank You!', confirmationEmail);
+    
+    // Send notification to admin
+    const admin = await Admin.findOne();
+    if (admin) {
+      const adminMessage = `New audio message received from ${name} (${email}).
+
+Duration: ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')} minutes
+File Size: ${(req.file.size / (1024 * 1024)).toFixed(2)} MB
+${transcription ? `Transcription: ${transcription}` : 'No transcription provided'}
+
+Please check the admin panel to listen and respond.`;
+
+      const adminEmail = getEmailTemplate(
+        '🎙️ New Audio Message Received',
+        adminMessage,
+        'System Notification',
+        'Admin'
+      );
+      
+      await sendEmail(admin.email, '🎙️ New Audio Message from ' + name, adminEmail);
+    }
+    
+    res.status(201).json({ 
+      success: true,
+      message: 'Your audio message has been sent successfully. I will get back to you soon!',
+      recordingId: newRecording._id
+    });
+  } catch (error) {
+    console.error('Audio submission error:', error);
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        message: 'Audio file is too large. Please upload a file smaller than 50MB.' 
+      });
+    }
+    if (error.message === 'Only audio files are allowed') {
+      return res.status(400).json({ 
+        message: 'Please upload a valid audio file.' 
+      });
+    }
+    res.status(500).json({ 
+      message: 'Failed to send your audio message. Please try again later.' 
+    });
+  }
+});
+
+// Serve audio file (for admin to listen)
+app.get('/api/admin/audio-recordings/:id/audio', authenticateToken, async (req, res) => {
+  try {
+    const recording = await AudioRecording.findById(req.params.id);
+    if (!recording) {
+      return res.status(404).json({ message: 'Audio recording not found' });
+    }
+    
+    res.set({
+      'Content-Type': recording.mimeType,
+      'Content-Length': recording.audioData.length,
+      'Content-Disposition': `inline; filename="${recording.originalName}"`
+    });
+    
+    res.send(recording.audioData);
+  } catch (error) {
+    console.error('Audio serve error:', error);
+    res.status(500).json({ message: 'Failed to load audio file' });
+  }
+});
+
+// ADMIN ROUTES
+
+// Get all audio recordings (for admin) - without audio data for performance
+app.get('/api/admin/audio-recordings', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    // Exclude audioData from the response for performance
+    const projection = { audioData: 0 };
+    
+    if (email) {
+      // Get all recordings from specific email
+      const recordings = await AudioRecording.find({ email }, projection)
+        .sort({ createdAt: -1 });
+      res.json({
+        success: true,
+        data: recordings,
+        email: email
+      });
+    } else {
+      // Get all recordings
+      const recordings = await AudioRecording.find({}, projection)
+        .sort({ createdAt: -1 });
+      res.json({
+        success: true,
+        data: recordings
+      });
+    }
+  } catch (error) {
+    console.error('Fetch audio recordings error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get specific audio recording with replies (for admin) - without audio data
+app.get('/api/admin/audio-recordings/:id', authenticateToken, async (req, res) => {
+  try {
+    const recording = await AudioRecording.findById(req.params.id, { audioData: 0 });
+    if (!recording) {
+      return res.status(404).json({ message: 'Audio recording not found' });
+    }
+    
+    // Mark as read if it's unread
+    if (recording.status === 'unread') {
+      recording.status = 'read';
+      await recording.save();
+    }
+    
+    // Get any replies
+    const replies = await AudioReply.find({ recordingId: recording._id })
+      .populate('repliedBy', 'name email')
+      .sort({ repliedAt: -1 });
+    
+    res.json({ 
+      success: true,
+      recording, 
+      replies 
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Reply to audio recording (for admin)
+app.post('/api/admin/audio-recordings/:id/reply', authenticateToken, async (req, res) => {
+  try {
+    const { replyContent } = req.body;
+    const recordingId = req.params.id;
+    const adminId = req.user.admin_id;
+
+    // Validate inputs
+    if (!replyContent || replyContent.trim() === '') {
+      return res.status(400).json({ message: 'Reply content is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(recordingId)) {
+      return res.status(400).json({ message: 'Invalid recording ID' });
+    }
+    if (!adminId) {
+      return res.status(401).json({ message: 'Unauthorized: Invalid admin credentials' });
+    }
+
+    // Find the recording (without audio data for performance)
+    const recording = await AudioRecording.findById(recordingId, { audioData: 0 });
+    if (!recording) {
+      return res.status(404).json({ message: 'Audio recording not found' });
+    }
+
+    // Create the reply
+    const newReply = new AudioReply({
+      recordingId,
+      replyContent: replyContent.trim(),
+      repliedBy: adminId
+    });
+
+    await newReply.save();
+
+    // Update recording status
+    recording.status = 'replied';
+    recording.replied = true;
+    await recording.save();
+
+    // Send reply email
+    const replyMessage = `Thank you for your audio message! I've listened to your recording and wanted to respond personally.
+
+Your original message duration: ${Math.floor(recording.duration / 60)}:${String(recording.duration % 60).padStart(2, '0')} minutes
+
+My Response:
+${replyContent}
+
+I really appreciate you taking the time to share your thoughts through audio. It's always great to hear directly from people who visit my site.`;
+
+    const replyEmail = getEmailTemplate(
+      'Response to Your Audio Message',
+      replyMessage,
+      'Aaditiya Tyagi',
+      recording.name
+    );
+
+    await sendEmail(
+      recording.email,
+      'Response to Your Audio Message - Aaditiya Tyagi',
+      replyEmail
+    );
+
+    // Populate the reply with admin info for response
+    const populatedReply = await AudioReply.findById(newReply._id).populate('repliedBy', 'name email');
+
+    res.json({
+      success: true,
+      message: 'Reply sent successfully',
+      reply: populatedReply
+    });
+  } catch (error) {
+    console.error('Audio reply error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Update audio recording status (for admin)
+app.put('/api/admin/audio-recordings/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const recordingId = req.params.id;
+    
+    if (!['unread', 'read', 'replied'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be unread, read, or replied' });
+    }
+    
+    const recording = await AudioRecording.findById(recordingId, { audioData: 0 });
+    if (!recording) {
+      return res.status(404).json({ message: 'Audio recording not found' });
+    }
+    
+    recording.status = status;
+    recording.replied = (status === 'replied');
+    await recording.save();
+    
+    res.json({ 
+      success: true, 
+      message: `Audio recording status updated to ${status}`,
+      updatedRecording: recording
+    });
+  } catch (error) {
+    console.error('Update audio status error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete audio recording (for admin)
+app.delete('/api/admin/audio-recordings/:id', authenticateToken, async (req, res) => {
+  try {
+    const recording = await AudioRecording.findById(req.params.id);
+    if (!recording) {
+      return res.status(404).json({ message: 'Audio recording not found' });
+    }
+    
+    // Delete associated replies
+    const deletedReplies = await AudioReply.deleteMany({ recordingId: recording._id });
+    
+    // Delete the recording
+    await AudioRecording.deleteOne({ _id: recording._id });
+    
+    res.json({ 
+      success: true,
+      message: 'Audio recording deleted successfully',
+      deletedRepliesCount: deletedReplies.deletedCount
+    });
+  } catch (error) {
+    console.error('Delete audio recording error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete all audio recordings (for admin)
+app.delete('/api/admin/audio-recordings', authenticateToken, async (req, res) => {
+  try {
+    // Get all recording IDs first
+    const recordings = await AudioRecording.find({}, '_id');
+    const recordingIds = recordings.map(rec => rec._id);
+    
+    if (recordingIds.length === 0) {
+      return res.json({ 
+        success: true,
+        message: 'No audio recordings to delete'
+      });
+    }
+    
+    // Delete all replies first
+    const deletedReplies = await AudioReply.deleteMany({ recordingId: { $in: recordingIds } });
+    
+    // Delete all recordings
+    const deleteResult = await AudioRecording.deleteMany({});
+    
+    res.json({ 
+      success: true,
+      message: `Successfully deleted ${deleteResult.deletedCount} audio recordings and ${deletedReplies.deletedCount} associated replies`,
+      deletedRecordings: deleteResult.deletedCount,
+      deletedReplies: deletedReplies.deletedCount
+    });
+  } catch (error) {
+    console.error('Delete all audio recordings error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get audio recordings stats (for admin dashboard)
+app.get('/api/admin/audio-stats', authenticateToken, async (req, res) => {
+  try {
+    const totalRecordings = await AudioRecording.countDocuments();
+    const unreadCount = await AudioRecording.countDocuments({ status: 'unread' });
+    const readCount = await AudioRecording.countDocuments({ status: 'read' });
+    const repliedCount = await AudioRecording.countDocuments({ status: 'replied' });
+    
+    // Get total storage used (in MB)
+    const recordings = await AudioRecording.find({}, 'fileSize');
+    const totalStorage = recordings.reduce((sum, recording) => sum + recording.fileSize, 0);
+    const totalStorageMB = (totalStorage / (1024 * 1024)).toFixed(2);
+    
+    res.json({
+      success: true,
+      stats: {
+        total: totalRecordings,
+        unread: unreadCount,
+        read: readCount,
+        replied: repliedCount,
+        totalStorageMB: parseFloat(totalStorageMB)
+      }
+    });
+  } catch (error) {
+    console.error('Audio stats error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
