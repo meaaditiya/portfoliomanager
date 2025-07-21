@@ -1500,6 +1500,447 @@ const ReplySchema = new mongoose.Schema({
 
 const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// Initialize Gemini AI with your API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Updated model names - use current available models:
+// Primary option: Latest Gemini 2.0 Flash (matches your curl example)
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Alternative models you can try:
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+// const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+
+// Helper function to clean HTML tags and extract plain text
+function extractPlainText(htmlContent) {
+  // Remove HTML tags and decode HTML entities
+  return htmlContent
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'") // Added single quote entity
+    .replace(/\[IMAGE:[^\]]+\]/g, '') // Remove image placeholders
+    .replace(/\[VIDEO:[^\]]+\]/g, '') // Remove video placeholders
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
+}
+
+// Validate API key configuration
+function validateApiKey() {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  if (process.env.GEMINI_API_KEY.length < 20) {
+    throw new Error('GEMINI_API_KEY appears to be invalid (too short)');
+  }
+}
+
+// Generate summary for a blog post (Public route)
+app.post('/api/blogs/:id/generate-summary', async (req, res) => {
+  try {
+    // Validate API key first
+    validateApiKey();
+    
+    const { id } = req.params;
+    const { wordLimit = 300, temperature = 0.7 } = req.body; // Made wordLimit configurable
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Extract plain text from blog content
+    const plainTextContent = extractPlainText(blog.content);
+    
+    if (plainTextContent.length < 100) {
+      return res.status(400).json({ 
+        message: 'Blog content is too short to generate a meaningful summary' 
+      });
+    }
+    
+    // Create the prompt for Gemini with better structure
+    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
+    - Be approximately ${wordLimit} words long
+    - Capture the main points and key insights
+    - Be engaging and well-structured with clear paragraphs
+    - Maintain the tone and style of the original content
+    - Be suitable for readers who want a quick overview
+    - Focus on the most important information and actionable insights
+    
+    Blog Title: "${blog.title}"
+    
+    Blog Content:
+    ${plainTextContent}
+    
+    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+    
+    // Configure generation parameters for better results
+    const generationConfig = {
+      temperature: temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: Math.ceil(wordLimit * 1.5), // Allow some flexibility
+    };
+    
+    const modelWithConfig = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: generationConfig
+    });
+    
+    // Generate summary using Gemini with retry logic
+    let result;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        result = await modelWithConfig.generateContent(prompt);
+        break;
+      } catch (retryError) {
+        attempts++;
+        if (attempts >= maxAttempts) throw retryError;
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+      }
+    }
+    
+    const response = await result.response;
+    let generatedSummary = response.text().trim();
+    
+    // Clean up any unwanted formatting that might be added
+    generatedSummary = generatedSummary
+      .replace(/^\*\*Summary\*\*:?\s*/i, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim();
+    
+    // Validate generated summary length (rough word count)
+    const wordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
+    
+    if (wordCount < Math.floor(wordLimit * 0.7)) {
+      console.warn(`Generated summary word count (${wordCount}) is significantly below target (${wordLimit})`);
+    }
+    
+    if (wordCount > wordLimit * 1.5) {
+      console.warn(`Generated summary word count (${wordCount}) is significantly above target (${wordLimit})`);
+    }
+    
+    res.json({
+      message: 'Summary generated successfully',
+      summary: generatedSummary,
+      wordCount: wordCount,
+      targetWordLimit: wordLimit,
+      blogId: blog._id,
+      blogTitle: blog.title,
+      generatedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error generating blog summary:', error);
+    
+    // Enhanced error handling with more specific cases
+    if (error.message.includes('API_KEY') || error.message.includes('key')) {
+      return res.status(500).json({ 
+        message: 'Gemini API configuration error. Please check your API key.',
+        code: 'API_KEY_ERROR'
+      });
+    }
+    
+    if (error.message.includes('quota') || error.message.includes('limit') || error.status === 429) {
+      return res.status(429).json({ 
+        message: 'API quota exceeded. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    if (error.status === 404 || error.message.includes('model not found')) {
+      return res.status(500).json({ 
+        message: 'Gemini model not found. Please check the model configuration.',
+        code: 'MODEL_NOT_FOUND'
+      });
+    }
+    
+    if (error.status === 400) {
+      return res.status(400).json({ 
+        message: 'Invalid request to Gemini API. Please check the content format.',
+        code: 'INVALID_REQUEST'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to generate summary. Please try again.',
+      code: 'GENERATION_FAILED',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Update blog with AI-generated summary (Public route)
+app.put('/api/blogs/:id/update-summary', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { summary, replaceExisting = false } = req.body;
+    
+    if (!summary || typeof summary !== 'string') {
+      return res.status(400).json({ message: 'Valid summary is required' });
+    }
+    
+    if (summary.length > 2000) { // Increased limit for better summaries
+      return res.status(400).json({ 
+        message: 'Summary is too long. Maximum 2000 characters allowed.' 
+      });
+    }
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check if summary already exists and replaceExisting is false
+    if (blog.summary && blog.summary.trim() !== '' && !replaceExisting) {
+      return res.status(409).json({ 
+        message: 'Blog already has a summary. Set replaceExisting to true to overwrite.',
+        currentSummary: blog.summary 
+      });
+    }
+    
+    // Update the summary with metadata
+    blog.summary = summary.trim();
+    blog.summaryUpdatedAt = new Date();
+    blog.summaryWordCount = summary.trim().split(/\s+/).filter(word => word.length > 0).length;
+    
+    await blog.save();
+    
+    res.json({
+      message: 'Blog summary updated successfully',
+      blog: {
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        summaryWordCount: blog.summaryWordCount,
+        summaryUpdatedAt: blog.summaryUpdatedAt,
+        updatedAt: blog.updatedAt
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error updating blog summary:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate and auto-update summary in one step (Public route)
+app.post('/api/blogs/:id/auto-summary', async (req, res) => {
+  try {
+    validateApiKey();
+    
+    const { id } = req.params;
+    const { wordLimit = 300, forceUpdate = false, temperature = 0.7 } = req.body;
+    
+    const blog = await Blog.findById(id);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check if summary already exists
+    if (blog.summary && blog.summary.trim() !== '' && !forceUpdate) {
+      return res.status(409).json({ 
+        message: 'Blog already has a summary. Set forceUpdate to true to regenerate.',
+        currentSummary: blog.summary 
+      });
+    }
+    
+    // Generate summary (reuse logic from generate-summary route)
+    const plainTextContent = extractPlainText(blog.content);
+    
+    if (plainTextContent.length < 100) {
+      return res.status(400).json({ 
+        message: 'Blog content is too short to generate a meaningful summary' 
+      });
+    }
+    
+    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
+    - Be approximately ${wordLimit} words long
+    - Capture the main points and key insights
+    - Be engaging and well-structured with clear paragraphs
+    - Maintain the tone and style of the original content
+    - Be suitable for readers who want a quick overview
+    - Focus on the most important information and actionable insights
+    
+    Blog Title: "${blog.title}"
+    
+    Blog Content:
+    ${plainTextContent}
+    
+    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+    
+    const generationConfig = {
+      temperature: temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: Math.ceil(wordLimit * 1.5),
+    };
+    
+    const modelWithConfig = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: generationConfig
+    });
+    
+    const result = await modelWithConfig.generateContent(prompt);
+    const response = await result.response;
+    let generatedSummary = response.text().trim();
+    
+    // Clean up formatting
+    generatedSummary = generatedSummary
+      .replace(/^\*\*Summary\*\*:?\s*/i, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim();
+    
+    // Update the blog with generated summary and metadata
+    blog.summary = generatedSummary;
+    blog.summaryUpdatedAt = new Date();
+    blog.summaryWordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
+    
+    await blog.save();
+    
+    res.json({
+      message: 'Summary generated and updated successfully',
+      blog: {
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        summaryWordCount: blog.summaryWordCount,
+        summaryUpdatedAt: blog.summaryUpdatedAt,
+        updatedAt: blog.updatedAt
+      },
+      targetWordLimit: wordLimit
+    });
+    
+  } catch (error) {
+    console.error('Error in auto-summary generation:', error);
+    
+    // Apply same error handling as generate-summary route
+    if (error.message.includes('API_KEY') || error.message.includes('key')) {
+      return res.status(500).json({ 
+        message: 'Gemini API configuration error. Please check your API key.',
+        code: 'API_KEY_ERROR'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to generate and update summary. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get summary status for multiple blogs (batch check) - Public route
+app.post('/api/blogs/summary-status', async (req, res) => {
+  try {
+    const { blogIds } = req.body;
+    
+    if (!Array.isArray(blogIds) || blogIds.length === 0) {
+      return res.status(400).json({ message: 'Blog IDs array is required' });
+    }
+    
+    if (blogIds.length > 100) { // Increased limit
+      return res.status(400).json({ message: 'Maximum 100 blog IDs allowed per request' });
+    }
+    
+    const blogs = await Blog.find({
+      _id: { $in: blogIds }
+    }).select('_id title summary summaryWordCount summaryUpdatedAt createdAt updatedAt');
+    
+    const summaryStatus = blogs.map(blog => ({
+      blogId: blog._id,
+      title: blog.title,
+      hasSummary: !!(blog.summary && blog.summary.trim() !== ''),
+      summaryLength: blog.summary ? blog.summary.length : 0,
+      summaryWordCount: blog.summaryWordCount || (blog.summary ? blog.summary.split(/\s+/).length : 0),
+      lastUpdated: blog.updatedAt,
+      summaryUpdatedAt: blog.summaryUpdatedAt || null
+    }));
+    
+    res.json({
+      summaryStatus,
+      totalBlogs: summaryStatus.length,
+      blogsWithSummary: summaryStatus.filter(status => status.hasSummary).length,
+      blogsWithoutSummary: summaryStatus.filter(status => !status.hasSummary).length,
+      checkedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error checking summary status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Health check endpoint for API connectivity
+app.get('/api/gemini/health', async (req, res) => {
+  try {
+    validateApiKey();
+    
+    // Test with a simple generation request
+    const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const testResult = await testModel.generateContent("Say 'API is working' in exactly 3 words.");
+    const testResponse = await testResult.response;
+    
+    res.json({
+      status: 'healthy',
+      model: 'gemini-2.0-flash',
+      apiKeyConfigured: true,
+      testResponse: testResponse.text().trim(),
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      apiKeyConfigured: !!process.env.GEMINI_API_KEY,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Optional: Function to list available models (for debugging)
+async function listAvailableModels() {
+  try {
+    validateApiKey();
+    
+    // Note: The SDK might not have a direct listModels method
+    // You can manually test available models or check documentation
+    const availableModels = [
+      'gemini-2.0-flash', // Latest model (matches your curl)
+      'gemini-1.5-flash', 
+      'gemini-1.5-pro',
+      'gemini-1.0-pro'
+    ];
+    
+    console.log('Available Gemini models for testing:');
+    availableModels.forEach(modelName => {
+      console.log(`- ${modelName}`);
+    });
+    
+    return availableModels;
+    
+  } catch (error) {
+    console.error('Error with model configuration:', error);
+    return [];
+  }
+}
+
+
+
 // Professional Email Templates
 const getConfirmationEmailTemplate = (name, message) => {
     return `
