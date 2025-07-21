@@ -37,6 +37,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     { name: 'Social Posts', path: '/socialpost' },
     {name: 'AdminMail', path:'/adminmail'},
     {name: 'Set Profile', path: '/profile'},
+    {name: 'Audio messages' , path: '/audiomessage'},
     
   ];
 
@@ -77,10 +78,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
       <div className="header-content">
         <div className="logo-section" onClick={handleGoHome} style={{ cursor: 'pointer' }}>
           <span className="logo-initials">AT</span>
-          <div className="logo-text">
-            <span className="logo-name">Admin Panel</span>
-            <span className="logo-role">Portfolio Manager</span>
-          </div>
+          
         </div>
                 
         <nav className="main-navigation">
