@@ -1564,10 +1564,7 @@ app.post('/api/blogs/:id/generate-summary', async (req, res) => {
     - Maintain the tone and style of the original content
     - Be suitable for readers who want a quick overview
     - Focus on the most important information and actionable insights
-    - Generate different answer every time  but same meaining
-    -can also generate in hindi language as well
-    -Write autor name Aaditiya Tyagi at last
-    
+    - Generate different answer every time  but same meaining 
     Blog Title: "${blog.title}"
     
     Blog Content:
