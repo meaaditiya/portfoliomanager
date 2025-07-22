@@ -1502,36 +1502,27 @@ const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize Gemini AI with your API key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Updated model names - use current available models:
-// Primary option: Latest Gemini 2.0 Flash (matches your curl example)
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-// Alternative models you can try:
-// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-// const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-// const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
 // Helper function to clean HTML tags and extract plain text
 function extractPlainText(htmlContent) {
-  // Remove HTML tags and decode HTML entities
+  
   return htmlContent
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/<[^>]*>/g, '') 
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'") // Added single quote entity
-    .replace(/\[IMAGE:[^\]]+\]/g, '') // Remove image placeholders
-    .replace(/\[VIDEO:[^\]]+\]/g, '') // Remove video placeholders
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .replace(/&#39;/g, "'") 
+    .replace(/\[IMAGE:[^\]]+\]/g, '') 
+    .replace(/\[VIDEO:[^\]]+\]/g, '') 
+    .replace(/\s+/g, ' ') 
     .trim();
 }
 
-// Validate API key configuration
 function validateApiKey() {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY environment variable is not set');
@@ -1573,6 +1564,9 @@ app.post('/api/blogs/:id/generate-summary', async (req, res) => {
     - Maintain the tone and style of the original content
     - Be suitable for readers who want a quick overview
     - Focus on the most important information and actionable insights
+    - Generate different answer every time  but same meaining
+    -can also generate in hindi language as well
+    -Write autor name Aaditiya Tyagi at last
     
     Blog Title: "${blog.title}"
     
