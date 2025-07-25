@@ -1559,8 +1559,6 @@ app.post('/api/blogs/:id/generate-summary', async (req, res) => {
     // Create the prompt for Gemini with better structure
     const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
     - Be approximately ${wordLimit} words long
-    - Generate this summary only in Hindi Script and language
-    -Then give Summary in the English language
     - Capture the main points and key insights
     - Be engaging and well-structured with clear paragraphs
     - Maintain the tone and style of the original content
