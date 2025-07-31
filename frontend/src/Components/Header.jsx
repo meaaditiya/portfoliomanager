@@ -38,6 +38,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     {name: 'AdminMail', path:'/adminmail'},
     {name: 'Set Profile', path: '/profile'},
     {name: 'Audio messages' , path: '/audiomessage'},
+    {name: 'Stream',path:'/stream'},
     
   ];
 

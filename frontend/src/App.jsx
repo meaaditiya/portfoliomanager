@@ -14,6 +14,7 @@ import Welcome from './Components/Welcome';
 import AdminMail from './Components/Adminmail';
 import Profile from './Components/Profile';
 import Audio from './Components/Audiomessage';
+import Stream from './Components/Stream';
 import './index.css';
 
 function AppContent() {
@@ -80,6 +81,7 @@ function AppContent() {
           <Route path="/profile" element={<Profile/>}/>
           <Route path="/admincommunitypost" element={<Admincommunitypost/>}/>
           <Route path="/audiomessage" element={<Audio/>}/>
+          <Route path="/stream" element={<Stream/>}/>
         </Routes>
       </main>
     </div>

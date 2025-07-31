@@ -1,0 +1,363 @@
+/* Stream Admin Dashboard Styles */
+
+.tyagi-admin-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.tyagi-admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e1e5e9;
+}
+
+.tyagi-admin-header h1 {
+  color: #2c3e50;
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 600;
+}
+
+.tyagi-login-message {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 50px;
+}
+
+.tyagi-login-message h2 {
+  color: #6c757d;
+  font-weight: 400;
+}
+
+/* Buttons */
+.tyagi-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.tyagi-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tyagi-btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.tyagi-btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.tyagi-btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.tyagi-btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+}
+
+.tyagi-btn-edit {
+  background: #28a745;
+  color: white;
+}
+
+.tyagi-btn-edit:hover:not(:disabled) {
+  background: #1e7e34;
+}
+
+.tyagi-btn-delete {
+  background: #dc3545;
+  color: white;
+}
+
+.tyagi-btn-delete:hover:not(:disabled) {
+  background: #bd2130;
+}
+
+/* Alerts */
+.tyagi-alert {
+  padding: 15px 20px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.tyagi-alert-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.tyagi-alert-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+/* Form Styles */
+.tyagi-form-container {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+}
+
+.tyagi-form-container h2 {
+  margin-top: 0;
+  margin-bottom: 25px;
+  color: #2c3e50;
+  font-size: 1.8rem;
+}
+
+.tyagi-stream-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tyagi-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.tyagi-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tyagi-form-group label {
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.tyagi-form-input,
+.tyagi-form-textarea,
+.tyagi-form-select {
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+.tyagi-form-input:focus,
+.tyagi-form-textarea:focus,
+.tyagi-form-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.tyagi-form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.tyagi-form-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+/* Streams Container */
+.tyagi-streams-container h2 {
+  color: #2c3e50;
+  margin-bottom: 25px;
+  font-size: 1.8rem;
+}
+
+.tyagi-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.tyagi-no-streams {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #6c757d;
+}
+
+.tyagi-streams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 25px;
+}
+
+/* Stream Card */
+.tyagi-stream-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.tyagi-stream-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.tyagi-stream-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.tyagi-stream-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3rem;
+  font-weight: 600;
+  flex: 1;
+  margin-right: 15px;
+}
+
+.tyagi-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tyagi-status-scheduled {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.tyagi-status-live {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.tyagi-status-ended {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.tyagi-stream-description {
+  color: #6c757d;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.tyagi-stream-details {
+  margin-bottom: 20px;
+}
+
+.tyagi-stream-datetime,
+.tyagi-stream-link {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.tyagi-stream-datetime strong,
+.tyagi-stream-link strong {
+  color: #495057;
+}
+
+.tyagi-youtube-link {
+  color: #007bff;
+  text-decoration: none;
+  margin-left: 8px;
+}
+
+.tyagi-youtube-link:hover {
+  text-decoration: underline;
+}
+
+.tyagi-stream-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.tyagi-stream-actions .tyagi-btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .tyagi-admin-container {
+    padding: 15px;
+  }
+  
+  .tyagi-admin-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+  
+  .tyagi-admin-header h1 {
+    font-size: 2rem;
+    text-align: center;
+  }
+  
+  .tyagi-form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .tyagi-form-actions {
+    flex-direction: column;
+  }
+  
+  .tyagi-streams-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tyagi-stream-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  
+  .tyagi-stream-header h3 {
+    margin-right: 0;
+  }
+  
+  .tyagi-status {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .tyagi-form-container {
+    padding: 20px;
+  }
+  
+  .tyagi-stream-card {
+    padding: 20px;
+  }
+  
+  .tyagi-stream-actions {
+    flex-direction: column;
+  }
+}

@@ -9400,6 +9400,201 @@ app.get('/api/admin/audio-stats', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// Stream Schema
+const streamSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  scheduledDate: {
+    type: String,
+    required: true // Format: "YYYY-MM-DD"
+  },
+  scheduledTime: {
+    type: String,
+    required: true // Format: "HH:MM AM/PM"
+  },
+  youtubeLink: {
+    type: String,
+    required: true
+  },
+  embedId: {
+    type: String,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['scheduled', 'live', 'ended'],
+    default: 'scheduled'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const Stream = mongoose.model('Stream', streamSchema);
+
+// CORRECTED Helper function to extract YouTube video ID - now supports /live/ URLs
+const extractYouTubeId = (url) => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|live\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
+// ADMIN ROUTES (Protected with authenticateToken)
+
+// Create new stream
+app.post('/api/admin/streams', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, scheduledDate, scheduledTime, youtubeLink } = req.body;
+    
+    const embedId = extractYouTubeId(youtubeLink);
+    if (!embedId) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' });
+    }
+
+    const stream = new Stream({
+      title,
+      description,
+      scheduledDate,
+      scheduledTime,
+      youtubeLink,
+      embedId
+    });
+
+    await stream.save();
+    res.status(201).json({ message: 'Stream scheduled successfully', stream });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update stream
+app.put('/api/admin/streams/:id', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, scheduledDate, scheduledTime, youtubeLink, status } = req.body;
+    
+    const updateData = { title, description, scheduledDate, scheduledTime, status };
+    
+    if (youtubeLink) {
+      const embedId = extractYouTubeId(youtubeLink);
+      if (!embedId) {
+        return res.status(400).json({ error: 'Invalid YouTube URL' });
+      }
+      updateData.youtubeLink = youtubeLink;
+      updateData.embedId = embedId;
+    }
+
+    const stream = await Stream.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+
+    res.json({ message: 'Stream updated successfully', stream });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete stream
+app.delete('/api/admin/streams/:id', authenticateToken, async (req, res) => {
+  try {
+    const stream = await Stream.findByIdAndDelete(req.params.id);
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    res.json({ message: 'Stream deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all streams for admin
+app.get('/api/admin/streams', authenticateToken, async (req, res) => {
+  try {
+    const streams = await Stream.find().sort({ scheduledDate: 1, scheduledTime: 1 });
+    res.json({ streams });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUBLIC ROUTES
+
+// Get all upcoming streams
+app.get('/api/streams', async (req, res) => {
+  try {
+    const streams = await Stream.find({ status: { $in: ['scheduled', 'live'] } })
+      .sort({ scheduledDate: 1, scheduledTime: 1 })
+      .select('-__v');
+    res.json({ streams });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single stream by ID
+app.get('/api/streams/:id', async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id).select('-__v');
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    res.json({ stream });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get streams by date
+app.get('/api/streams/date/:date', async (req, res) => {
+  try {
+    const streams = await Stream.find({ 
+      scheduledDate: req.params.date,
+      status: { $in: ['scheduled', 'live'] }
+    }).sort({ scheduledTime: 1 }).select('-__v');
+    res.json({ streams });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get live streams
+app.get('/api/streams/live', async (req, res) => {
+  try {
+    const streams = await Stream.find({ status: 'live' })
+      .sort({ scheduledDate: 1, scheduledTime: 1 })
+      .select('-__v');
+    res.json({ streams });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get embed data for stream
+app.get('/api/streams/:id/embed', async (req, res) => {
+  try {
+    const stream = await Stream.findById(req.params.id).select('title embedId youtubeLink');
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    res.json({ 
+      embedId: stream.embedId,
+      embedUrl: `https://www.youtube.com/embed/${stream.embedId}`,
+      title: stream.title,
+      youtubeLink: stream.youtubeLink
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
