@@ -15,7 +15,8 @@ const StreamAdmin = () => {
     scheduledDate: '',
     scheduledTime: '',
     youtubeLink: '',
-    status: 'scheduled'
+    status: 'scheduled',
+    password: ''
   });
 
   const BASE_URL = 'https://connectwithaaditiyamg.onrender.com';
@@ -102,7 +103,8 @@ const StreamAdmin = () => {
       scheduledDate: stream.scheduledDate,
       scheduledTime: stream.scheduledTime,
       youtubeLink: stream.youtubeLink,
-      status: stream.status
+      status: stream.status,
+      password: stream.password || ''
     });
     setShowForm(true);
   };
@@ -144,7 +146,8 @@ const StreamAdmin = () => {
       scheduledDate: '',
       scheduledTime: '',
       youtubeLink: '',
-      status: 'scheduled'
+      status: 'scheduled',
+      password: ''
     });
     setEditingStream(null);
     setShowForm(false);
@@ -274,6 +277,22 @@ const StreamAdmin = () => {
               </select>
             </div>
 
+            <div className="tyagi-form-group">
+              <label htmlFor="password">Password (Optional)</label>
+              <input
+                type="text"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="tyagi-form-input"
+                placeholder="Leave empty for public stream"
+              />
+              <small className="tyagi-form-hint">
+                Set a password to make this stream private. Users will need this password to access the stream.
+              </small>
+            </div>
+
             <div className="tyagi-form-actions">
               <button
                 type="submit"
@@ -309,8 +328,15 @@ const StreamAdmin = () => {
             <div key={stream._id} className="tyagi-stream-card">
               <div className="tyagi-stream-header">
                 <h3>{stream.title}</h3>
-                <div className={`tyagi-status tyagi-status-${stream.status}`}>
-                  {stream.status}
+                <div className="tyagi-stream-badges">
+                  <div className={`tyagi-status tyagi-status-${stream.status}`}>
+                    {stream.status}
+                  </div>
+                  {stream.password && (
+                    <div className="tyagi-status tyagi-status-protected">
+                      🔒 Protected
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -333,6 +359,11 @@ const StreamAdmin = () => {
                     View on YouTube
                   </a>
                 </div>
+                {stream.password && (
+                  <div className="tyagi-stream-password">
+                    <strong>Password:</strong> {stream.password}
+                  </div>
+                )}
               </div>
 
               <div className="tyagi-stream-actions">
