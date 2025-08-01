@@ -9723,6 +9723,55 @@ app.post('/api/streams/:id/embed', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+const { createProxyMiddleware } = require('http-proxy-middleware');
+app.use('/api/youtube-chat-proxy', createProxyMiddleware({
+  target: 'https://www.youtube.com',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/youtube-chat-proxy': ''
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    // Remove X-Frame-Options header
+    proxyReq.removeHeader('X-Frame-Options');
+    proxyReq.removeHeader('Content-Security-Policy');
+    proxyReq.setHeader('X-Forwarded-Host', req.headers.host);
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    // Remove headers that prevent iframe embedding
+    delete proxyRes.headers['x-frame-options'];
+    delete proxyRes.headers['content-security-policy'];
+    delete proxyRes.headers['x-content-type-options'];
+    
+    // Set headers to allow embedding
+    proxyRes.headers['X-Frame-Options'] = 'ALLOWALL';
+    proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+    proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+  },
+  logLevel: 'debug'
+}));
+
+// Alternative: Custom chat endpoint that fetches YouTube chat data
+app.get('/api/streams/:id/chat', async (req, res) => {
+  try {
+    const streamId = req.params.id;
+    const stream = await Stream.findById(streamId);
+    
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+
+    // For now, return a placeholder response
+    // In production, you'd need to implement YouTube Data API integration
+    res.json({
+      chatAvailable: stream.status === 'live',
+      embedId: stream.embedId,
+      proxyUrl: `/api/youtube-chat-proxy/live_chat?v=${stream.embedId}&embed_domain=${req.headers.host}`,
+      status: stream.status
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
