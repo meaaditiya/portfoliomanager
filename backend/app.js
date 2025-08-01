@@ -9531,7 +9531,7 @@ app.get('/api/admin/streams', authenticateToken, async (req, res) => {
 // Get all upcoming streams
 app.get('/api/streams', async (req, res) => {
   try {
-    const streams = await Stream.find({ status: { $in: ['scheduled', 'live'] } })
+    const streams = await Stream.find()
       .sort({ scheduledDate: 1, scheduledTime: 1 })
       .select('-__v');
     res.json({ streams });
@@ -9539,7 +9539,6 @@ app.get('/api/streams', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 // Get single stream by ID
 app.get('/api/streams/:id', async (req, res) => {
   try {
