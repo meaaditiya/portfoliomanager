@@ -9433,6 +9433,11 @@ const streamSchema = new mongoose.Schema({
     enum: ['scheduled', 'live', 'ended'],
     default: 'scheduled'
   },
+  password: {
+    type: String,
+    default: null,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -9453,7 +9458,7 @@ const extractYouTubeId = (url) => {
 // Create new stream
 app.post('/api/admin/streams', authenticateToken, async (req, res) => {
   try {
-    const { title, description, scheduledDate, scheduledTime, youtubeLink } = req.body;
+    const { title, description, scheduledDate, scheduledTime, youtubeLink, password } = req.body;
     
     const embedId = extractYouTubeId(youtubeLink);
     if (!embedId) {
@@ -9466,7 +9471,8 @@ app.post('/api/admin/streams', authenticateToken, async (req, res) => {
       scheduledDate,
       scheduledTime,
       youtubeLink,
-      embedId
+      embedId,
+      password: password || null
     });
 
     await stream.save();
@@ -9479,9 +9485,14 @@ app.post('/api/admin/streams', authenticateToken, async (req, res) => {
 // Update stream
 app.put('/api/admin/streams/:id', authenticateToken, async (req, res) => {
   try {
-    const { title, description, scheduledDate, scheduledTime, youtubeLink, status } = req.body;
+    const { title, description, scheduledDate, scheduledTime, youtubeLink, status, password } = req.body;
     
     const updateData = { title, description, scheduledDate, scheduledTime, status };
+    
+    // Handle password update (can be set, updated, or removed)
+    if (password !== undefined) {
+      updateData.password = password || null;
+    }
     
     if (youtubeLink) {
       const embedId = extractYouTubeId(youtubeLink);
@@ -9528,25 +9539,78 @@ app.get('/api/admin/streams', authenticateToken, async (req, res) => {
 
 // PUBLIC ROUTES
 
-// Get all upcoming streams
+// Get all upcoming streams (password-protected streams show limited info)
 app.get('/api/streams', async (req, res) => {
   try {
     const streams = await Stream.find()
       .sort({ scheduledDate: 1, scheduledTime: 1 })
       .select('-__v');
-    res.json({ streams });
+    
+    // Filter out sensitive data for password-protected streams
+    const filteredStreams = streams.map(stream => {
+      if (stream.password) {
+        return {
+          _id: stream._id,
+          title: stream.title,
+          description: stream.description,
+          scheduledDate: stream.scheduledDate,
+          scheduledTime: stream.scheduledTime,
+          status: stream.status,
+          createdAt: stream.createdAt,
+          isPasswordProtected: true
+        };
+      }
+      return {
+        ...stream.toObject(),
+        isPasswordProtected: false
+      };
+    });
+    
+    res.json({ streams: filteredStreams });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-// Get single stream by ID
-app.get('/api/streams/:id', async (req, res) => {
+
+// Get single stream by ID (requires password if protected)
+app.post('/api/streams/:id', async (req, res) => {
   try {
+    const { password } = req.body;
     const stream = await Stream.findById(req.params.id).select('-__v');
+    
     if (!stream) {
       return res.status(404).json({ error: 'Stream not found' });
     }
-    res.json({ stream });
+
+    // Check if stream is password protected
+    if (stream.password) {
+      if (!password) {
+        return res.status(401).json({ 
+          error: 'Password required',
+          message: 'This stream is password protected. Please provide the password.',
+          isPasswordProtected: true
+        });
+      }
+      
+      if (password !== stream.password) {
+        return res.status(401).json({ 
+          error: 'Invalid password',
+          message: 'The password you entered is incorrect.',
+          isPasswordProtected: true
+        });
+      }
+    }
+
+    // Return full stream data (excluding password from response)
+    const streamData = stream.toObject();
+    delete streamData.password;
+    
+    res.json({ 
+      stream: {
+        ...streamData,
+        isPasswordProtected: !!stream.password
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -9559,7 +9623,28 @@ app.get('/api/streams/date/:date', async (req, res) => {
       scheduledDate: req.params.date,
       status: { $in: ['scheduled', 'live'] }
     }).sort({ scheduledTime: 1 }).select('-__v');
-    res.json({ streams });
+    
+    // Filter out sensitive data for password-protected streams
+    const filteredStreams = streams.map(stream => {
+      if (stream.password) {
+        return {
+          _id: stream._id,
+          title: stream.title,
+          description: stream.description,
+          scheduledDate: stream.scheduledDate,
+          scheduledTime: stream.scheduledTime,
+          status: stream.status,
+          createdAt: stream.createdAt,
+          isPasswordProtected: true
+        };
+      }
+      return {
+        ...stream.toObject(),
+        isPasswordProtected: false
+      };
+    });
+    
+    res.json({ streams: filteredStreams });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -9571,24 +9656,68 @@ app.get('/api/streams/live', async (req, res) => {
     const streams = await Stream.find({ status: 'live' })
       .sort({ scheduledDate: 1, scheduledTime: 1 })
       .select('-__v');
-    res.json({ streams });
+    
+    // Filter out sensitive data for password-protected streams
+    const filteredStreams = streams.map(stream => {
+      if (stream.password) {
+        return {
+          _id: stream._id,
+          title: stream.title,
+          description: stream.description,
+          scheduledDate: stream.scheduledDate,
+          scheduledTime: stream.scheduledTime,
+          status: stream.status,
+          createdAt: stream.createdAt,
+          isPasswordProtected: true
+        };
+      }
+      return {
+        ...stream.toObject(),
+        isPasswordProtected: false
+      };
+    });
+    
+    res.json({ streams: filteredStreams });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get embed data for stream
-app.get('/api/streams/:id/embed', async (req, res) => {
+// Get embed data for stream (requires password if protected)
+app.post('/api/streams/:id/embed', async (req, res) => {
   try {
-    const stream = await Stream.findById(req.params.id).select('title embedId youtubeLink');
+    const { password } = req.body;
+    const stream = await Stream.findById(req.params.id).select('title embedId youtubeLink password');
+    
     if (!stream) {
       return res.status(404).json({ error: 'Stream not found' });
     }
+
+    // Check if stream is password protected
+    if (stream.password) {
+      if (!password) {
+        return res.status(401).json({ 
+          error: 'Password required',
+          message: 'This stream is password protected. Please provide the password.',
+          isPasswordProtected: true
+        });
+      }
+      
+      if (password !== stream.password) {
+        return res.status(401).json({ 
+          error: 'Invalid password',
+          message: 'The password you entered is incorrect.',
+          isPasswordProtected: true
+        });
+      }
+    }
+
     res.json({ 
       embedId: stream.embedId,
       embedUrl: `https://www.youtube.com/embed/${stream.embedId}`,
       title: stream.title,
-      youtubeLink: stream.youtubeLink
+      youtubeLink: stream.youtubeLink,
+      isPasswordProtected: !!stream.password
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
