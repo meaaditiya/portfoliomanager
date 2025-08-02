@@ -10,6 +10,31 @@ require('dotenv').config();
 const { body, validationResult } = require('express-validator');
 const path = require('path');
 const fs = require('fs');
+const Admin = require('./models/admin');
+const AudioRecording = require('./models/audioRecordingSchema');
+const AudioReply = require('./models/audioReplySchema');
+const  BlacklistedToken = require('./models/blacklistedtoken');
+const  Blog  = require('./models/blog');
+const  Comment = require('./models/comment');
+const  CommentReaction = require('./models/commentreaction');
+const CommunityComment = require('./models/communityCommentSchema');
+const CommunityLike = require('./models/communityLikeSchema');
+const CommunityPost = require('./models/communityPostSchema');
+const CommunityShare = require('./models/communityShareSchema');
+const Email = require('./models/emailSchema');
+const ImageComment = require('./models/imageCommentSchema');
+const ImagePost= require('./models/imagepost');
+const ImageReaction= require('./models/imageReactionSchema');
+const Message= require('./models/message');
+const OTP= require('./models/otp');
+const ProfileImage= require('./models/profileImageSchema');
+const ProjectRequest= require('./models/projectRequestSchema');
+const Quote= require('./models/quoteSchema');
+const Reaction= require('./models/reaction');
+const Reply= require('./models/reply');
+const SocialMediaEmbed= require('./models/socialMediaEmbedSchema');
+const Stream=require('./models/streamSchema');
+
 
 
 // Initialize Express app
@@ -49,34 +74,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connection to Database Successful, MongoDB connected!'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// MongoDB Schemas
-const adminSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  isEmailVerified: { type: Boolean, default: false },
-  role: { type: String, default: 'admin' },
-  status: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
-  lastLogin: { type: Date },
-  createdAt: { type: Date, default: Date.now }
-});
 
-const otpSchema = new mongoose.Schema({
-  email: { type: String, required: true },
-  otp: { type: String, required: true },
-  purpose: { type: String, enum: ['registration', 'password_reset'], required: true },
-  createdAt: { type: Date, default: Date.now, expires: '10m' } // OTP expires after 10 minutes
-});
-
-const blacklistedTokenSchema = new mongoose.Schema({
-  token: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now, expires: '24h' } // Tokens expire after 24 hours
-});
-
-// Create models
-const Admin = mongoose.model('Admin', adminSchema);
-const OTP = mongoose.model('OTP', otpSchema);
-const BlacklistedToken = mongoose.model('BlacklistedToken', blacklistedTokenSchema);
 
 // Authentication middleware
 const authenticateToken = async (req, res, next) => {
@@ -469,180 +467,6 @@ app.get('/api/admin/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Updated Blog Schema with Video Support
-const blogSchema = new mongoose.Schema({
-    title: { 
-      type: String, 
-      required: true,
-      trim: true
-    },
-    content: { 
-      type: String, 
-      required: true 
-    },
-    // Array to store inline images used in content
-    contentImages: [{
-      url: {
-        type: String,
-        required: true
-      },
-      alt: {
-        type: String,
-        default: ''
-      },
-      caption: {
-        type: String,
-        default: ''
-      },
-      position: {
-        type: String,
-        enum: ['left', 'right', 'center', 'full-width'],
-        default: 'center'
-      },
-      imageId: {
-        type: String,
-        required: true,
-        unique: true
-      }
-    }],
-    // Array to store inline videos used in content
-    contentVideos: [{
-      url: {
-        type: String,
-        required: true
-      },
-      videoId: {
-        type: String,
-        required: true
-      },
-      platform: {
-        type: String,
-        enum: ['youtube', 'vimeo', 'dailymotion'],
-        default: 'youtube'
-      },
-      title: {
-        type: String,
-        default: ''
-      },
-      caption: {
-        type: String,
-        default: ''
-      },
-      position: {
-        type: String,
-        enum: ['left', 'right', 'center', 'full-width'],
-        default: 'center'
-      },
-      autoplay: {
-        type: Boolean,
-        default: false
-      },
-      muted: {
-        type: Boolean,
-        default: false
-      },
-      // Unique identifier to reference in content
-      embedId: {
-        type: String,
-        required: true,
-        unique: true
-      }
-    }],
-    summary: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 200
-    },
-    author: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Admin',
-      required: true
-    },
-    slug: {
-      type: String,
-      required: false,
-      unique: true,
-      lowercase: true
-    },
-    status: { 
-      type: String, 
-      enum: ['draft', 'published'], 
-      default: 'draft' 
-    },
-    tags: [{ 
-      type: String, 
-      trim: true 
-    }],
-    featuredImage: { 
-      type: String 
-    },
-    publishedAt: { 
-      type: Date 
-    },
-    createdAt: { 
-      type: Date, 
-      default: Date.now 
-    },
-    updatedAt: { 
-      type: Date, 
-      default: Date.now 
-    },
-    reactionCounts: {
-      likes: {
-        type: Number,
-        default: 0
-      },
-      dislikes: {
-        type: Number,
-        default: 0
-      }
-    },
-    commentsCount: {
-      type: Number,
-      default: 0
-    }
-});
-
-// Updated pre-save middleware to handle videos
-blogSchema.pre('save', function(next) {
-  if (this.isModified('title')) {
-    this.slug = this.title
-      .toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .replace(/\s+/g, '-');
-  }
-  
-  // Generate unique IDs for new content images
-  if (this.isModified('contentImages')) {
-    this.contentImages.forEach(image => {
-      if (!image.imageId) {
-        image.imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      }
-    });
-  }
-  
-  // Generate unique IDs for new content videos
-  if (this.isModified('contentVideos')) {
-    this.contentVideos.forEach(video => {
-      if (!video.embedId) {
-        video.embedId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      }
-    });
-  }
-  
-  if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
-    this.publishedAt = new Date();
-  }
-  
-  this.updatedAt = new Date();
-  next();
-});
-
-const Blog = mongoose.model('Blog', blogSchema);
-  
-  // Blog Routes
-  // Create a new blog post
 app.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;
@@ -1444,61 +1268,6 @@ function processContent(content, contentImages, contentVideos) {
   
   return processedContent;
 }
-
-const MessageSchema = new mongoose.Schema({
-    name: {
-      type: String,
-      required: [true, 'Name is required']
-    },
-    email: {
-      type: String,
-      required: [true, 'Email is required'],
-      match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email']
-    },
-    message: {
-      type: String,
-      required: [true, 'Message content is required']
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    },
-    status: {
-      type: String,
-      enum: ['unread', 'read', 'replied'],
-      default: 'unread'
-    },
-    replied: {
-      type: Boolean,
-      default: false
-    }
-});
-
-const Message = mongoose.model('Message', mongoose.models.Message || MessageSchema);
-
-// Reply Schema
-const ReplySchema = new mongoose.Schema({
-    messageId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Message',
-      required: true
-    },
-    replyContent: {
-      type: String,
-      required: [true, 'Reply content is required']
-    },
-    repliedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Admin',
-      required: true
-    },
-    repliedAt: {
-      type: Date,
-      default: Date.now
-    }
-});
-
-const Reply = mongoose.model('Reply', mongoose.models.Reply || ReplySchema);
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -3423,133 +3192,6 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       res.status(500).json({ message: error.message });
     }
   });
-
-  
-
-  const ReactionSchema = new mongoose.Schema({
-    blog: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Blog',
-      required: true
-    },
-    type: {
-      type: String,
-      enum: ['like', 'dislike'],
-      required: true
-    },
-    user: {
-      name: {
-        type: String,
-        required: true
-      },
-      email: {
-        type: String,
-        required: true
-      }
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  });
-  
-  // Compound index to prevent multiple reactions from the same user on the same blog
-  ReactionSchema.index({ blog: 1, 'user.email': 1 }, { unique: true });
-  
-  const Reaction = mongoose.model('Reaction', ReactionSchema);
-  
-  const CommentSchema = new mongoose.Schema({
-  blog: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Blog',
-    required: true
-  },
-  user: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    }
-  },
-  content: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 1000
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'approved'
-  },
-  // New field to identify author comments
-  isAuthorComment: {
-    type: Boolean,
-    default: false
-  },
-  // New fields for replies
-  parentComment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Comment',
-    default: null // null means it's a top-level comment
-  },
-  repliesCount: {
-    type: Number,
-    default: 0
-  },
-  // New fields for comment reactions
-  reactionCounts: {
-    likes: {
-      type: Number,
-      default: 0
-    },
-    dislikes: {
-      type: Number,
-      default: 0
-    }
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const Comment = mongoose.model('Comment', CommentSchema);
-  const CommentReactionSchema = new mongoose.Schema({
-  comment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Comment',
-    required: true
-  },
-  type: {
-    type: String,
-    enum: ['like', 'dislike'],
-    required: true
-  },
-  user: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    }
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Compound index to prevent multiple reactions from the same user on the same comment
-CommentReactionSchema.index({ comment: 1, 'user.email': 1 }, { unique: true });
-
-const CommentReaction = mongoose.model('CommentReaction', CommentReactionSchema);
-// PUBLIC ROUTE: Add reply to a comment
 app.post(
   '/api/comments/:commentId/replies',
   [
@@ -4554,118 +4196,6 @@ const upload = multer({
     files: 10 // Maximum 10 files
   }
 });
-// Image Post Schema
-const imagePostSchema = new mongoose.Schema({
-  caption: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  image: {
-    data: Buffer,
-    contentType: String
-  },
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    required: true
-  },
-  hideReactionCount: {
-    type: Boolean,
-    default: false
-  },
-  reactionCount: {
-    type: Number,
-    default: 0
-  },
-  commentCount: {
-    type: Number,
-    default: 0
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Image Post Reaction Schema
-const imageReactionSchema = new mongoose.Schema({
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ImagePost',
-    required: true
-  },
-  user: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    },
-    deviceId: {
-      type: String,
-      required: true
-    }
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Compound index to prevent multiple reactions from the same user/device on the same post
-imageReactionSchema.index({ post: 1, 'user.email': 1 }, { unique: true });
-imageReactionSchema.index({ post: 1, 'user.deviceId': 1 }, { unique: true });
-
-// Image Post Comment Schema
-const imageCommentSchema = new mongoose.Schema({
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ImagePost',
-    required: true
-  },
-  user: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    },
-    deviceId: {
-      type: String,
-      required: true
-    }
-  },
-  content: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 500
-  },
-  status: {
-    type: String,
-    enum: ['active', 'hidden'],
-    default: 'active'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Create models
-const ImagePost = mongoose.model('ImagePost', imagePostSchema);
-const ImageReaction = mongoose.model('ImageReaction', imageReactionSchema);
-const ImageComment = mongoose.model('ImageComment', imageCommentSchema);
-
 // Helper middleware to extract device ID
 const extractDeviceId = (req, res, next) => {
   // Use user-agent and IP as a simple device identifier
@@ -5225,59 +4755,6 @@ app.get('/api/image-posts/:id/comments', async (req, res) => {
   }
 });
 
-
-// Social Posts 
-
-// Social Media Embed Schema
-const socialMediaEmbedSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 200
-  },
-  platform: {
-    type: String,
-    enum: ['twitter', 'facebook', 'linkedin'],
-    required: true
-  },
-  embedUrl: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  embedCode: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: 500
-  },
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    required: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Create model
-const SocialMediaEmbed = mongoose.model('SocialMediaEmbed', socialMediaEmbedSchema);
-
 // ADMIN ROUTES
 // Create a new social media embed (admin only)
 app.post('/api/admin/social-embeds', authenticateToken, async (req, res) => {
@@ -5594,96 +5071,6 @@ app.get('/api/social-embeds/platform/:platform', async (req, res) => {
   }
 });
 
-
-// Updated Project Request Schema with multiple files support
-const projectRequestSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address']
-  },
-  projectType: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  budget: {
-    type: String,
-    trim: true,
-    default: null
-  },
-  timeline: {
-    type: String,
-    trim: true,
-    default: null
-  },
-  description: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  features: {
-    type: String,
-    trim: true,
-    default: null
-  },
-  techPreferences: {
-    type: String,
-    trim: true,
-    default: null
-  },
-  additionalInfo: {
-    type: String,
-    trim: true,
-    default: null
-  },
-  files: [{
-    filename: {
-      type: String,
-      required: true
-    },
-    originalName: {
-      type: String,
-      required: true
-    },
-    mimetype: {
-      type: String,
-      required: true
-    },
-    size: {
-      type: Number,
-      required: true
-    },
-    data: {
-      type: Buffer,
-      required: true
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  status: {
-    type: String,
-    enum: ['pending', 'acknowledged'],
-    default: 'pending'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
-
-// Routes
 // Submit project request with multiple files (accessible to anyone)
 app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
   try {
@@ -6550,24 +5937,6 @@ app.delete('/api/admin/project/requests', authenticateToken, async (req, res) =>
     res.status(500).json({ message: error.message });
   }
 });
-
-// Email Schema for MongoDB (add this to your models)
-const emailSchema = new mongoose.Schema({
-  to: { type: String, required: true },
-  subject: { type: String, required: true },
-  message: { type: String, required: true },
-  attachments: [{
-    filename: String,
-    contentType: String,
-    data: Buffer,
-    size: Number
-  }],
-  sentAt: { type: Date, default: Date.now },
-  sentBy: { type: String, required: true }, // admin email or ID
-  status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
-});
-
-const Email = mongoose.model('Email', emailSchema);
 app.use('/public', express.static(path.join(__dirname, 'public')));
 const getEmailTemplate = (subject, message, senderName = 'Aaditiya Tyagi', receiverName) => {
   return `
@@ -7264,47 +6633,6 @@ app.get('/api/admin/email-stats', authenticateToken, async (req, res) => {
     });
   }
 });
-
-const profileImageSchema = new mongoose.Schema({
-  imageData: {
-    type: Buffer,
-    required: true
-  },
-  contentType: {
-    type: String,
-    required: true,
-    enum: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
-  },
-  filename: {
-    type: String,
-    required: true
-  },
-  size: {
-    type: Number,
-    required: true
-  },
-  uploadedBy: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    }
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  uploadedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const ProfileImage = mongoose.model('ProfileImage', profileImageSchema);
-
 app.post(
   '/api/profile-image/upload',
   authenticateToken,
@@ -7495,45 +6823,7 @@ app.patch('/api/profile-image/:id/activate', authenticateToken, async (req, res)
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-const quoteSchema = new mongoose.Schema({
-  content: {
-    type: String,
-    required: true,
-    trim: true,
-    maxLength: 500
-  },
-  author: {
-    type: String,
-    default: 'Aaditiya Tyagi',
-    trim: true,
-    maxLength: 100
-  },
-  addedBy: {
-    name: {
-      type: String,
-      required: true
-    },
-    email: {
-      type: String,
-      required: true
-    }
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-const Quote = mongoose.model('Quote', quoteSchema);
 
-//==================== QUOTE ROUTES (SINGLE QUOTE SYSTEM) ====================
 
 // ADMIN ROUTE: Set/Update the single quote
 app.post(
@@ -7708,195 +6998,6 @@ app.patch('/api/quote/toggle', authenticateToken, async (req, res) => {
   }
 });
 
-
-
-
-
-// Updated MongoDB Schemas - Fixed to match email/name approach
-const communityPostSchema = new mongoose.Schema({
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    required: true
-  },
-  postType: {
-    type: String,
-    enum: ['image', 'poll', 'video', 'quiz', 'link'],
-    required: true
-  },
-  description: {
-    type: String,
-    required: false
-  },
-  // For image posts
-  images: [{
-    data: Buffer,
-    contentType: String,
-    filename: String
-  }],
-  // For video posts
-  video: {
-    data: Buffer,
-    contentType: String,
-    filename: String
-  },
-  caption:{
-     type: String,
-    required: false
-  } ,
-  // For poll posts
-  pollOptions: [{
-    option: String,
-    votes: [{
-      userEmail: String,
-      userName: String,
-      votedAt: {
-        type: Date,
-        default: Date.now
-      }
-    }]
-  }],
-  pollExpiresAt: Date,
-  // For quiz posts
-  quizQuestions: [{
-    question: String,
-    options: [String],
-    correctAnswer: Number,
-    explanation: String
-  }],
-  // For link posts
-  linkUrl: String,
-  linkTitle: String,
-  linkDescription: String,
-  linkThumbnail: {
-    data: Buffer,
-    contentType: String
-  },
-  // Common fields
-  likes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityLike'
-  }],
-  comments: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityComment'
-  }],
-  shares: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityShare'
-  }],
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Fixed CommunityLike schema
-const communityLikeSchema = new mongoose.Schema({
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityPost',
-    required: true
-  },
-  userEmail: {
-    type: String,
-    required: true
-  },
-  userName: {
-    type: String,
-    required: true
-  },
-  likedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Fixed CommunityComment schema
-const communityCommentSchema = new mongoose.Schema({
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityPost',
-    required: true
-  },
-  userEmail: {
-    type: String,
-    required: true
-  },
-  userName: {
-    type: String,
-    required: true
-  },
-  comment: {
-    type: String,
-    required: true
-  },
-  parentComment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityComment'
-  },
-  replies: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityComment'
-  }],
-  likes: [{
-    userEmail: String,
-    userName: String,
-    likedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Fixed CommunityShare schema
-const communityShareSchema = new mongoose.Schema({
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'CommunityPost',
-    required: true
-  },
-  userEmail: {
-    type: String,
-    required: true
-  },
-  userName: {
-    type: String,
-    required: true
-  },
-  sharedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Create models
-const CommunityPost = mongoose.model('CommunityPost', communityPostSchema);
-const CommunityLike = mongoose.model('CommunityLike', communityLikeSchema);
-const CommunityComment = mongoose.model('CommunityComment', communityCommentSchema);
-const CommunityShare = mongoose.model('CommunityShare', communityShareSchema);
-
-// ROUTES
 
 // Create a new community post - FIXED
 app.post('/api/community/posts', authenticateToken, upload.fields([
@@ -8930,85 +8031,6 @@ app.get('/api/community/user/:userEmail/activity', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-// Audio Recording Schema (add this with your other schemas)
-const audioRecordingSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    lowercase: true,
-    trim: true
-  },
-  audioData: {
-    type: Buffer,
-    required: true
-  },
-  mimeType: {
-    type: String,
-    required: true
-  },
-  originalName: {
-    type: String,
-    required: true
-  },
-  fileSize: {
-    type: Number,
-    required: true
-  },
-  duration: {
-    type: Number, // in seconds
-    required: true
-  },
-  transcription: {
-    type: String,
-    default: ''
-  },
-  status: {
-    type: String,
-    enum: ['unread', 'read', 'replied'],
-    default: 'unread'
-  },
-  replied: {
-    type: Boolean,
-    default: false
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const AudioRecording = mongoose.model('AudioRecording', audioRecordingSchema);
-
-// Audio Reply Schema
-const audioReplySchema = new mongoose.Schema({
-  recordingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'AudioRecording',
-    required: true
-  },
-  replyContent: {
-    type: String,
-    required: true
-  },
-  repliedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    required: true
-  },
-  repliedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const AudioReply = mongoose.model('AudioReply', audioReplySchema);
-
 // Update multer configuration for audio files
 const audioFileFilter = (req, file, cb) => {
   const allowedAudioTypes = [
@@ -9400,52 +8422,6 @@ app.get('/api/admin/audio-stats', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Stream Schema
-const streamSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    default: '',
-    trim: true
-  },
-  scheduledDate: {
-    type: String,
-    required: true // Format: "YYYY-MM-DD"
-  },
-  scheduledTime: {
-    type: String,
-    required: true // Format: "HH:MM AM/PM"
-  },
-  youtubeLink: {
-    type: String,
-    required: true
-  },
-  embedId: {
-    type: String,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['scheduled', 'live', 'ended'],
-    default: 'scheduled'
-  },
-  password: {
-    type: String,
-    default: null,
-    trim: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const Stream = mongoose.model('Stream', streamSchema);
-
 // CORRECTED Helper function to extract YouTube video ID - now supports /live/ URLs
 const extractYouTubeId = (url) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|live\/|watch\?v=|&v=)([^#&?]*).*/;
