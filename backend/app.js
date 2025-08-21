@@ -1,15 +1,15 @@
-require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const sgMail = require('@sendgrid/mail');
 require('dotenv').config();
 const { body, validationResult } = require('express-validator');
 const path = require('path');
 const fs = require('fs');
+
 const Admin = require('./models/admin');
 const AudioRecording = require('./models/audioRecordingSchema');
 const AudioReply = require('./models/audioReplySchema');
@@ -34,6 +34,7 @@ const Reaction= require('./models/reaction');
 const Reply= require('./models/reply');
 const SocialMediaEmbed= require('./models/socialMediaEmbedSchema');
 const Stream=require('./models/streamSchema');
+const nodemailer = require('nodemailer');
 
 
 
@@ -44,10 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 const PORT = process.env.PORT || 5000;
 
-// Configure SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+
 
 // Middleware
 app.use(cors({
@@ -116,39 +114,44 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Helper function to send emails
+
+
+// Clean Gmail sendEmail function - Drop-in replacement
 const sendEmail = async (email, subject, html, attachments = []) => {
-  if (!process.env.SENDGRID_API_KEY) {
-    console.warn('SendGrid API key not set. Email would have been sent to:', email);
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('Gmail credentials not set. Email would have been sent to:', email);
     return true;
   }
 
-  const msg = {
+  const transporter = nodemailer.createTransport({  // ← Fixed: removed "er"
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+  const mailOptions = {
+    from: process.env.FROM_EMAIL || process.env.EMAIL_USER,
     to: email,
-    from: process.env.FROM_EMAIL || 'your-email@example.com',
-    subject,
-    html
+    subject: subject,
+    html: html
   };
 
-  // Add attachments if provided
   if (attachments && attachments.length > 0) {
-    msg.attachments = attachments.map(att => ({
-      content: att.data.toString('base64'),
+    mailOptions.attachments = attachments.map(att => ({
       filename: att.filename,
-      type: att.contentType,
-      disposition: 'attachment'
+      content: att.data,
+      contentType: att.contentType
     }));
   }
 
   try {
-    await sgMail.send(msg);
+    const info = await transporter.sendMail(mailOptions);
     console.log(`Email sent successfully to ${email}`);
     return true;
   } catch (error) {
-    console.error('SendGrid Error:', error);
-    if (error.response) {
-      console.error('Error response body:', error.response.body);
-    }
+    console.error('Gmail Error:', error);
     throw error;
   }
 };
@@ -4069,93 +4072,7 @@ app.delete('/api/comments/:commentId/user',
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   });
-// Add these packages at the top if not already present
-const axios = require('axios');
-const https = require('https');
 
-// Enhanced keep-alive function
-const keepAlive = () => {
-  const PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  const appUrl = process.env.APP_URL || 'connectwithaaditiya.onrender.com';
-  const urls = [
-    `https://${appUrl}/api/ping`,
-    // Add any other URLs you want to ping, like:
-    `https://${appUrl}/api/blogs?limit=1`,
-  ];
-  
-  console.log(`Setting up keep-alive pings every ${PING_INTERVAL/60000} minutes to prevent sleep`);
-
-  // Create an interval that rotates through different endpoints
-  setInterval(async () => {
-    const timestamp = new Date().toISOString();
-    console.log(`\n[${timestamp}] Sending keep-alive pings...`);
-    
-    // Internal ping - won't go out to the network but keeps the process active
-    const internalRes = await axios.get(`http://localhost:${PORT}/api/ping`, {
-      headers: { 'Connection': 'keep-alive' }
-    }).catch(err => {
-      console.error('Internal ping failed:', err.message);
-      return { status: 'error' };
-    });
-    
-    console.log(`Internal ping status: ${internalRes.status || 'failed'}`);
-    
-    // External ping using multiple strategies
-    for (const url of urls) {
-      try {
-        // Strategy 1: Using axios
-        const res = await axios.get(url, {
-          headers: { 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
-          timeout: 10000 // 10 second timeout
-        });
-        console.log(`Ping to ${url} succeeded with status ${res.status}`);
-      } catch (err) {
-        console.error(`Axios ping to ${url} failed:`, err.message);
-        
-        // Strategy 2: Fallback to native https request
-        try {
-          await new Promise((resolve, reject) => {
-            const req = https.get(url, {
-              headers: { 'User-Agent': 'KeepAliveBot/1.0', 'Connection': 'keep-alive' },
-              timeout: 10000
-            }, (res) => {
-              console.log(`Native ping to ${url} succeeded with status ${res.statusCode}`);
-              res.on('data', () => {}); // Drain the response
-              res.on('end', resolve);
-            });
-            
-            req.on('error', (e) => {
-              console.error(`Native ping to ${url} failed:`, e.message);
-              reject(e);
-            });
-            
-            req.on('timeout', () => {
-              req.destroy();
-              reject(new Error('Timeout'));
-            });
-          });
-        } catch (e) {
-          console.error(`All ping strategies to ${url} failed`);
-        }
-      }
-    }
-  }, PING_INTERVAL);
-  
-  // Also add an immediate ping to wake up right away
-  setTimeout(() => {
-    console.log('Sending initial wake-up ping...');
-    axios.get(`https://${appUrl}/api/ping`).catch(err => {
-      console.log('Initial ping failed, but process will continue');
-    });
-  }, 5000); // Wait 5 seconds after server start
-};
-
-// Add a ping endpoint
-app.get('/api/ping', (req, res) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] Ping received from ${req.ip}`);
-  res.status(200).json({ message: 'Server is alive!', timestamp });
-});
 const multer = require('multer');
 
 // Configure multer for file uploads - store in memory
@@ -8751,5 +8668,5 @@ app.get('/api/streams/:id/chat', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  keepAlive(); // Start the enhanced keep-alive mechanism
+// Start the enhanced keep-alive mechanism
 });
