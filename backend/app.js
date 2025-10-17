@@ -68,7 +68,7 @@ app.use(cors({
 
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://tyagiaaditiya123:aadi2226@cvitacluster2.p1qdp.mongodb.net/?retryWrites=true&w=majority&appName=cvitacluster2' )
+mongoose.connect(process.env.MONGODB_URI )
   .then(() => console.log('Connection to Database Successful, MongoDB connected!'))
   .catch(err => console.error('MongoDB connection error:', err));
 
