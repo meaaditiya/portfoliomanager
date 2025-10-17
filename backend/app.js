@@ -68,7 +68,7 @@ app.use(cors({
 
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://tyagiaaditiya123:aadi2226@cvitacluster2.p1qdp.mongodb.net/?retryWrites=true&w=majority&appName=cvitacluster2' )
   .then(() => console.log('Connection to Database Successful, MongoDB connected!'))
   .catch(err => console.error('MongoDB connection error:', err));
 
@@ -118,40 +118,44 @@ const generateOTP = () => {
 
 // Clean Gmail sendEmail function - Drop-in replacement
 const sendEmail = async (email, subject, html, attachments = []) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('Gmail credentials not set. Email would have been sent to:', email);
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET || !process.env.GMAIL_REFRESH_TOKEN) {
+    console.warn('Gmail OAuth credentials not set. Email would have been sent to:', email);
     return true;
   }
 
-  const transporter = nodemailer.createTransport({  // ← Fixed: removed "er"
+  const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      type: 'OAuth2',
+      user: process.env.GMAIL_USER,
+      clientId: process.env.GMAIL_CLIENT_ID,
+      clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      refreshToken: process.env.GMAIL_REFRESH_TOKEN,
     }
   });
 
   const mailOptions = {
-    from: process.env.FROM_EMAIL || process.env.EMAIL_USER,
+    from: process.env.FROM_EMAIL,
     to: email,
     subject: subject,
     html: html
   };
 
+  // Handle attachments if present
   if (attachments && attachments.length > 0) {
     mailOptions.attachments = attachments.map(att => ({
       filename: att.filename,
-      content: att.data,
-      contentType: att.contentType
+      content: att.data, // Buffer or base64 string
     }));
   }
 
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`Email sent successfully to ${email}`);
+    console.log('Message ID:', info.messageId);
     return true;
   } catch (error) {
-    console.error('Gmail Error:', error);
+    console.error('Gmail OAuth Error:', error);
     throw error;
   }
 };
