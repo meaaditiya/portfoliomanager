@@ -116,49 +116,62 @@ const generateOTP = () => {
 
 
 
-// Clean Gmail sendEmail function - Drop-in replacement
+const { google } = require('googleapis');
+
 const sendEmail = async (email, subject, html, attachments = []) => {
   if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET || !process.env.GMAIL_REFRESH_TOKEN) {
-    console.warn('Gmail OAuth credentials not set. Email would have been sent to:', email);
+    console.warn('Gmail OAuth credentials not set.');
     return true;
-  }
-
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user: process.env.GMAIL_USER,
-      clientId: process.env.GMAIL_CLIENT_ID,
-      clientSecret: process.env.GMAIL_CLIENT_SECRET,
-      refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-    }
-  });
-
-  const mailOptions = {
-    from: process.env.FROM_EMAIL,
-    to: email,
-    subject: subject,
-    html: html
-  };
-
-  // Handle attachments if present
-  if (attachments && attachments.length > 0) {
-    mailOptions.attachments = attachments.map(att => ({
-      filename: att.filename,
-      content: att.data, // Buffer or base64 string
-    }));
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const OAuth2 = google.auth.OAuth2;
+    const oauth2Client = new OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      'https://developers.google.com/oauthplayground'
+    );
+
+    oauth2Client.setCredentials({
+      refresh_token: process.env.GMAIL_REFRESH_TOKEN
+    });
+
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Create email content
+    const messageParts = [
+      `From: ${process.env.FROM_EMAIL}`,
+      `To: ${email}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      html
+    ];
+
+    const message = messageParts.join('\n');
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    const res = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage
+      }
+    });
+
     console.log(`Email sent successfully to ${email}`);
-    console.log('Message ID:', info.messageId);
+    console.log('Message ID:', res.data.id);
     return true;
   } catch (error) {
-    console.error('Gmail OAuth Error:', error);
+    console.error('Gmail API Error:', error);
     throw error;
   }
 };
+
 // Routes
 // Register new admin
 app.post('/api/admin/register', async (req, res) => {
