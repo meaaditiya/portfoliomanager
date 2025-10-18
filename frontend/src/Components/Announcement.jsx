@@ -20,7 +20,7 @@ const AnnouncementAdmin = () => {
     removeDocument: false
   });
 
-  const API_BASE = 'http://localhost:5000/api';
+  const API_BASE = 'https://connectwithaaditiyamg.onrender.com/api';
   const token = localStorage.getItem('token');
 
   useEffect(() => {
