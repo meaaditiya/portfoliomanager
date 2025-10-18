@@ -8206,11 +8206,7 @@ app.post('/api/admin/audio-recordings/:id/reply', authenticateToken, async (req,
     await recording.save();
 
     // Send reply email
-    const replyMessage = `Thank you for your audio message! I've listened to your recording and wanted to respond personally.
-
-Your original message duration: ${Math.floor(recording.duration / 60)}:${String(recording.duration % 60).padStart(2, '0')} minutes
-
-My Response:
+    const replyMessage = `Thank you for your audio message! 
 ${replyContent}
 
 I really appreciate you taking the time to share your thoughts through audio. It's always great to hear directly from people who visit my site.`;
