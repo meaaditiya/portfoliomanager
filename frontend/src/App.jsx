@@ -16,6 +16,7 @@ import Profile from './Components/Profile';
 import Audio from './Components/Audiomessage';
 import Stream from './Components/Stream';
 import './index.css';
+import Announcement from './Components/Announcement';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('/adminpost'); // Initialize with default path
@@ -82,6 +83,7 @@ function AppContent() {
           <Route path="/admincommunitypost" element={<Admincommunitypost/>}/>
           <Route path="/audiomessage" element={<Audio/>}/>
           <Route path="/stream" element={<Stream/>}/>
+          <Route path="/announcement" element={<Announcement/>}/>
         </Routes>
       </main>
     </div>

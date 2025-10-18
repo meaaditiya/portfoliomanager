@@ -34,6 +34,7 @@ const Reaction= require('./models/reaction');
 const Reply= require('./models/reply');
 const SocialMediaEmbed= require('./models/socialMediaEmbedSchema');
 const Stream=require('./models/streamSchema');
+const Announcement= require('./models/announcementSchema');
 const nodemailer = require('nodemailer');
 
 
@@ -8682,6 +8683,304 @@ app.get('/api/streams/:id/chat', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+
+
+
+app.post('/api/admin/announcement', authenticateToken, upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'document', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { title, caption, link, priority } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const announcementData = {
+      title,
+      caption: caption || '',
+      link: link || '',
+      priority: priority || 0
+    };
+
+  
+    if (req.files && req.files.image) {
+      const imageFile = req.files.image[0];
+      announcementData.image = {
+        data: imageFile.buffer,
+        contentType: imageFile.mimetype,
+        filename: imageFile.originalname
+      };
+    }
+
+    if (req.files && req.files.document) {
+      const docFile = req.files.document[0];
+      announcementData.document = {
+        data: docFile.buffer,
+        contentType: docFile.mimetype,
+        filename: docFile.originalname
+      };
+    }
+
+    const announcement = new Announcement(announcementData);
+    await announcement.save();
+
+    res.status(201).json({ 
+      message: 'Announcement created successfully', 
+      announcement: {
+        _id: announcement._id,
+        title: announcement.title,
+        caption: announcement.caption,
+        link: announcement.link,
+        priority: announcement.priority,
+        isActive: announcement.isActive,
+        hasImage: !!announcement.image,
+        hasDocument: !!announcement.document,
+        createdAt: announcement.createdAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
+  try {
+    const announcements = await Announcement.find()
+      .select('-image.data -document.data')
+      .sort({ priority: -1, createdAt: -1 });
+
+    const announcementsWithInfo = announcements.map(ann => ({
+      _id: ann._id,
+      title: ann.title,
+      caption: ann.caption,
+      link: ann.link,
+      priority: ann.priority,
+      isActive: ann.isActive,
+      hasImage: !!ann.image?.data,
+      hasDocument: !!ann.document?.data,
+      imageFilename: ann.image?.filename,
+      documentFilename: ann.document?.filename,
+      createdAt: ann.createdAt,
+      updatedAt: ann.updatedAt
+    }));
+
+    res.json({ announcements: announcementsWithInfo });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/announcement/active', async (req, res) => {
+  try {
+    // Pehle bina select ke fetch karo to check hasImage/hasDocument
+    const announcements = await Announcement.find({ isActive: true })
+      .sort({ priority: -1, createdAt: -1 });
+
+    const announcementsWithInfo = announcements.map(ann => ({
+      _id: ann._id,
+      title: ann.title,
+      caption: ann.caption,
+      link: ann.link,
+      priority: ann.priority,
+      hasImage: !!(ann.image && ann.image.data),  // Proper check
+      hasDocument: !!(ann.document && ann.document.data),  // Proper check
+      createdAt: ann.createdAt
+    }));
+
+    res.json({ announcements: announcementsWithInfo });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id)
+      .select('-image.data -document.data');
+
+    if (!announcement) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    res.json({ 
+      announcement: {
+        _id: announcement._id,
+        title: announcement.title,
+        caption: announcement.caption,
+        link: announcement.link,
+        priority: announcement.priority,
+        isActive: announcement.isActive,
+        hasImage: !!announcement.image?.data,
+        hasDocument: !!announcement.document?.data,
+        imageFilename: announcement.image?.filename,
+        documentFilename: announcement.document?.filename,
+        createdAt: announcement.createdAt,
+        updatedAt: announcement.updatedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/announcement/:id/image', async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+
+    if (!announcement || !announcement.image || !announcement.image.data) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    res.set('Content-Type', announcement.image.contentType);
+    res.send(announcement.image.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/announcement/:id/document', async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+
+    if (!announcement || !announcement.document || !announcement.document.data) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    res.set('Content-Type', announcement.document.contentType);
+    res.set('Content-Disposition', `attachment; filename="${announcement.document.filename}"`);
+    res.send(announcement.document.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'document', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { title, caption, link, priority, isActive, removeImage, removeDocument } = req.body;
+
+    const announcement = await Announcement.findById(req.params.id);
+
+    if (!announcement) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    // Update basic fields
+    if (title) announcement.title = title;
+    if (caption !== undefined) announcement.caption = caption;
+    if (link !== undefined) announcement.link = link;
+    if (priority !== undefined) announcement.priority = priority;
+    if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
+
+    // Handle image removal
+    if (removeImage === 'true' || removeImage === true) {
+      announcement.image = undefined;
+    }
+
+    // Handle document removal
+    if (removeDocument === 'true' || removeDocument === true) {
+      announcement.document = undefined;
+    }
+
+    // Handle new image upload
+    if (req.files && req.files.image) {
+      const imageFile = req.files.image[0];
+      announcement.image = {
+        data: imageFile.buffer,
+        contentType: imageFile.mimetype,
+        filename: imageFile.originalname
+      };
+    }
+
+   
+    if (req.files && req.files.document) {
+      const docFile = req.files.document[0];
+      announcement.document = {
+        data: docFile.buffer,
+        contentType: docFile.mimetype,
+        filename: docFile.originalname
+      };
+    }
+
+    await announcement.save();
+
+    res.json({ 
+      message: 'Announcement updated successfully',
+      announcement: {
+        _id: announcement._id,
+        title: announcement.title,
+        caption: announcement.caption,
+        link: announcement.link,
+        priority: announcement.priority,
+        isActive: announcement.isActive,
+        hasImage: !!announcement.image,
+        hasDocument: !!announcement.document,
+        updatedAt: announcement.updatedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+app.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+
+    if (!announcement) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    announcement.isActive = !announcement.isActive;
+    await announcement.save();
+
+    res.json({ 
+      message: `Announcement ${announcement.isActive ? 'activated' : 'deactivated'} successfully`,
+      announcement: {
+        _id: announcement._id,
+        isActive: announcement.isActive
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+app.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
+  try {
+    const announcement = await Announcement.findByIdAndDelete(req.params.id);
+
+    if (!announcement) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    res.json({ message: 'Announcement deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/admin/announcement', authenticateToken, async (req, res) => {
+  try {
+    const result = await Announcement.deleteMany({});
+    res.json({ 
+      message: 'All announcements deleted successfully',
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
