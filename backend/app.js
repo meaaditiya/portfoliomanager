@@ -8683,12 +8683,23 @@ app.get('/api/streams/:id/chat', async (req, res) => {
 
 
 
+// Helper function to calculate expiry date
+const calculateExpiryDate = (expiryType, expiryValue, customDate) => {
+  if (expiryType === 'custom' && customDate) {
+    return new Date(customDate);
+  } else if (expiryType === 'duration' && expiryValue) {
+    const now = new Date();
+    return new Date(now.getTime() + (expiryValue * 60 * 60 * 1000)); // hours to milliseconds
+  }
+  return null;
+};
+
 app.post('/api/admin/announcement', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    const { title, caption, link, priority } = req.body;
+    const { title, caption, link, priority, expiryType, expiryValue, expiresAt } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -8701,7 +8712,14 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
       priority: priority || 0
     };
 
-  
+    // Handle expiry
+    if (expiryType) {
+      const expiryDate = calculateExpiryDate(expiryType, expiryValue, expiresAt);
+      if (expiryDate) {
+        announcementData.expiresAt = expiryDate;
+      }
+    }
+
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcementData.image = {
@@ -8732,6 +8750,8 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
+        expiresAt: announcement.expiresAt,
+        isExpired: announcement.isExpired,
         hasImage: !!announcement.image,
         hasDocument: !!announcement.document,
         createdAt: announcement.createdAt
@@ -8744,6 +8764,8 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
 
 app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
+    await Announcement.expireOldAnnouncements();
+
     const announcements = await Announcement.find()
       .select('-image.data -document.data')
       .sort({ priority: -1, createdAt: -1 });
@@ -8755,6 +8777,8 @@ app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
       link: ann.link,
       priority: ann.priority,
       isActive: ann.isActive,
+      expiresAt: ann.expiresAt,
+      isExpired: ann.isExpired,
       hasImage: !!ann.image?.data,
       hasDocument: !!ann.document?.data,
       imageFilename: ann.image?.filename,
@@ -8771,9 +8795,13 @@ app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
 
 app.get('/api/announcement/active', async (req, res) => {
   try {
-    // Pehle bina select ke fetch karo to check hasImage/hasDocument
-    const announcements = await Announcement.find({ isActive: true })
-      .sort({ priority: -1, createdAt: -1 });
+    await Announcement.expireOldAnnouncements();
+
+    const announcements = await Announcement.find({ 
+      isActive: true,
+      isExpired: false
+    })
+    .sort({ priority: -1, createdAt: -1 });
 
     const announcementsWithInfo = announcements.map(ann => ({
       _id: ann._id,
@@ -8781,8 +8809,9 @@ app.get('/api/announcement/active', async (req, res) => {
       caption: ann.caption,
       link: ann.link,
       priority: ann.priority,
-      hasImage: !!(ann.image && ann.image.data),  // Proper check
-      hasDocument: !!(ann.document && ann.document.data),  // Proper check
+      expiresAt: ann.expiresAt,
+      hasImage: !!(ann.image && ann.image.data),
+      hasDocument: !!(ann.document && ann.document.data),
       createdAt: ann.createdAt
     }));
 
@@ -8801,6 +8830,11 @@ app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
+    announcement.checkExpiry();
+    if (announcement.isModified()) {
+      await announcement.save();
+    }
+
     res.json({ 
       announcement: {
         _id: announcement._id,
@@ -8809,6 +8843,8 @@ app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
+        expiresAt: announcement.expiresAt,
+        isExpired: announcement.isExpired,
         hasImage: !!announcement.image?.data,
         hasDocument: !!announcement.document?.data,
         imageFilename: announcement.image?.filename,
@@ -8853,13 +8889,24 @@ app.get('/api/announcement/:id/document', async (req, res) => {
   }
 });
 
-
 app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    const { title, caption, link, priority, isActive, removeImage, removeDocument } = req.body;
+    const { 
+      title, 
+      caption, 
+      link, 
+      priority, 
+      isActive, 
+      removeImage, 
+      removeDocument,
+      expiryType,
+      expiryValue,
+      expiresAt,
+      removeExpiry
+    } = req.body;
 
     const announcement = await Announcement.findById(req.params.id);
 
@@ -8867,24 +8914,32 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
-    // Update basic fields
     if (title) announcement.title = title;
     if (caption !== undefined) announcement.caption = caption;
     if (link !== undefined) announcement.link = link;
     if (priority !== undefined) announcement.priority = priority;
     if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
 
-    // Handle image removal
+    // Handle expiry
+    if (removeExpiry === 'true' || removeExpiry === true) {
+      announcement.expiresAt = null;
+      announcement.isExpired = false;
+    } else if (expiryType) {
+      const expiryDate = calculateExpiryDate(expiryType, expiryValue, expiresAt);
+      if (expiryDate) {
+        announcement.expiresAt = expiryDate;
+        announcement.isExpired = false;
+      }
+    }
+
     if (removeImage === 'true' || removeImage === true) {
       announcement.image = undefined;
     }
 
-    // Handle document removal
     if (removeDocument === 'true' || removeDocument === true) {
       announcement.document = undefined;
     }
 
-    // Handle new image upload
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcement.image = {
@@ -8894,7 +8949,6 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       };
     }
 
-   
     if (req.files && req.files.document) {
       const docFile = req.files.document[0];
       announcement.document = {
@@ -8915,6 +8969,8 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
+        expiresAt: announcement.expiresAt,
+        isExpired: announcement.isExpired,
         hasImage: !!announcement.image,
         hasDocument: !!announcement.document,
         updatedAt: announcement.updatedAt
@@ -8925,13 +8981,18 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
   }
 });
 
-
 app.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
 
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    if (announcement.isExpired) {
+      return res.status(400).json({ 
+        error: 'Cannot activate an expired announcement. Please update the expiry date first.' 
+      });
     }
 
     announcement.isActive = !announcement.isActive;
@@ -8948,7 +9009,6 @@ app.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, r
     res.status(500).json({ error: error.message });
   }
 });
-
 
 app.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {

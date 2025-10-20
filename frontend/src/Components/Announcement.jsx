@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Eye, EyeOff, Pencil, Trash2, Plus, FileText, Image } from 'lucide-react';
+import { X, Upload, Eye, EyeOff, Pencil, Trash2, Plus, FileText, Image, Calendar, Clock } from 'lucide-react';
 import './Announcement.css';
 
 const AnnouncementAdmin = () => {
@@ -17,7 +17,11 @@ const AnnouncementAdmin = () => {
     image: null,
     document: null,
     removeImage: false,
-    removeDocument: false
+    removeDocument: false,
+    expiryType: 'none',
+    expiryValue: '',
+    expiresAt: '',
+    removeExpiry: false
   });
 
   const API_BASE = 'https://connectwithaaditiyamg.onrender.com/api';
@@ -76,6 +80,17 @@ const AnnouncementAdmin = () => {
       formDataToSend.append('isActive', formData.isActive);
       formDataToSend.append('removeImage', formData.removeImage);
       formDataToSend.append('removeDocument', formData.removeDocument);
+      formDataToSend.append('removeExpiry', formData.removeExpiry);
+    }
+
+    // Handle expiry fields
+    if (formData.expiryType !== 'none' && !formData.removeExpiry) {
+      formDataToSend.append('expiryType', formData.expiryType);
+      if (formData.expiryType === 'duration' && formData.expiryValue) {
+        formDataToSend.append('expiryValue', formData.expiryValue);
+      } else if (formData.expiryType === 'custom' && formData.expiresAt) {
+        formDataToSend.append('expiresAt', formData.expiresAt);
+      }
     }
     
     if (formData.image) {
@@ -121,6 +136,16 @@ const AnnouncementAdmin = () => {
 
   const handleEdit = (announcement) => {
     setCurrentAnnouncement(announcement);
+    
+    let expiryType = 'none';
+    let expiryValue = '';
+    let expiresAt = '';
+    
+    if (announcement.expiresAt) {
+      expiryType = 'custom';
+      expiresAt = new Date(announcement.expiresAt).toISOString().slice(0, 16);
+    }
+    
     setFormData({
       title: announcement.title,
       caption: announcement.caption || '',
@@ -130,7 +155,11 @@ const AnnouncementAdmin = () => {
       image: null,
       document: null,
       removeImage: false,
-      removeDocument: false
+      removeDocument: false,
+      expiryType,
+      expiryValue,
+      expiresAt,
+      removeExpiry: false
     });
     setEditMode(true);
     setShowModal(true);
@@ -223,7 +252,11 @@ const AnnouncementAdmin = () => {
       image: null,
       document: null,
       removeImage: false,
-      removeDocument: false
+      removeDocument: false,
+      expiryType: 'none',
+      expiryValue: '',
+      expiresAt: '',
+      removeExpiry: false
     });
     setEditMode(false);
     setCurrentAnnouncement(null);
@@ -234,6 +267,18 @@ const AnnouncementAdmin = () => {
     setShowModal(false);
     setEditMode(false);
     setCurrentAnnouncement(null);
+  };
+
+  const formatExpiryDate = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -257,9 +302,14 @@ const AnnouncementAdmin = () => {
           <div key={announcement._id} className="announcement-card">
             <div className="card-header">
               <h3>{announcement.title}</h3>
-              <span className={`status-badge ${announcement.isActive ? 'active' : 'inactive'}`}>
-                {announcement.isActive ? 'Active' : 'Inactive'}
-              </span>
+              <div className="status-badges">
+                <span className={`status-badge ${announcement.isActive ? 'active' : 'inactive'}`}>
+                  {announcement.isActive ? 'Active' : 'Inactive'}
+                </span>
+                {announcement.isExpired && (
+                  <span className="status-badge expired">Expired</span>
+                )}
+              </div>
             </div>
 
             {announcement.caption && (
@@ -276,6 +326,12 @@ const AnnouncementAdmin = () => {
                   <a href={announcement.link} target="_blank" rel="noopener noreferrer">
                     View
                   </a>
+                </div>
+              )}
+              {announcement.expiresAt && (
+                <div className="meta-item expiry-info">
+                  <Calendar size={14} />
+                  <strong>Expires:</strong> {formatExpiryDate(announcement.expiresAt)}
                 </div>
               )}
             </div>
@@ -396,6 +452,66 @@ const AnnouncementAdmin = () => {
                       onChange={handleInputChange}
                     />
                     Active
+                  </label>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="expiryType">Expiry Type</label>
+                <select
+                  id="expiryType"
+                  name="expiryType"
+                  value={formData.expiryType}
+                  onChange={handleInputChange}
+                >
+                  <option value="none">No Expiry</option>
+                  <option value="duration">Duration (Hours)</option>
+                  <option value="custom">Custom Date</option>
+                </select>
+              </div>
+
+              {formData.expiryType === 'duration' && (
+                <div className="form-group">
+                  <label htmlFor="expiryValue">
+                    <Clock size={16} /> Duration (Hours)
+                  </label>
+                  <input
+                    type="number"
+                    id="expiryValue"
+                    name="expiryValue"
+                    value={formData.expiryValue}
+                    onChange={handleInputChange}
+                    placeholder="Enter hours"
+                    min="1"
+                  />
+                </div>
+              )}
+
+              {formData.expiryType === 'custom' && (
+                <div className="form-group">
+                  <label htmlFor="expiresAt">
+                    <Calendar size={16} /> Expiry Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="expiresAt"
+                    name="expiresAt"
+                    value={formData.expiresAt}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              )}
+
+              {editMode && currentAnnouncement?.expiresAt && (
+                <div className="form-group checkbox-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="removeExpiry"
+                      checked={formData.removeExpiry}
+                      onChange={handleInputChange}
+                    />
+                    Remove expiry date
                   </label>
                 </div>
               )}
