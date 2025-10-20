@@ -89,8 +89,9 @@ const AnnouncementAdmin = () => {
       if (formData.expiryType === 'duration' && formData.expiryValue) {
         formDataToSend.append('expiryValue', formData.expiryValue);
       } else if (formData.expiryType === 'custom' && formData.expiresAt) {
-        formDataToSend.append('expiresAt', formData.expiresAt);
-      }
+  const localDate = new Date(formData.expiresAt);
+  formDataToSend.append('expiresAt', localDate.toISOString()); // ← YE SAHI HAI
+}
     }
     
     if (formData.image) {
@@ -135,16 +136,24 @@ const AnnouncementAdmin = () => {
   };
 
   const handleEdit = (announcement) => {
-    setCurrentAnnouncement(announcement);
-    
-    let expiryType = 'none';
-    let expiryValue = '';
-    let expiresAt = '';
-    
-    if (announcement.expiresAt) {
-      expiryType = 'custom';
-      expiresAt = new Date(announcement.expiresAt).toISOString().slice(0, 16);
-    }
+   setCurrentAnnouncement(announcement);
+  
+  let expiryType = 'none';
+  let expiryValue = '';
+  let expiresAt = '';
+  
+  if (announcement.expiresAt) {
+    expiryType = 'custom';
+    // Convert UTC to local time for datetime-local input
+    const date = new Date(announcement.expiresAt);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    expiresAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+  
     
     setFormData({
       title: announcement.title,
