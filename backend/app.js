@@ -9,7 +9,7 @@ require('dotenv').config();
 const { body, validationResult } = require('express-validator');
 const path = require('path');
 const fs = require('fs');
-
+const crypto = require('crypto');
 const Admin = require('./models/admin');
 const AudioRecording = require('./models/audioRecordingSchema');
 const AudioReply = require('./models/audioReplySchema');
@@ -2401,54 +2401,141 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       </html>
     `;
 };
+function getOTPEmailTemplate(otp) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .otp-box { background: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
+        .otp-code { font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 5px; }
+        .warning { color: #dc2626; font-size: 14px; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>OTP Verification</h2>
+        <p>Hello,</p>
+        <p>OTP is required to maintain authenticity of the sender so they can use the correct and their own E-mail account to send the messages. Please use the following OTP to verify your email address:</p>
+        
+        <div class="otp-box">
+          <div class="otp-code">${otp}</div>
+        </div>
+        
+        <p><strong>This OTP will expire in 10 minutes.</strong></p>
+        
+        <div class="warning">
+          <p>⚠️ If you didn't request this OTP, please ignore this email.</p>
+        </div>
+        
+        <p>Best regards,<br>Aaditiya Tyagi</p>
+      </div>
+    </body>
+    </html>
+  `;
+}
   // Contact Routes to add to your app.js
   // Submit a new contact message (unchanged for non-admin users)
- app.post('/api/contact', async (req, res) => {
-    try {
-      const { name, email, message } = req.body;
-      
-      // Validate inputs
-      if (!name || !email || !message) {
-        return res.status(400).json({ message: 'All fields are required' });
-      }
-      
-      // Validate email format
-      const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: 'Please provide a valid email' });
-      }
-      
-      // Create new message
-      const newMessage = new Message({
-        name,
-        email,
-        message
-      });
-      
-      await newMessage.save();
-      
-      // Send enhanced confirmation email to user
-      const confirmationEmail = getConfirmationEmailTemplate(name, message);
-      await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
-      
-      // Send enhanced notification to admin
-      const adminNotification = getAdminNotificationTemplate(name, email, message);
-      
-      // Find admin email - assuming first admin or use a dedicated notifications email
-      const admin = await Admin.findOne();
-      if (admin) {
-        await sendEmail(admin.email, '🔔 New Contact Message from ' + name, adminNotification);
-      }
-      
-      res.status(201).json({ 
-        success: true,
-        message: 'Your message has been sent successfully. We will get back to you soon!'
-      });
-    } catch (error) {
-      console.error('Contact submission error:', error);
-      res.status(500).json({ message: 'Failed to send your message. Please try again later.' });
+  app.post('/api/contact/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validate email
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
     }
-  });
+    
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    
+    // Delete any existing OTP for this email and purpose
+    await OTP.deleteMany({ email, purpose: 'contact_verification' });
+    
+    // Save new OTP
+    const newOTP = new OTP({
+      email,
+      otp,
+      purpose: 'contact_verification'
+    });
+    await newOTP.save();
+    
+    // Send OTP via email
+    const otpEmailTemplate = getOTPEmailTemplate(otp);
+    await sendEmail(email, 'Your Contact Form Verification Code', otpEmailTemplate);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'OTP sent successfully to your email. Please check your inbox.'
+    });
+  } catch (error) {
+    console.error('OTP sending error:', error);
+    res.status(500).json({ message: 'Failed to send OTP. Please try again.' });
+  }
+});
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, message, otp } = req.body;
+    
+    // Validate inputs
+    if (!name || !email || !message || !otp) {
+      return res.status(400).json({ message: 'All fields including OTP are required' });
+    }
+    
+    // Validate email format
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+    
+    // Verify OTP
+    const otpRecord = await OTP.findOne({ 
+      email, 
+      otp, 
+      purpose: 'contact_verification' 
+    });
+    
+    if (!otpRecord) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired OTP. Please request a new one.' 
+      });
+    }
+    
+    // Create new message
+    const newMessage = new Message({
+      name,
+      email,
+      message
+    });
+    
+    await newMessage.save();
+    
+    // Delete used OTP
+    await OTP.deleteOne({ _id: otpRecord._id });
+    
+    // Send enhanced confirmation email to user
+    const confirmationEmail = getConfirmationEmailTemplate(name, message);
+    await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
+    
+    // Send enhanced notification to admin
+    const adminNotification = getAdminNotificationTemplate(name, email, message);
+    
+    const admin = await Admin.findOne();
+    if (admin) {
+      await sendEmail(admin.email, '🔔 New Contact Message from ' + name, adminNotification);
+    }
+    
+    res.status(201).json({ 
+      success: true,
+      message: 'Your message has been sent successfully. We will get back to you soon!'
+    });
+  } catch (error) {
+    console.error('Contact submission error:', error);
+    res.status(500).json({ message: 'Failed to send your message. Please try again later.' });
+  }
+});
   
   // Admin Routes for Messages
   // Get all messages (for admin) - Enhanced with grouping by email
@@ -5006,14 +5093,72 @@ app.get('/api/social-embeds/platform/:platform', async (req, res) => {
   }
 });
 
-// Submit project request with multiple files (accessible to anyone)
+// Send OTP for project submission
+app.post('/api/project/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validate email
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+    
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    
+    // Delete any existing OTP for this email and purpose
+    await OTP.deleteMany({ email, purpose: 'project_verification' });
+    
+    // Save new OTP
+    const newOTP = new OTP({
+      email,
+      otp,
+      purpose: 'project_verification'
+    });
+    await newOTP.save();
+    
+    // Send OTP via email
+    const otpEmailTemplate = getOTPEmailTemplate(otp);
+    await sendEmail(email, 'Your Project Submission Verification Code', otpEmailTemplate);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'OTP sent successfully to your email. Please check your inbox.'
+    });
+  } catch (error) {
+    console.error('OTP sending error:', error);
+    res.status(500).json({ message: 'Failed to send OTP. Please try again.' });
+  }
+});
+
+// Submit project request with OTP verification
 app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
   try {
-    const { name, email, projectType, description, budget, timeline, features, techPreferences, additionalInfo } = req.body;
+    const { name, email, projectType, description, budget, timeline, features, techPreferences, additionalInfo, otp } = req.body;
 
     // Validate required inputs
-    if (!name || !email || !projectType || !description) {
-      return res.status(400).json({ message: 'Name, email, project type, and description are required' });
+    if (!name || !email || !projectType || !description || !otp) {
+      return res.status(400).json({ message: 'Name, email, project type, description, and OTP are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+
+    // Verify OTP
+    const otpRecord = await OTP.findOne({ 
+      email, 
+      otp, 
+      purpose: 'project_verification' 
+    });
+    
+    if (!otpRecord) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired OTP. Please request a new one.' 
+      });
     }
 
     // Process uploaded files
@@ -5046,6 +5191,9 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
 
     await newRequest.save();
 
+    // Delete used OTP
+    await OTP.deleteOne({ _id: otpRecord._id });
+
     // Send confirmation email to user
     const fileList = files.length > 0 ? 
       `<p><strong>Uploaded files:</strong></p><ul>${files.map(f => `<li>${f.originalName} (${(f.size / 1024).toFixed(2)} KB)</li>`).join('')}</ul>` : 
@@ -5057,7 +5205,7 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your project request hs been received successfully</title>
+  <title>Your project request has been received successfully</title>
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -5393,17 +5541,19 @@ app.post('/api/project/submit', upload.array('files', 5), async (req, res) => {
   </div>
 </body>
 </html>`;
- await sendEmail(email, 'Project Request Confirmation', confirmationEmail);
+    await sendEmail(email, 'Project Request Confirmation', confirmationEmail);
 
     res.status(201).json({
+      success: true,
       message: 'Project request submitted successfully. Check your email for confirmation.',
       filesUploaded: files.length
     });
   } catch (error) {
     console.error('Project submission error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Failed to submit project request. Please try again later.' });
   }
 });
+
 
 // Get all project requests (admin only) - exclude file data for performance
 app.get('/api/admin/project/requests', authenticateToken, async (req, res) => {
@@ -7989,16 +8139,53 @@ const audioUpload = multer({
 });
 
 // PUBLIC ROUTES
+app.post('/api/audio-contact/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validate email
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+    
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    
+    // Delete any existing OTP for this email and purpose
+    await OTP.deleteMany({ email, purpose: 'audio_verification' });
+    
+    // Save new OTP
+    const newOTP = new OTP({
+      email,
+      otp,
+      purpose: 'audio_verification'
+    });
+    await newOTP.save();
+    
+    // Send OTP via email
+    const otpEmailTemplate = getOTPEmailTemplate(otp);
+    await sendEmail(email, 'Your Audio Message Verification Code', otpEmailTemplate);
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'OTP sent successfully to your email. Please check your inbox.'
+    });
+  } catch (error) {
+    console.error('OTP sending error:', error);
+    res.status(500).json({ message: 'Failed to send OTP. Please try again.' });
+  }
+});
 
-// Submit audio recording (for public users)
+// Submit audio contact with OTP verification
 app.post('/api/audio-contact', audioUpload.single('audioFile'), async (req, res) => {
   try {
-    const { name, email, duration, transcription = '' } = req.body;
+    const { name, email, duration, transcription = '', otp } = req.body;
     
     // Validate inputs
-    if (!name || !email || !duration || !req.file) {
+    if (!name || !email || !duration || !req.file || !otp) {
       return res.status(400).json({ 
-        message: 'Name, email, duration, and audio file are required' 
+        message: 'Name, email, duration, audio file, and OTP are required' 
       });
     }
     
@@ -8006,6 +8193,19 @@ app.post('/api/audio-contact', audioUpload.single('audioFile'), async (req, res)
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'Please provide a valid email' });
+    }
+    
+    // Verify OTP
+    const otpRecord = await OTP.findOne({ 
+      email, 
+      otp, 
+      purpose: 'audio_verification' 
+    });
+    
+    if (!otpRecord) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired OTP. Please request a new one.' 
+      });
     }
     
     // Create new audio recording with file data stored in MongoDB
@@ -8021,6 +8221,9 @@ app.post('/api/audio-contact', audioUpload.single('audioFile'), async (req, res)
     });
     
     await newRecording.save();
+    
+    // Delete used OTP
+    await OTP.deleteOne({ _id: otpRecord._id });
     
     // Send confirmation email to user
     const confirmationMessage = `Thank you for your audio message! I've received your recording and will listen to it shortly. I'll get back to you via email soon.
