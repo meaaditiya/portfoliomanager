@@ -1725,219 +1725,227 @@ async function listAvailableModels() {
 // Professional Email Templates
 const getConfirmationEmailTemplate = (name, message) => {
     return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Message Confirmation - Thank You</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #2c3e50;
-            background-color: #ecf0f1;
-            padding: 20px;
-          }
-          .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #ffffff;
-            border: 1px solid #bdc3c7;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-          }
-          .header {
-            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-          }
-          .header h1 {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-          }
-          .header p {
-            font-size: 16px;
-            opacity: 0.9;
-            font-weight: 300;
-          }
-          .content {
-            padding: 40px 30px;
-          }
-          .greeting {
-            font-size: 18px;
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 25px;
-          }
-          .main-text {
-            font-size: 16px;
-            color: #34495e;
-            margin-bottom: 25px;
-            line-height: 1.7;
-          }
-          .message-preview {
-            background-color: #f8f9fa;
-            border-left: 4px solid #3498db;
-            padding: 25px;
-            margin: 25px 0;
-          }
-          .message-preview h3 {
-            font-size: 16px;
-            margin-bottom: 15px;
-            font-weight: 600;
-            color: #2c3e50;
-          }
-          .message-text {
-            font-style: italic;
-            line-height: 1.7;
-            color: #5d6d7e;
-          }
-          .info-section {
-            background-color: #f1f2f6;
-            border: 1px solid #ddd;
-            padding: 25px;
-            margin: 30px 0;
-          }
-          .info-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-            padding: 15px;
-            background-color: white;
-            border-left: 3px solid #3498db;
-          }
-          .info-item:last-child {
-            margin-bottom: 0;
-          }
-          .info-icon {
-            width: 40px;
-            height: 40px;
-            background-color: #3498db;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-weight: bold;
-          }
-          .info-content h4 {
-            color: #2c3e50;
-            margin-bottom: 5px;
-            font-weight: 600;
-          }
-          .info-content p {
-            color: #7f8c8d;
-            font-size: 14px;
-          }
-          .cta-section {
-            background-color: #ecf0f1;
-            padding: 30px;
-            text-align: center;
-            margin: 25px 0;
-            border: 1px solid #bdc3c7;
-          }
-          .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-            color: white;
-            padding: 15px 30px;
-            text-decoration: none;
-            font-weight: 600;
-            margin-top: 15px;
-            transition: all 0.3s ease;
-          }
-          .cta-button:hover {
-            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
-          }
-          .footer {
-            background-color: #f8f9fa;
-            padding: 30px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-          }
-          .signature {
-            color: #2c3e50;
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 10px;
-          }
-          .disclaimer {
-            color: #95a5a6;
-            font-size: 12px;
-            margin-top: 20px;
-            line-height: 1.4;
-          }
-          @media (max-width: 600px) {
-            .email-container {
-              margin: 10px;
-            }
-            .header, .content, .footer {
-              padding: 25px 20px;
-            }
-            .header h1 {
-              font-size: 24px;
-            }
-            .info-item {
-              flex-direction: column;
-              text-align: center;
-            }
-            .info-icon {
-              margin-right: 0;
-              margin-bottom: 10px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="header">
-            <h1>MESSAGE CONFIRMATION</h1>
-            <p>Your inquiry has been successfully received</p>
-          </div>
-          
-          <div class="content">
-            <div class="greeting">
-              Dear ${name},
-            </div>
-            
-            <p class="main-text">Thank you for contacting me. I have received your message and appreciate your interest. I will review your inquiry and respond as soon as possible.</p>
-            
-            <div class="message-preview">
-              <h3>Your Message Summary:</h3>
-              <div class="message-text">"${message}"</div>
-            </div>
-            
-            <div class="info-section">
-             
-                
-                <div class="info-content">
-                  <h4>Response Timeline</h4>
-                  <p>You can expect a response within 24-48 business hours</p>
-                </div>
-              
-             
-            </div>
-          </div>
-          
-          <div class="footer">
-            <div class="signature">
-              <p>Best regards,<br/>
-              <strong>Aaditiya Tyagi</strong><br/>
-            <p class="disclaimer">
-              This is an automated confirmation email. Please do not reply to this message.
-            </p>
-          </div>
-        </div>
-      </body>
-      </html>
+     <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Message Confirmation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #202124;
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header {
+      text-align: center;
+      padding: 30px 20px 20px;
+      background-color: #ffffff;
+    }
+    .logo {
+      max-width: 65px;
+      height: 65px;
+      margin-bottom: 20px;
+      box-shadow: rgba(10px,10px, 10px,10px);
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 500;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #3a3a3a;
+    }
+    .content {
+      padding: 20px 30px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #1a1a1a;
+      margin-bottom: 20px;
+    }
+    .main-text {
+      font-size: 15px;
+      color: #3a3a3a;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .message-preview {
+      background-color: #f8f9fa;
+      padding: 20px;
+      margin: 25px 0;
+      border-radius: 4px;
+    }
+    .message-preview h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    .message-text {
+      font-style: italic;
+      line-height: 1.6;
+      color: #3a3a3a;
+      font-size: 14px;
+    }
+    .info-section {
+      padding: 20px;
+      margin: 25px 0;
+      text-align: center;
+    }
+    .info-section h4 {
+      color: #1a1a1a;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 15px;
+    }
+    .info-section p {
+      color: #3a3a3a;
+      font-size: 14px;
+    }
+    .contact-info {
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e8eaed;
+    }
+    .contact-info p {
+      margin-bottom: 12px;
+      color: #3a3a3a;
+      font-size: 14px;
+    }
+    .contact-info a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    .contact-info a:hover {
+      text-decoration: underline;
+    }
+    .visit-site {
+      display: inline-block;
+      padding: 10px 24px;
+      background-color: #1a73e8;
+      color: #ffffff !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .visit-site:hover {
+      background-color: #1557b0;
+    }
+    .email-footer {
+      background-color: #f8f9fa;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e8eaed;
+    }
+    .email-footer p {
+      color: #5f6368;
+      font-size: 12px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .email-footer a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    .email-footer a:hover {
+      text-decoration: underline;
+    }
+    .social-links {
+      margin: 15px 0;
+      font-size: 13px;
+    }
+    .social-links a {
+      color: #1a73e8;
+      text-decoration: none;
+      margin: 0 8px;
+    }
+    .social-links a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      .email-container {
+        margin: 10px;
+      }
+      .content, .contact-info, .email-footer {
+        padding: 20px;
+      }
+      .header h1 {
+        font-size: 20px;
+      }
+      .logo {
+        max-width: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <img src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555" alt="Logo" class="logo">
+      <h1>Message Received</h1>
+      <p>Thank you for reaching out</p>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        Hi ${name},
+      </div>
+      
+      <p class="main-text">Thank you for contacting me. I've received your message and will get back to you as soon as possible.</p>
+      
+      <div class="message-preview">
+        <h3>Your Message:</h3>
+        <div class="message-text">"${message}"</div>
+      </div>
+      
+      <div class="info-section">
+        <h4>Response Time</h4>
+        <p>You can expect a response within 24-48 business hours</p>
+      </div>
+    </div>
+    
+    <div class="contact-info">
+      <p><strong>Best regards,</strong><br>Aaditiya Tyagi</p>
+      <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
+      <p>
+        <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
+          Visit My Site
+        </a>
+      </p>
+    </div>
+
+    <div class="email-footer">
+      <p>This email was generated automatically. Please do not reply directly.</p>
+      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
+      <div class="social-links">
+        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
+        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
+      </div>
+      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
     `;
 };
 
@@ -2183,222 +2191,245 @@ const getAdminNotificationTemplate = (name, email, message) => {
 
 const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Response from Aaditiya Tyagi</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #ecf0f1;
-            padding: 20px;
-            line-height: 1.6;
-          }
-          .email-container {
-            max-width: 650px;
-            margin: 0 auto;
-            background: white;
-            border: 1px solid #bdc3c7;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-          }
-          .header {
-            background-color: #34495e;
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-          }
-          .header h1 {
-            font-size: 26px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-          }
-          .header p {
-            opacity: 0.9;
-            font-size: 16px;
-          }
-          .content {
-            padding: 40px 30px;
-          }
-          .greeting {
-            font-size: 18px;
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 25px;
-          }
-          .intro-text {
-            font-size: 16px;
-            color: #34495e;
-            margin-bottom: 30px;
-            line-height: 1.7;
-          }
-          .conversation-section {
-            margin: 30px 0;
-          }
-          .message-block {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            padding: 25px;
-            margin: 20px 0;
-          }
-          .original-message {
-            border-left: 4px solid #34495e;
-          }
-          .reply-message {
-            border-left: 4px solid  #34495e;
-          }
-          .message-header {
-            color: #2c3e50;
-            font-weight: 600;
-            margin-bottom: 15px;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid #ecf0f1;
-            padding-bottom: 8px;
-          }
-          .message-content {
-            color: #34495e;
-            line-height: 1.8;
-            font-size: 15px;
-          }
-          .signature-section {
-            background-color: #f1f2f6;
-            padding: 30px;
-            margin: 3px 0;
-            border: 1px solid #ddd;
-          }
-          .signature {
-            color: #2c3e50;
-            font-weight: 600;
-            font-size: 16px;
-            text-align: center;
-          }
-          .title {
-            color: #7f8c8d;
-            font-style: italic;
-            margin-top: 5px;
-            font-size: 14px;
-          }
-          .contact-section {
-            background-color: #ecf0f1;
-            padding: 25px;
-            margin: 25px 0;
-            text-align: center;
-            border: 1px solid #bdc3c7;
-          }
-          .contact-section h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 16px;
-          }
-          .contact-info {
-            color:#ddd;
-            font-size: 14px;
-            line-height: 1.6;
-          }
-          .footer {
-            background-color: #34495e;
-            color: white;
-            padding: 30px;
-            text-align: center;
-          }
-          .footer-content {
-            max-width: 400px;
-            margin: 0 auto;
-          }
-          .footer h3 {
-            margin-bottom: 15px;
-            font-size: 18px;
-            font-weight: 600;
-          }
-          .footer p {
-            opacity: 0.9;
-            line-height: 1.6;
-            font-size: 14px;
-          }
-          .divider {
-            height: 1px;
-            background-color: #bdc3c7;
-            margin: 30px 0;
-          }
-          @media (max-width: 600px) {
-            .email-container {
-              margin: 10px;
-            }
-            .header, .content {
-              padding: 25px 20px;
-            }
-            .header h1 {
-              font-size: 22px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="header">
-            <h1>RESPONSE TO YOUR QUERY</h1>
-            <p>Thank you for your patience</p>
-          </div>
-          
-          <div class="content">
-            <div class="greeting">
-              Dear ${name},
-            </div>
-            
-            <p class="intro-text">
-              Thank you for reaching out to me. I have carefully reviewed your message and am pleased to provide you with a detailed response below.
-            </p>
-            
-            <div class="conversation-section">
-              <div class="message-block original-message">
-                <div class="message-header">Your Original Message</div>
-                <div class="message-content">${originalMessage}</div>
-              </div>
-              
-              <div class="message-block reply-message">
-                <div class="message-header">My Response</div>
-                <div class="message-content">${replyContent}</div>
-              </div>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <p class="intro-text">
-              If you have any follow-up questions or would like to discuss this matter further, please don't hesitate to contact me.
-            </p>
-          </div>
-          
-          <div class="signature-section">
-            <div class="signature">
-              <strong>Best Regards</strong>
-              <div class="title">Aaditiya Tyagi</div>
-            </div>
-          </div>
-          
-         
-          
-          <div class="footer">
-            <div class="footer-content">
-              <h3>Thank You</h3>
-              <p>I appreciate your time and interest. I look forward to any future opportunities to assist you with your inquiries or discuss potential collaborations.</p>
-            <div class="contact-info">
-              For future correspondence, please use the same contact method<br/>
-              or visit my website for additional contact options.
-            </div>
-            </div>
-          </div>
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Response from Aaditiya Tyagi</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #202124;
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header {
+      text-align: center;
+      padding: 30px 20px 20px;
+      background-color: #ffffff;
+    }
+    .logo {
+      max-width: 65px;
+      height: 65px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 500;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #3a3a3a;
+    }
+    .content {
+      padding: 20px 30px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #1a1a1a;
+      margin-bottom: 20px;
+    }
+    .main-text {
+      font-size: 15px;
+      color: #3a3a3a;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .conversation-section {
+      margin: 25px 0;
+    }
+    .message-block {
+      background-color: #f8f9fa;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+    .message-header {
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    .message-content {
+      line-height: 1.6;
+      color: #3a3a3a;
+      font-size: 14px;
+    }
+    .signature-section {
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e8eaed;
+    }
+    .signature {
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+    .signature strong {
+      font-weight: 500;
+    }
+    .title {
+      color: #3a3a3a;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+    .contact-info {
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e8eaed;
+    }
+    .contact-info p {
+      margin-bottom: 12px;
+      color: #3a3a3a;
+      font-size: 14px;
+    }
+    .contact-info a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    .contact-info a:hover {
+      text-decoration: underline;
+    }
+    .visit-site {
+      display: inline-block;
+      padding: 10px 24px;
+      background-color: #1a73e8;
+      color: #ffffff !important;
+      text-decoration: none !important;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .visit-site:hover {
+      background-color: #1557b0;
+    }
+    .email-footer {
+      background-color: #f8f9fa;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #e8eaed;
+    }
+    .email-footer p {
+      color: #5f6368;
+      font-size: 12px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .email-footer a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    .email-footer a:hover {
+      text-decoration: underline;
+    }
+    .social-links {
+      margin: 15px 0;
+      font-size: 13px;
+    }
+    .social-links a {
+      color: #1a73e8;
+      text-decoration: none;
+      margin: 0 8px;
+    }
+    .social-links a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      .email-container {
+        margin: 10px;
+      }
+      .content, .contact-info, .email-footer, .signature-section {
+        padding: 20px;
+      }
+      .header h1 {
+        font-size: 20px;
+      }
+      .logo {
+        max-width: 55px;
+        height: 55px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <img src="https://ik.imagekit.io/afi9t3xki/Screenshot%202025-06-10%20162118.png?updatedAt=1751634427555" alt="Logo" class="logo">
+      <h1>Response to Your Query</h1>
+      <p>Thank you for your patience</p>
+    </div>
+    
+    <div class="content">
+      <div class="greeting">
+        Dear ${name},
+      </div>
+      
+      <p class="main-text">
+        Thank you for reaching out to me. I have carefully reviewed your message and am pleased to provide you with a detailed response below.
+      </p>
+      
+      <div class="conversation-section">
+        <div class="message-block">
+          <div class="message-header">Your Original Message:</div>
+          <div class="message-content">${originalMessage}</div>
         </div>
-      </body>
-      </html>
+        
+        <div class="message-block">
+          <div class="message-header">My Response:</div>
+          <div class="message-content">${replyContent}</div>
+        </div>
+      </div>
+      
+      <p class="main-text">
+        If you have any follow-up questions or would like to discuss this matter further, please don't hesitate to contact me.
+      </p>
+    </div>
+    
+    <div class="signature-section">
+      <div class="signature">
+        <strong>Best Regards</strong>
+        <div class="title">Aaditiya Tyagi</div>
+      </div>
+    </div>
+    
+    <div class="contact-info">
+      <p><strong>Contact:</strong> <a href="tel:+917351102036">+91 73511 02036</a></p>
+      <p>
+        <a href="https://connectwithaaditiya.onrender.com" target="_blank" class="visit-site">
+          Visit My Site
+        </a>
+      </p>
+    </div>
+
+    <div class="email-footer">
+      <p>This email was generated automatically. Please do not reply directly.</p>
+      <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>
+      <div class="social-links">
+        <a href="https://x.com/aaditiya__tyagi" target="_blank">X</a> |
+        <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" target="_blank">LinkedIn</a> |
+        <a href="https://github.com/meaaditiya" target="_blank">GitHub</a>
+      </div>
+      <p>© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
     `;
 };
 function getOTPEmailTemplate(otp) {
