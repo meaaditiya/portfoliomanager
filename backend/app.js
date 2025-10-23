@@ -1883,10 +1883,10 @@ const getConfirmationEmailTemplate = (name, message) => {
     }
     @media (max-width: 600px) {
       .email-container {
-        margin: 10px;
+        margin: -20px;
       }
       .content, .contact-info, .email-footer {
-        padding: 20px;
+        padding: 15px;
       }
       .header h1 {
         font-size: 20px;
@@ -2352,10 +2352,10 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
     }
     @media (max-width: 600px) {
       .email-container {
-        margin: 10px;
+        margin: -20px;
       }
       .content, .contact-info, .email-footer, .signature-section {
-        padding: 20px;
+        padding: 15px;
       }
       .header h1 {
         font-size: 20px;
