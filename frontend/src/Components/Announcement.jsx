@@ -89,9 +89,9 @@ const AnnouncementAdmin = () => {
       if (formData.expiryType === 'duration' && formData.expiryValue) {
         formDataToSend.append('expiryValue', formData.expiryValue);
       } else if (formData.expiryType === 'custom' && formData.expiresAt) {
-  const localDate = new Date(formData.expiresAt);
-  formDataToSend.append('expiresAt', localDate.toISOString()); // ← YE SAHI HAI
-}
+        const localDate = new Date(formData.expiresAt);
+        formDataToSend.append('expiresAt', localDate.toISOString());
+      }
     }
     
     if (formData.image) {
@@ -136,24 +136,22 @@ const AnnouncementAdmin = () => {
   };
 
   const handleEdit = (announcement) => {
-   setCurrentAnnouncement(announcement);
+    setCurrentAnnouncement(announcement);
   
-  let expiryType = 'none';
-  let expiryValue = '';
-  let expiresAt = '';
+    let expiryType = 'none';
+    let expiryValue = '';
+    let expiresAt = '';
   
-  if (announcement.expiresAt) {
-    expiryType = 'custom';
-    // Convert UTC to local time for datetime-local input
-    const date = new Date(announcement.expiresAt);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    expiresAt = `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
-  
+    if (announcement.expiresAt) {
+      expiryType = 'custom';
+      const date = new Date(announcement.expiresAt);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      expiresAt = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
     
     setFormData({
       title: announcement.title,
@@ -291,46 +289,46 @@ const AnnouncementAdmin = () => {
   };
 
   return (
-    <div className="announcement-admin">
-      <div className="admin-header">
+    <div className="annc-admin-main-wrapper">
+      <div className="annc-admin-top-header">
         <h1>Announcement Management</h1>
-        <div className="header-actions">
-          <button className="btn btn-danger" onClick={handleDeleteAll}>
+        <div className="annc-admin-header-actions">
+          <button className="annc-admin-btn annc-admin-btn-danger" onClick={handleDeleteAll}>
             Delete All
           </button>
-          <button className="btn btn-primary" onClick={openCreateModal}>
+          <button className="annc-admin-btn annc-admin-btn-primary" onClick={openCreateModal}>
             <Plus size={20} /> Create Announcement
           </button>
         </div>
       </div>
 
-      {loading && <div className="loading">Loading...</div>}
+      {loading && <div className="annc-admin-loading-state">Loading...</div>}
 
-      <div className="announcements-grid">
+      <div className="annc-admin-cards-grid">
         {announcements.map((announcement) => (
-          <div key={announcement._id} className="announcement-card">
-            <div className="card-header">
+          <div key={announcement._id} className="annc-admin-single-card">
+            <div className="annc-admin-card-top-section">
               <h3>{announcement.title}</h3>
-              <div className="status-badges">
-                <span className={`status-badge ${announcement.isActive ? 'active' : 'inactive'}`}>
+              <div className="annc-admin-status-badges-group">
+                <span className={`annc-admin-status-badge ${announcement.isActive ? 'annc-admin-active' : 'annc-admin-inactive'}`}>
                   {announcement.isActive ? 'Active' : 'Inactive'}
                 </span>
                 {announcement.isExpired && (
-                  <span className="status-badge expired">Expired</span>
+                  <span className="annc-admin-status-badge annc-admin-expired">Expired</span>
                 )}
               </div>
             </div>
 
             {announcement.caption && (
-              <p className="caption">{announcement.caption}</p>
+              <p className="annc-admin-card-caption">{announcement.caption}</p>
             )}
 
-            <div className="card-meta">
-              <div className="meta-item">
+            <div className="annc-admin-card-metadata">
+              <div className="annc-admin-meta-single-item">
                 <strong>Priority:</strong> {announcement.priority}
               </div>
               {announcement.link && (
-                <div className="meta-item">
+                <div className="annc-admin-meta-single-item">
                   <strong>Link:</strong> 
                   <a href={announcement.link} target="_blank" rel="noopener noreferrer">
                     View
@@ -338,47 +336,47 @@ const AnnouncementAdmin = () => {
                 </div>
               )}
               {announcement.expiresAt && (
-                <div className="meta-item expiry-info">
+                <div className="annc-admin-meta-single-item annc-admin-expiry-display">
                   <Calendar size={14} />
                   <strong>Expires:</strong> {formatExpiryDate(announcement.expiresAt)}
                 </div>
               )}
             </div>
 
-            <div className="card-attachments">
+            <div className="annc-admin-card-attachments-list">
               {announcement.hasImage && (
-                <div className="attachment-badge">
+                <div className="annc-admin-attachment-item-badge">
                   <Image size={16} /> {announcement.imageFilename}
                 </div>
               )}
               {announcement.hasDocument && (
-                <div className="attachment-badge">
+                <div className="annc-admin-attachment-item-badge">
                   <FileText size={16} /> {announcement.documentFilename}
                 </div>
               )}
             </div>
 
-            <div className="card-footer">
+            <div className="annc-admin-card-bottom-footer">
               <small>Created: {new Date(announcement.createdAt).toLocaleDateString()}</small>
             </div>
 
-            <div className="card-actions">
+            <div className="annc-admin-card-action-buttons">
               <button 
-                className="btn-icon btn-toggle" 
+                className="annc-admin-btn-icon annc-admin-btn-toggle-visibility" 
                 onClick={() => handleToggleActive(announcement._id)}
                 title={announcement.isActive ? 'Deactivate' : 'Activate'}
               >
                 {announcement.isActive ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
               <button 
-                className="btn-icon btn-edit" 
+                className="annc-admin-btn-icon annc-admin-btn-edit-item" 
                 onClick={() => handleEdit(announcement)}
                 title="Edit"
               >
                 <Pencil size={18} />
               </button>
               <button 
-                className="btn-icon btn-delete" 
+                className="annc-admin-btn-icon annc-admin-btn-delete-item" 
                 onClick={() => handleDelete(announcement._id)}
                 title="Delete"
               >
@@ -390,23 +388,23 @@ const AnnouncementAdmin = () => {
       </div>
 
       {announcements.length === 0 && !loading && (
-        <div className="empty-state">
+        <div className="annc-admin-empty-placeholder">
           <p>No announcements found. Create your first announcement!</p>
         </div>
       )}
 
       {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+        <div className="annc-admin-modal-backdrop" onClick={closeModal}>
+          <div className="annc-admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="annc-admin-modal-top-bar">
               <h2>{editMode ? 'Edit Announcement' : 'Create Announcement'}</h2>
-              <button className="btn-close" onClick={closeModal}>
+              <button className="annc-admin-btn-close-modal" onClick={closeModal}>
                 <X size={24} />
               </button>
             </div>
 
-            <div className="announcement-form">
-              <div className="form-group">
+            <div className="annc-admin-form-container">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="title">Title *</label>
                 <input
                   type="text"
@@ -418,7 +416,7 @@ const AnnouncementAdmin = () => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="caption">Caption</label>
                 <textarea
                   id="caption"
@@ -429,7 +427,7 @@ const AnnouncementAdmin = () => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="link">Link</label>
                 <input
                   type="url"
@@ -440,7 +438,7 @@ const AnnouncementAdmin = () => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="priority">Priority</label>
                 <input
                   type="number"
@@ -452,7 +450,7 @@ const AnnouncementAdmin = () => {
               </div>
 
               {editMode && (
-                <div className="form-group checkbox-group">
+                <div className="annc-admin-form-field-group annc-admin-checkbox-wrapper">
                   <label>
                     <input
                       type="checkbox"
@@ -465,7 +463,7 @@ const AnnouncementAdmin = () => {
                 </div>
               )}
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="expiryType">Expiry Type</label>
                 <select
                   id="expiryType"
@@ -480,7 +478,7 @@ const AnnouncementAdmin = () => {
               </div>
 
               {formData.expiryType === 'duration' && (
-                <div className="form-group">
+                <div className="annc-admin-form-field-group">
                   <label htmlFor="expiryValue">
                     <Clock size={16} /> Duration (Hours)
                   </label>
@@ -497,7 +495,7 @@ const AnnouncementAdmin = () => {
               )}
 
               {formData.expiryType === 'custom' && (
-                <div className="form-group">
+                <div className="annc-admin-form-field-group">
                   <label htmlFor="expiresAt">
                     <Calendar size={16} /> Expiry Date & Time
                   </label>
@@ -512,7 +510,7 @@ const AnnouncementAdmin = () => {
               )}
 
               {editMode && currentAnnouncement?.expiresAt && (
-                <div className="form-group checkbox-group">
+                <div className="annc-admin-form-field-group annc-admin-checkbox-wrapper">
                   <label>
                     <input
                       type="checkbox"
@@ -525,9 +523,9 @@ const AnnouncementAdmin = () => {
                 </div>
               )}
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="image">Image</label>
-                <div className="file-input-wrapper">
+                <div className="annc-admin-file-upload-wrapper">
                   <input
                     type="file"
                     id="image"
@@ -538,7 +536,7 @@ const AnnouncementAdmin = () => {
                   <Upload size={20} />
                 </div>
                 {editMode && currentAnnouncement?.hasImage && (
-                  <label className="checkbox-label">
+                  <label className="annc-admin-checkbox-label-inline">
                     <input
                       type="checkbox"
                       name="removeImage"
@@ -550,9 +548,9 @@ const AnnouncementAdmin = () => {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="annc-admin-form-field-group">
                 <label htmlFor="document">Document</label>
-                <div className="file-input-wrapper">
+                <div className="annc-admin-file-upload-wrapper">
                   <input
                     type="file"
                     id="document"
@@ -563,7 +561,7 @@ const AnnouncementAdmin = () => {
                   <Upload size={20} />
                 </div>
                 {editMode && currentAnnouncement?.hasDocument && (
-                  <label className="checkbox-label">
+                  <label className="annc-admin-checkbox-label-inline">
                     <input
                       type="checkbox"
                       name="removeDocument"
@@ -575,11 +573,11 @@ const AnnouncementAdmin = () => {
                 )}
               </div>
 
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
+              <div className="annc-admin-form-actions-bar">
+                <button type="button" className="annc-admin-btn annc-admin-btn-secondary" onClick={closeModal}>
                   Cancel
                 </button>
-                <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+                <button type="button" className="annc-admin-btn annc-admin-btn-primary" onClick={handleSubmit} disabled={loading}>
                   {loading ? 'Saving...' : (editMode ? 'Update' : 'Create')}
                 </button>
               </div>

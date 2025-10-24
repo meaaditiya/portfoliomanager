@@ -35,6 +35,7 @@ const Reply= require('./models/reply');
 const SocialMediaEmbed= require('./models/socialMediaEmbedSchema');
 const Stream=require('./models/streamSchema');
 const Announcement= require('./models/announcementSchema');
+const Query = require('./models/querySchema');
 const nodemailer = require('nodemailer');
 
 
@@ -1738,161 +1739,196 @@ const getConfirmationEmailTemplate = (name, message) => {
       box-sizing: border-box;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #202124;
-      background-color: #f8f9fa;
-      padding: 20px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      line-height: 1.4;
+      color: #2c2c2c;
+      padding: 30px 20px;
     }
     .email-container {
-      max-width: 600px;
+      max-width: 580px;
       margin: 0 auto;
-      background: #ffffff;
-      border-radius: 8px;
-      overflow: hidden;
     }
     .header {
       text-align: center;
-      padding: 30px 20px 20px;
-      background-color: #ffffff;
+      padding: 20px 0 15px;
+      border-bottom: 1px solid #3a3a3a;
+      margin-bottom: 25px;
     }
     .logo {
       max-width: 65px;
       height: 65px;
-      margin-bottom: 20px;
-      box-shadow: rgba(10px,10px, 10px,10px);
+      margin-bottom: 15px;
+      filter: grayscale(20%);
     }
     .header h1 {
-      font-size: 22px;
-      font-weight: 500;
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 400;
+      color: #2c2c2c;
+      margin-bottom: 5px;
+      letter-spacing: 1px;
     }
     .header p {
       font-size: 14px;
-      color: #3a3a3a;
+      color: #5a5a5a;
+      font-style: italic;
     }
     .content {
-      padding: 20px 30px;
+      padding: 15px 0;
     }
     .greeting {
-      font-size: 16px;
-      color: #1a1a1a;
-      margin-bottom: 20px;
+      font-size: 17px;
+      color: #2c2c2c;
+      margin-bottom: 12px;
+      font-weight: 500;
     }
     .main-text {
       font-size: 15px;
       color: #3a3a3a;
-      margin-bottom: 20px;
-      line-height: 1.6;
+      margin-bottom: 15px;
+      line-height: 1.5;
     }
     .message-preview {
-      background-color: #f8f9fa;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
+      padding: 18px;
+      margin: 20px 0;
+     
+      background: #fafafa;
     }
     .message-preview h3 {
-      font-size: 14px;
-      margin-bottom: 12px;
-      font-weight: 500;
-      color: #1a1a1a;
+      font-size: 11px;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #2c2c2c;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
     }
     .message-text {
       font-style: italic;
-      line-height: 1.6;
+      line-height: 1.5;
       color: #3a3a3a;
       font-size: 14px;
     }
     .info-section {
-      padding: 20px;
-      margin: 25px 0;
+      padding: 15px 0;
       text-align: center;
     }
     .info-section h4 {
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      color: #2c2c2c;
+      margin-bottom: 6px;
       font-weight: 500;
       font-size: 15px;
+      letter-spacing: 0.5px;
     }
     .info-section p {
-      color: #3a3a3a;
+      color: #5a5a5a;
       font-size: 14px;
+      font-style: italic;
     }
     .contact-info {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .contact-info p {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #3a3a3a;
       font-size: 14px;
+      line-height: 1.4;
     }
     .contact-info a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .contact-info a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
-    .visit-site {
-      display: inline-block;
-      padding: 10px 24px;
-      background-color: #1a73e8;
-      color: #ffffff !important;
-      text-decoration: none !important;
-      border-radius: 4px;
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .visit-site {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 36px;
+  background: linear-gradient(180deg, #444444 0%, #1f1f1f 100%);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border: none !important;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.visit-site:hover {
+  background: linear-gradient(180deg, #555555 0%, #2b2b2b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
     .visit-site:hover {
-      background-color: #1557b0;
+      background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(58, 58, 58, 0.35);
     }
     .email-footer {
-      background-color: #f8f9fa;
-      padding: 25px 30px;
+      padding: 20px 0 12px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .email-footer p {
-      color: #5f6368;
+      color: #6a6a6a;
       font-size: 12px;
-      margin-bottom: 10px;
-      line-height: 1.5;
+      margin-bottom: 8px;
+      line-height: 1.3;
     }
     .email-footer a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
     }
     .email-footer a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
     .social-links {
-      margin: 15px 0;
+      margin: 12px 0 8px;
       font-size: 13px;
     }
     .social-links a {
-      color: #1a73e8;
+      color: #5a5a5a;
       text-decoration: none;
       margin: 0 8px;
+      font-weight: 500;
+      border-bottom: 1px solid #5a5a5a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .social-links a:hover {
-      text-decoration: underline;
+      color: #3a3a3a;
+      border-bottom-color: #3a3a3a;
+    }
+    strong {
+      color: #2c2c2c;
+      font-weight: 600;
     }
     @media (max-width: 600px) {
-      .email-container {
-        margin: -20px;
-      }
-      .content, .contact-info, .email-footer {
-        padding: 15px;
+      body {
+        padding: 20px 12px;
       }
       .header h1 {
-        font-size: 20px;
+        font-size: 24px;
       }
       .logo {
-        max-width: 150px;
+        max-width: 55px;
+        height: 55px;
       }
     }
   </style>
@@ -2204,161 +2240,198 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       box-sizing: border-box;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #202124;
-      background-color: #f8f9fa;
-      padding: 20px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      line-height: 1.4;
+      color: #2c2c2c;
+      padding: 30px 20px;
     }
     .email-container {
-      max-width: 600px;
+      max-width: 580px;
       margin: 0 auto;
-      background: #ffffff;
-      border-radius: 8px;
-      overflow: hidden;
     }
     .header {
       text-align: center;
-      padding: 30px 20px 20px;
-      background-color: #ffffff;
+      padding: 20px 0 15px;
+      border-bottom: 1px solid #3a3a3a;
+      margin-bottom: 25px;
     }
     .logo {
       max-width: 65px;
       height: 65px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+      filter: grayscale(20%);
     }
     .header h1 {
-      font-size: 22px;
-      font-weight: 500;
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 400;
+      color: #2c2c2c;
+      margin-bottom: 5px;
+      letter-spacing: 1px;
     }
     .header p {
       font-size: 14px;
-      color: #3a3a3a;
+      color: #5a5a5a;
+      font-style: italic;
     }
     .content {
-      padding: 20px 30px;
+      padding: 15px 0;
     }
     .greeting {
-      font-size: 16px;
-      color: #1a1a1a;
-      margin-bottom: 20px;
+      font-size: 17px;
+      color: #2c2c2c;
+      margin-bottom: 12px;
+      font-weight: 500;
     }
     .main-text {
       font-size: 15px;
       color: #3a3a3a;
-      margin-bottom: 20px;
-      line-height: 1.6;
+      margin-bottom: 15px;
+      line-height: 1.5;
     }
     .conversation-section {
-      margin: 25px 0;
+      margin: 20px 0;
     }
-    .message-block {
-      background-color: #f8f9fa;
-      padding: 20px;
-      margin: 15px 0;
-      border-radius: 4px;
-    }
-    .message-header {
-      font-size: 14px;
-      margin-bottom: 12px;
-      font-weight: 500;
-      color: #1a1a1a;
+    .message-label {
+      font-size: 11px;
+      margin-bottom: 8px;
+      margin-top: 15px;
+      font-weight: 600;
+      color: #2c2c2c;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+     
+      padding-bottom: 6px;
     }
     .message-content {
-      line-height: 1.6;
+      padding: 12px 0 12px 15px;
+     
+      background: #fafafa;
+      line-height: 1.5;
       color: #3a3a3a;
       font-size: 14px;
+      margin-bottom: 10px;
     }
     .signature-section {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .signature {
-      color: #1a1a1a;
+      color: #2c2c2c;
       font-size: 14px;
     }
     .signature strong {
-      font-weight: 500;
+      font-weight: 600;
+      color: #2c2c2c;
     }
     .title {
-      color: #3a3a3a;
+      color: #5a5a5a;
       margin-top: 5px;
       font-size: 14px;
     }
     .contact-info {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .contact-info p {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #3a3a3a;
       font-size: 14px;
+      line-height: 1.4;
     }
     .contact-info a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .contact-info a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
-    .visit-site {
-      display: inline-block;
-      padding: 10px 24px;
-      background-color: #1a73e8;
-      color: #ffffff !important;
-      text-decoration: none !important;
-      border-radius: 4px;
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .visit-site {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 36px;
+  background: linear-gradient(180deg, #444444 0%, #1f1f1f 100%);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border: none !important;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.visit-site:hover {
+  background: linear-gradient(180deg, #555555 0%, #2b2b2b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
     .visit-site:hover {
-      background-color: #1557b0;
+      background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(58, 58, 58, 0.35);
     }
     .email-footer {
-      background-color: #f8f9fa;
-      padding: 25px 30px;
+      padding: 20px 0 12px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .email-footer p {
-      color: #5f6368;
+      color: #6a6a6a;
       font-size: 12px;
-      margin-bottom: 10px;
-      line-height: 1.5;
+      margin-bottom: 8px;
+      line-height: 1.3;
     }
     .email-footer a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
     }
     .email-footer a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
     .social-links {
-      margin: 15px 0;
+      margin: 12px 0 8px;
       font-size: 13px;
     }
     .social-links a {
-      color: #1a73e8;
+      color: #5a5a5a;
       text-decoration: none;
       margin: 0 8px;
+      font-weight: 500;
+      border-bottom: 1px solid #5a5a5a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .social-links a:hover {
-      text-decoration: underline;
+      color: #3a3a3a;
+      border-bottom-color: #3a3a3a;
+    }
+    strong {
+      color: #2c2c2c;
+      font-weight: 600;
     }
     @media (max-width: 600px) {
-      .email-container {
-        margin: -20px;
-      }
-      .content, .contact-info, .email-footer, .signature-section {
-        padding: 15px;
+      body {
+        padding: 20px 12px;
       }
       .header h1 {
-        font-size: 20px;
+        font-size: 24px;
       }
       .logo {
         max-width: 55px;
@@ -2385,15 +2458,11 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       </p>
       
       <div class="conversation-section">
-        <div class="message-block">
-          <div class="message-header">Your Original Message:</div>
-          <div class="message-content">${originalMessage}</div>
-        </div>
+        <div class="message-label">Your Original Message:</div>
+        <div class="message-content">${originalMessage}</div>
         
-        <div class="message-block">
-          <div class="message-header">My Response:</div>
-          <div class="message-content">${replyContent}</div>
-        </div>
+        <div class="message-label">My Response:</div>
+        <div class="message-content">${replyContent}</div>
       </div>
       
       <p class="main-text">
@@ -9270,6 +9339,299 @@ app.delete('/api/admin/announcement', authenticateToken, async (req, res) => {
   }
 });
 
+
+// POST - Create a new query (Public route - no authentication needed)
+app.post('/api/queries/create', async (req, res) => {
+  try {
+    const { name, email, queryText } = req.body;
+
+    // Validation
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Name is required' });
+    }
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    if (!queryText || !queryText.trim()) {
+      return res.status(400).json({ message: 'Query text is required' });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // Generate unique ticket ID
+    const ticketId = await Query.generateTicketId();
+
+    // Create query
+    const query = new Query({
+      ticketId,
+      name: name.trim(),
+      email: email.trim(),
+      queryText: queryText.trim()
+    });
+
+    await query.save();
+
+    res.status(201).json({
+      message: 'Query submitted successfully',
+      ticketId: query.ticketId,
+      status: query.status
+    });
+  } catch (error) {
+    console.error('Error creating query:', error);
+    res.status(500).json({ message: 'Failed to submit query. Please try again.' });
+  }
+});
+
+// GET - Check query status and reply by ticket ID (Public route)
+app.get('/api/queries/check/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+
+    // Validate ticket ID format (6 digits)
+    if (!/^QRY\d{12}$/.test(ticketId)) {
+      return res.status(400).json({ message: 'Invalid ticket ID format. Must be 15 digits.' });
+    }
+
+    const query = await Query.findOne({ ticketId })
+      .select('ticketId name email queryText status adminReply repliedAt createdAt');
+
+    if (!query) {
+      return res.status(404).json({ message: 'Query not found with this ticket ID' });
+    }
+
+    // Check if admin has replied
+    if (!query.adminReply) {
+      return res.status(200).json({
+        ticketId: query.ticketId,
+        name: query.name,
+        email: query.email,
+        queryText: query.queryText,
+        status: query.status,
+        submittedAt: query.createdAt,
+        message: 'No reply to your query as of now'
+      });
+    }
+
+    // Return query with reply
+    res.status(200).json({
+      ticketId: query.ticketId,
+      name: query.name,
+      email: query.email,
+      queryText: query.queryText,
+      status: query.status,
+      adminReply: query.adminReply,
+      repliedAt: query.repliedAt,
+      submittedAt: query.createdAt
+    });
+  } catch (error) {
+    console.error('Error checking query:', error);
+    res.status(500).json({ message: 'Failed to check query status' });
+  }
+});
+
+// ============================================
+// ADMIN ROUTES - Manage Queries
+// ============================================
+
+// GET - Get all queries (Admin only)
+app.get('/api/admin/queries', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { status, page = 1, limit = 20 } = req.query;
+    const query = {};
+
+    // Filter by status if provided
+    if (status && ['pending', 'replied', 'closed'].includes(status)) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const queries = await Query.find(query)
+      .populate('repliedBy', 'username email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Query.countDocuments(query);
+
+    res.status(200).json({
+      queries,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalQueries: total,
+        limit: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching queries:', error);
+    res.status(500).json({ message: 'Failed to fetch queries' });
+  }
+});
+
+// GET - Get single query by ticket ID (Admin only)
+app.get('/api/admin/queries/:ticketId', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { ticketId } = req.params;
+
+    const query = await Query.findOne({ ticketId })
+      .populate('repliedBy', 'username email');
+
+    if (!query) {
+      return res.status(404).json({ message: 'Query not found' });
+    }
+
+    res.status(200).json({ query });
+  } catch (error) {
+    console.error('Error fetching query:', error);
+    res.status(500).json({ message: 'Failed to fetch query' });
+  }
+});
+
+// PUT - Add/Update reply to query (Admin only)
+app.put('/api/admin/queries/:ticketId/reply', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { ticketId } = req.params;
+    const { adminReply } = req.body;
+
+    // Validation
+    if (!adminReply || !adminReply.trim()) {
+      return res.status(400).json({ message: 'Reply text is required' });
+    }
+
+    const query = await Query.findOne({ ticketId });
+
+    if (!query) {
+      return res.status(404).json({ message: 'Query not found' });
+    }
+
+    // Update query with reply
+    query.adminReply = adminReply.trim();
+    query.repliedBy = req.user.admin_id;
+    query.repliedAt = new Date();
+    query.status = 'replied';
+
+    await query.save();
+
+    const updatedQuery = await Query.findOne({ ticketId })
+      .populate('repliedBy', 'username email');
+
+    res.status(200).json({
+      message: 'Reply added successfully',
+      query: updatedQuery
+    });
+  } catch (error) {
+    console.error('Error adding reply:', error);
+    res.status(500).json({ message: 'Failed to add reply' });
+  }
+});
+
+// PUT - Update query status (Admin only)
+app.put('/api/admin/queries/:ticketId/status', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { ticketId } = req.params;
+    const { status } = req.body;
+
+    // Validation
+    if (!['pending', 'replied', 'closed'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be: pending, replied, or closed' });
+    }
+
+    const query = await Query.findOneAndUpdate(
+      { ticketId },
+      { status },
+      { new: true }
+    ).populate('repliedBy', 'username email');
+
+    if (!query) {
+      return res.status(404).json({ message: 'Query not found' });
+    }
+
+    res.status(200).json({
+      message: 'Status updated successfully',
+      query
+    });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ message: 'Failed to update status' });
+  }
+});
+
+// DELETE - Delete query (Admin only)
+app.delete('/api/admin/queries/:ticketId', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { ticketId } = req.params;
+
+    const query = await Query.findOneAndDelete({ ticketId });
+
+    if (!query) {
+      return res.status(404).json({ message: 'Query not found' });
+    }
+
+    res.status(200).json({
+      message: 'Query deleted successfully',
+      ticketId: query.ticketId
+    });
+  } catch (error) {
+    console.error('Error deleting query:', error);
+    res.status(500).json({ message: 'Failed to delete query' });
+  }
+});
+
+// DELETE - Bulk delete queries (Admin only)
+app.post('/api/admin/queries/bulk-delete', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+
+    const { ticketIds } = req.body;
+
+    if (!Array.isArray(ticketIds) || ticketIds.length === 0) {
+      return res.status(400).json({ message: 'Ticket IDs array is required' });
+    }
+
+    const result = await Query.deleteMany({ ticketId: { $in: ticketIds } });
+
+    res.status(200).json({
+      message: `${result.deletedCount} queries deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error bulk deleting queries:', error);
+    res.status(500).json({ message: 'Failed to delete queries' });
+  }
+});
 
 // Start server
 app.listen(PORT, () => {

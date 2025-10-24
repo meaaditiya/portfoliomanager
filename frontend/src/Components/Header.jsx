@@ -40,6 +40,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     {name: 'Audio messages' , path: '/audiomessage'},
     {name: 'Stream',path:'/stream'},
     {name: 'Announcement', path: '/announcement'},
+    {name: 'Query', path: '/query'},
     
   ];
 
