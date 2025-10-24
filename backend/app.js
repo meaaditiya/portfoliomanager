@@ -1738,161 +1738,196 @@ const getConfirmationEmailTemplate = (name, message) => {
       box-sizing: border-box;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #202124;
-      background-color: #f8f9fa;
-      padding: 20px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      line-height: 1.4;
+      color: #2c2c2c;
+      padding: 30px 20px;
     }
     .email-container {
-      max-width: 600px;
+      max-width: 580px;
       margin: 0 auto;
-      background: #ffffff;
-      border-radius: 8px;
-      overflow: hidden;
     }
     .header {
       text-align: center;
-      padding: 30px 20px 20px;
-      background-color: #ffffff;
+      padding: 20px 0 15px;
+      border-bottom: 1px solid #3a3a3a;
+      margin-bottom: 25px;
     }
     .logo {
       max-width: 65px;
       height: 65px;
-      margin-bottom: 20px;
-      box-shadow: rgba(10px,10px, 10px,10px);
+      margin-bottom: 15px;
+      filter: grayscale(20%);
     }
     .header h1 {
-      font-size: 22px;
-      font-weight: 500;
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 400;
+      color: #2c2c2c;
+      margin-bottom: 5px;
+      letter-spacing: 1px;
     }
     .header p {
       font-size: 14px;
-      color: #3a3a3a;
+      color: #5a5a5a;
+      font-style: italic;
     }
     .content {
-      padding: 20px 30px;
+      padding: 15px 0;
     }
     .greeting {
-      font-size: 16px;
-      color: #1a1a1a;
-      margin-bottom: 20px;
+      font-size: 17px;
+      color: #2c2c2c;
+      margin-bottom: 12px;
+      font-weight: 500;
     }
     .main-text {
       font-size: 15px;
       color: #3a3a3a;
-      margin-bottom: 20px;
-      line-height: 1.6;
+      margin-bottom: 15px;
+      line-height: 1.5;
     }
     .message-preview {
-      background-color: #f8f9fa;
-      padding: 20px;
-      margin: 25px 0;
-      border-radius: 4px;
+      padding: 18px;
+      margin: 20px 0;
+     
+      background: #fafafa;
     }
     .message-preview h3 {
-      font-size: 14px;
-      margin-bottom: 12px;
-      font-weight: 500;
-      color: #1a1a1a;
+      font-size: 11px;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #2c2c2c;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
     }
     .message-text {
       font-style: italic;
-      line-height: 1.6;
+      line-height: 1.5;
       color: #3a3a3a;
       font-size: 14px;
     }
     .info-section {
-      padding: 20px;
-      margin: 25px 0;
+      padding: 15px 0;
       text-align: center;
     }
     .info-section h4 {
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      color: #2c2c2c;
+      margin-bottom: 6px;
       font-weight: 500;
       font-size: 15px;
+      letter-spacing: 0.5px;
     }
     .info-section p {
-      color: #3a3a3a;
+      color: #5a5a5a;
       font-size: 14px;
+      font-style: italic;
     }
     .contact-info {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .contact-info p {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #3a3a3a;
       font-size: 14px;
+      line-height: 1.4;
     }
     .contact-info a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .contact-info a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
-    .visit-site {
-      display: inline-block;
-      padding: 10px 24px;
-      background-color: #1a73e8;
-      color: #ffffff !important;
-      text-decoration: none !important;
-      border-radius: 4px;
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .visit-site {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 36px;
+  background: linear-gradient(180deg, #444444 0%, #1f1f1f 100%);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border: none !important;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.visit-site:hover {
+  background: linear-gradient(180deg, #555555 0%, #2b2b2b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
     .visit-site:hover {
-      background-color: #1557b0;
+      background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(58, 58, 58, 0.35);
     }
     .email-footer {
-      background-color: #f8f9fa;
-      padding: 25px 30px;
+      padding: 20px 0 12px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .email-footer p {
-      color: #5f6368;
+      color: #6a6a6a;
       font-size: 12px;
-      margin-bottom: 10px;
-      line-height: 1.5;
+      margin-bottom: 8px;
+      line-height: 1.3;
     }
     .email-footer a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
     }
     .email-footer a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
     .social-links {
-      margin: 15px 0;
+      margin: 12px 0 8px;
       font-size: 13px;
     }
     .social-links a {
-      color: #1a73e8;
+      color: #5a5a5a;
       text-decoration: none;
       margin: 0 8px;
+      font-weight: 500;
+      border-bottom: 1px solid #5a5a5a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .social-links a:hover {
-      text-decoration: underline;
+      color: #3a3a3a;
+      border-bottom-color: #3a3a3a;
+    }
+    strong {
+      color: #2c2c2c;
+      font-weight: 600;
     }
     @media (max-width: 600px) {
-      .email-container {
-        margin: -20px;
-      }
-      .content, .contact-info, .email-footer {
-        padding: 15px;
+      body {
+        padding: 20px 12px;
       }
       .header h1 {
-        font-size: 20px;
+        font-size: 24px;
       }
       .logo {
-        max-width: 150px;
+        max-width: 55px;
+        height: 55px;
       }
     }
   </style>
@@ -2204,161 +2239,198 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       box-sizing: border-box;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #202124;
-      background-color: #f8f9fa;
-      padding: 20px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      line-height: 1.4;
+      color: #2c2c2c;
+      padding: 30px 20px;
     }
     .email-container {
-      max-width: 600px;
+      max-width: 580px;
       margin: 0 auto;
-      background: #ffffff;
-      border-radius: 8px;
-      overflow: hidden;
     }
     .header {
       text-align: center;
-      padding: 30px 20px 20px;
-      background-color: #ffffff;
+      padding: 20px 0 15px;
+      border-bottom: 1px solid #3a3a3a;
+      margin-bottom: 25px;
     }
     .logo {
       max-width: 65px;
       height: 65px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
+      filter: grayscale(20%);
     }
     .header h1 {
-      font-size: 22px;
-      font-weight: 500;
-      color: #1a1a1a;
-      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 400;
+      color: #2c2c2c;
+      margin-bottom: 5px;
+      letter-spacing: 1px;
     }
     .header p {
       font-size: 14px;
-      color: #3a3a3a;
+      color: #5a5a5a;
+      font-style: italic;
     }
     .content {
-      padding: 20px 30px;
+      padding: 15px 0;
     }
     .greeting {
-      font-size: 16px;
-      color: #1a1a1a;
-      margin-bottom: 20px;
+      font-size: 17px;
+      color: #2c2c2c;
+      margin-bottom: 12px;
+      font-weight: 500;
     }
     .main-text {
       font-size: 15px;
       color: #3a3a3a;
-      margin-bottom: 20px;
-      line-height: 1.6;
+      margin-bottom: 15px;
+      line-height: 1.5;
     }
     .conversation-section {
-      margin: 25px 0;
+      margin: 20px 0;
     }
-    .message-block {
-      background-color: #f8f9fa;
-      padding: 20px;
-      margin: 15px 0;
-      border-radius: 4px;
-    }
-    .message-header {
-      font-size: 14px;
-      margin-bottom: 12px;
-      font-weight: 500;
-      color: #1a1a1a;
+    .message-label {
+      font-size: 11px;
+      margin-bottom: 8px;
+      margin-top: 15px;
+      font-weight: 600;
+      color: #2c2c2c;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+     
+      padding-bottom: 6px;
     }
     .message-content {
-      line-height: 1.6;
+      padding: 12px 0 12px 15px;
+     
+      background: #fafafa;
+      line-height: 1.5;
       color: #3a3a3a;
       font-size: 14px;
+      margin-bottom: 10px;
     }
     .signature-section {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .signature {
-      color: #1a1a1a;
+      color: #2c2c2c;
       font-size: 14px;
     }
     .signature strong {
-      font-weight: 500;
+      font-weight: 600;
+      color: #2c2c2c;
     }
     .title {
-      color: #3a3a3a;
+      color: #5a5a5a;
       margin-top: 5px;
       font-size: 14px;
     }
     .contact-info {
-      padding: 25px 30px;
+      padding: 20px 0 15px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .contact-info p {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       color: #3a3a3a;
       font-size: 14px;
+      line-height: 1.4;
     }
     .contact-info a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .contact-info a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
-    .visit-site {
-      display: inline-block;
-      padding: 10px 24px;
-      background-color: #1a73e8;
-      color: #ffffff !important;
-      text-decoration: none !important;
-      border-radius: 4px;
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
+  .visit-site {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 36px;
+  background: linear-gradient(180deg, #444444 0%, #1f1f1f 100%);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  border: none !important;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.visit-site:hover {
+  background: linear-gradient(180deg, #555555 0%, #2b2b2b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
     .visit-site:hover {
-      background-color: #1557b0;
+      background: linear-gradient(135deg, #3a3a3a 0%, #1c1c1c 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(58, 58, 58, 0.35);
     }
     .email-footer {
-      background-color: #f8f9fa;
-      padding: 25px 30px;
+      padding: 20px 0 12px;
       text-align: center;
-      border-top: 1px solid #e8eaed;
+      border-top: 1px solid #d0d0d0;
+      margin-top: 25px;
     }
     .email-footer p {
-      color: #5f6368;
+      color: #6a6a6a;
       font-size: 12px;
-      margin-bottom: 10px;
-      line-height: 1.5;
+      margin-bottom: 8px;
+      line-height: 1.3;
     }
     .email-footer a {
-      color: #1a73e8;
+      color: #4a4a4a;
       text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid #4a4a4a;
+      padding-bottom: 1px;
     }
     .email-footer a:hover {
-      text-decoration: underline;
+      color: #2c2c2c;
+      border-bottom-color: #2c2c2c;
     }
     .social-links {
-      margin: 15px 0;
+      margin: 12px 0 8px;
       font-size: 13px;
     }
     .social-links a {
-      color: #1a73e8;
+      color: #5a5a5a;
       text-decoration: none;
       margin: 0 8px;
+      font-weight: 500;
+      border-bottom: 1px solid #5a5a5a;
+      padding-bottom: 1px;
+      transition: all 0.2s;
     }
     .social-links a:hover {
-      text-decoration: underline;
+      color: #3a3a3a;
+      border-bottom-color: #3a3a3a;
+    }
+    strong {
+      color: #2c2c2c;
+      font-weight: 600;
     }
     @media (max-width: 600px) {
-      .email-container {
-        margin: -20px;
-      }
-      .content, .contact-info, .email-footer, .signature-section {
-        padding: 15px;
+      body {
+        padding: 20px 12px;
       }
       .header h1 {
-        font-size: 20px;
+        font-size: 24px;
       }
       .logo {
         max-width: 55px;
@@ -2385,15 +2457,11 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       </p>
       
       <div class="conversation-section">
-        <div class="message-block">
-          <div class="message-header">Your Original Message:</div>
-          <div class="message-content">${originalMessage}</div>
-        </div>
+        <div class="message-label">Your Original Message:</div>
+        <div class="message-content">${originalMessage}</div>
         
-        <div class="message-block">
-          <div class="message-header">My Response:</div>
-          <div class="message-content">${replyContent}</div>
-        </div>
+        <div class="message-label">My Response:</div>
+        <div class="message-content">${replyContent}</div>
       </div>
       
       <p class="main-text">
