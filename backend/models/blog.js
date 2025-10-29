@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-// Updated Blog Schema with Video Support
+
+// Updated Blog Schema with Video Support, Reports, and Read Tracking
 const blogSchema = new mongoose.Schema({
     title: { 
       type: String, 
@@ -71,7 +72,6 @@ const blogSchema = new mongoose.Schema({
         type: Boolean,
         default: false
       },
-      // Unique identifier to reference in content
       embedId: {
         type: String,
         required: true,
@@ -131,10 +131,38 @@ const blogSchema = new mongoose.Schema({
     commentsCount: {
       type: Number,
       default: 0
+    },
+    // NEW: Read tracking
+    totalReads: {
+      type: Number,
+      default: 0
+    },
+    // NEW: Reports array
+    reports: [{
+      userEmail: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true
+      },
+      reason: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    // NEW: Total reports count
+    totalReports: {
+      type: Number,
+      default: 0
     }
 });
 
-// Updated pre-save middleware to handle videos
+// Updated pre-save middleware
 blogSchema.pre('save', function(next) {
   if (this.isModified('title')) {
     this.slug = this.title
@@ -163,6 +191,11 @@ blogSchema.pre('save', function(next) {
   
   if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
     this.publishedAt = new Date();
+  }
+  
+  // Update totalReports count when reports are modified
+  if (this.isModified('reports')) {
+    this.totalReports = this.reports.length;
   }
   
   this.updatedAt = new Date();

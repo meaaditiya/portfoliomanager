@@ -719,7 +719,7 @@ app.get('/api/blogs', async (req, res) => {
   }
 });
   
-  // Get a single blog post (updated to process videos)
+ // UPDATED: Get a single blog post (with read tracking)
 app.get('/api/blogs/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -735,7 +735,12 @@ app.get('/api/blogs/:identifier', async (req, res) => {
       query.status = 'published';
     }
     
-    const blog = await Blog.findOne(query)
+    // Increment totalReads and get the blog
+    const blog = await Blog.findOneAndUpdate(
+      query,
+      { $inc: { totalReads: 1 } },
+      { new: true }
+    )
       .populate('author', 'name email')
       .exec();
     
@@ -746,6 +751,9 @@ app.get('/api/blogs/:identifier', async (req, res) => {
     const blogObj = blog.toObject();
     blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
     
+    // Don't send full reports array to clients for privacy
+    delete blogObj.reports;
+    
     res.json(blogObj);
   } catch (error) {
     console.error('Error fetching blog:', error);
@@ -753,6 +761,289 @@ app.get('/api/blogs/:identifier', async (req, res) => {
   }
 });
 
+// NEW: Report a blog post (Public route)
+app.post('/api/blogs/:identifier/report', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const { userEmail, reason } = req.body;
+    
+    // Validation
+    if (!userEmail || !reason) {
+      return res.status(400).json({ 
+        message: 'User email and reason are required' 
+      });
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userEmail)) {
+      return res.status(400).json({ 
+        message: 'Invalid email format' 
+      });
+    }
+    
+    // Reason length validation
+    if (reason.trim().length < 10 || reason.trim().length > 500) {
+      return res.status(400).json({ 
+        message: 'Reason must be between 10 and 500 characters' 
+      });
+    }
+    
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    // Only published blogs can be reported
+    query.status = 'published';
+    
+    const blog = await Blog.findOne(query);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Check if user has already reported this blog
+    const existingReport = blog.reports.find(
+      report => report.userEmail.toLowerCase() === userEmail.toLowerCase()
+    );
+    
+    if (existingReport) {
+      return res.status(400).json({ 
+        message: 'You have already reported this blog post' 
+      });
+    }
+    
+    // Add the report
+    blog.reports.push({
+      userEmail: userEmail.toLowerCase().trim(),
+      reason: reason.trim(),
+      timestamp: new Date()
+    });
+    
+    await blog.save();
+    
+    res.status(201).json({ 
+      message: 'Report submitted successfully',
+      totalReports: blog.totalReports
+    });
+  } catch (error) {
+    console.error('Error reporting blog:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Get reports for a specific blog (Admin only)
+app.get('/api/blogs/:identifier/reports', authenticateToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const blog = await Blog.findOne(query)
+      .select('title slug reports totalReports')
+      .exec();
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    res.json({
+      blogId: blog._id,
+      title: blog.title,
+      slug: blog.slug,
+      totalReports: blog.totalReports,
+      reports: blog.reports
+    });
+  } catch (error) {
+    console.error('Error fetching blog reports:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Delete a specific report (Admin only)
+app.delete('/api/blogs/:identifier/reports/:reportId', authenticateToken, async (req, res) => {
+  try {
+    const { identifier, reportId } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const blog = await Blog.findOne(query);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    const reportIndex = blog.reports.findIndex(
+      report => report._id.toString() === reportId
+    );
+    
+    if (reportIndex === -1) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+    
+    blog.reports.splice(reportIndex, 1);
+    await blog.save();
+    
+    res.json({ 
+      message: 'Report deleted successfully',
+      totalReports: blog.totalReports
+    });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Clear all reports for a specific blog (Admin only)
+app.delete('/api/blogs/:identifier/reports', authenticateToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const blog = await Blog.findOne(query);
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    blog.reports = [];
+    await blog.save();
+    
+    res.json({ 
+      message: 'All reports cleared successfully',
+      totalReports: blog.totalReports
+    });
+  } catch (error) {
+    console.error('Error clearing reports:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Get all blogs with reports (Admin only)
+app.get('/api/blogs/reports/all', authenticateToken, async (req, res) => {
+  try {
+    const blogs = await Blog.find({ totalReports: { $gt: 0 } })
+      .select('title slug totalReports reports status createdAt')
+      .populate('author', 'name email')
+      .sort('-totalReports')
+      .exec();
+    
+    res.json(blogs);
+  } catch (error) {
+    console.error('Error fetching blogs with reports:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Get blog statistics (Admin only)
+app.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const blog = await Blog.findOne(query)
+      .select('title slug totalReads totalReports reactionCounts commentsCount status publishedAt createdAt')
+      .populate('author', 'name email')
+      .exec();
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    res.json({
+      blogId: blog._id,
+      title: blog.title,
+      slug: blog.slug,
+      status: blog.status,
+      author: blog.author,
+      publishedAt: blog.publishedAt,
+      createdAt: blog.createdAt,
+      stats: {
+        totalReads: blog.totalReads,
+        totalReports: blog.totalReports,
+        likes: blog.reactionCounts.likes,
+        dislikes: blog.reactionCounts.dislikes,
+        commentsCount: blog.commentsCount
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching blog stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW: Get overall blog statistics (Admin only)
+app.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
+  try {
+    const totalBlogs = await Blog.countDocuments();
+    const publishedBlogs = await Blog.countDocuments({ status: 'published' });
+    const draftBlogs = await Blog.countDocuments({ status: 'draft' });
+    const blogsWithReports = await Blog.countDocuments({ totalReports: { $gt: 0 } });
+    
+    const totalReadsResult = await Blog.aggregate([
+      { $group: { _id: null, totalReads: { $sum: '$totalReads' } } }
+    ]);
+    
+    const totalReportsResult = await Blog.aggregate([
+      { $group: { _id: null, totalReports: { $sum: '$totalReports' } } }
+    ]);
+    
+    const totalReactionsResult = await Blog.aggregate([
+      { 
+        $group: { 
+          _id: null, 
+          totalLikes: { $sum: '$reactionCounts.likes' },
+          totalDislikes: { $sum: '$reactionCounts.dislikes' }
+        } 
+      }
+    ]);
+    
+    const mostReadBlogs = await Blog.find({ status: 'published' })
+      .select('title slug totalReads publishedAt')
+      .sort('-totalReads')
+      .limit(5)
+      .exec();
+    
+    const mostReportedBlogs = await Blog.find({ totalReports: { $gt: 0 } })
+      .select('title slug totalReports status')
+      .sort('-totalReports')
+      .limit(5)
+      .exec();
+    
+    res.json({
+      overview: {
+        totalBlogs,
+        publishedBlogs,
+        draftBlogs,
+        blogsWithReports,
+        totalReads: totalReadsResult[0]?.totalReads || 0,
+        totalReports: totalReportsResult[0]?.totalReports || 0,
+        totalLikes: totalReactionsResult[0]?.totalLikes || 0,
+        totalDislikes: totalReactionsResult[0]?.totalDislikes || 0
+      },
+      mostReadBlogs,
+      mostReportedBlogs
+    });
+  } catch (error) {
+    console.error('Error fetching blog overview stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // Update a blog post (updated to handle videos)
 app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
   try {

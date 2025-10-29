@@ -1,7 +1,7 @@
 // src/components/BlogAnalytics.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash, FaReply, FaHeart, FaHeartBroken } from 'react-icons/fa';
+import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash, FaReply, FaHeart, FaHeartBroken, FaFlag, FaChartBar, FaEye, FaExclamationTriangle } from 'react-icons/fa';
 import './Analytics.css';
 
 const BlogAnalytics = ({ blogId }) => {
@@ -33,6 +33,27 @@ const BlogAnalytics = ({ blogId }) => {
   // Comment reactions state
   const [commentReactions, setCommentReactions] = useState({});
   const [userCommentReactions, setUserCommentReactions] = useState({});
+  
+  // NEW: Reports state
+  const [reports, setReports] = useState({
+    list: [],
+    total: 0,
+    blogTitle: '',
+    blogSlug: ''
+  });
+  
+  // NEW: Statistics state
+  const [stats, setStats] = useState({
+    totalReads: 0,
+    totalReports: 0,
+    likes: 0,
+    dislikes: 0,
+    commentsCount: 0,
+    status: '',
+    author: null,
+    publishedAt: null,
+    createdAt: null
+  });
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -86,12 +107,129 @@ const BlogAnalytics = ({ blogId }) => {
       await fetchCommentsByStatus('approved');
       // Fetch author comments
       await fetchAuthorComments();
+      // NEW: Fetch reports
+      await fetchReports();
+      // NEW: Fetch statistics
+      await fetchStatistics();
       
     } catch (err) {
       console.error('Error fetching analytics:', err);
       setError(err.response?.data?.message || 'Failed to load analytics data');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // NEW: Fetch reports
+  const fetchReports = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/reports`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      setReports({
+        list: response.data.reports || [],
+        total: response.data.totalReports || 0,
+        blogTitle: response.data.title,
+        blogSlug: response.data.slug
+      });
+      
+    } catch (err) {
+      console.error('Error fetching reports:', err);
+    }
+  };
+  
+  // NEW: Fetch statistics
+  const fetchStatistics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/stats`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      setStats({
+        totalReads: response.data.stats.totalReads || 0,
+        totalReports: response.data.stats.totalReports || 0,
+        likes: response.data.stats.likes || 0,
+        dislikes: response.data.stats.dislikes || 0,
+        commentsCount: response.data.stats.commentsCount || 0,
+        status: response.data.status,
+        author: response.data.author,
+        publishedAt: response.data.publishedAt,
+        createdAt: response.data.createdAt
+      });
+      
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+    }
+  };
+  
+  // NEW: Delete a specific report
+  const deleteReport = async (reportId) => {
+    if (!window.confirm('Are you sure you want to delete this report?')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/reports/${reportId}`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      // Refresh reports and statistics
+      await fetchReports();
+      await fetchStatistics();
+      
+    } catch (err) {
+      console.error('Error deleting report:', err);
+      alert(err.response?.data?.message || 'Failed to delete report');
+    }
+  };
+  
+  // NEW: Clear all reports
+  const clearAllReports = async () => {
+    if (!window.confirm('Are you sure you want to clear ALL reports for this blog? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/reports`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      // Refresh reports and statistics
+      await fetchReports();
+      await fetchStatistics();
+      
+    } catch (err) {
+      console.error('Error clearing reports:', err);
+      alert(err.response?.data?.message || 'Failed to clear reports');
     }
   };
   
@@ -579,6 +717,12 @@ const BlogAnalytics = ({ blogId }) => {
     <div className="blog-analytics">
       <div className="analytics-tabs">
         <button 
+          className={`tab-btn ${activeTab === 'stats' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stats')}
+        >
+          <FaChartBar /> Statistics
+        </button>
+        <button 
           className={`tab-btn ${activeTab === 'reactions' ? 'active' : ''}`}
           onClick={() => setActiveTab('reactions')}
         >
@@ -589,6 +733,12 @@ const BlogAnalytics = ({ blogId }) => {
           onClick={() => setActiveTab('comments')}
         >
           Comments
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          <FaFlag /> Reports {reports.total > 0 && <span className="badge-count">{reports.total}</span>}
         </button>
       </div>
       
@@ -601,17 +751,162 @@ const BlogAnalytics = ({ blogId }) => {
         <div className="error-message">{error}</div>
       ) : (
         <div className="analytics-content">
+          {/* NEW: Statistics Tab */}
+          {activeTab === 'stats' && (
+            <div className="statistics-analytics">
+              <h3>Blog Statistics Overview</h3>
+              
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaEye />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.totalReads}</div>
+                    <div className="stat-label">Total Reads</div>
+                  </div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaThumbsUp />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.likes}</div>
+                    <div className="stat-label">Likes</div>
+                  </div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaThumbsDown />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.dislikes}</div>
+                    <div className="stat-label">Dislikes</div>
+                  </div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaCommentAlt />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.commentsCount}</div>
+                    <div className="stat-label">Comments</div>
+                  </div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaFlag />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.totalReports}</div>
+                    <div className="stat-label">Reports</div>
+                  </div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaCheck />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.status}</div>
+                    <div className="stat-label">Status</div>
+                  </div>
+                </div>
+              </div>
+              
+              {stats.author && (
+                <div className="stats-metadata">
+                  <h4>Blog Metadata</h4>
+                  <div className="metadata-grid">
+                    <div className="metadata-item">
+                      <strong>Author:</strong> {stats.author.name} ({stats.author.email})
+                    </div>
+                    {stats.publishedAt && (
+                      <div className="metadata-item">
+                        <strong>Published:</strong> {formatDate(stats.publishedAt)}
+                      </div>
+                    )}
+                    <div className="metadata-item">
+                      <strong>Created:</strong> {formatDate(stats.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* NEW: Reports Tab */}
+          {activeTab === 'reports' && (
+            <div className="reports-analytics">
+              <div className="reports-header">
+                <h3>Blog Reports ({reports.total})</h3>
+                {reports.total > 0 && (
+                  <button 
+                    className="btn-clear-reports"
+                    onClick={clearAllReports}
+                  >
+                    <FaTrash /> Clear All Reports
+                  </button>
+                )}
+              </div>
+              
+              {reports.list.length === 0 ? (
+                renderEmptyState('reports')
+              ) : (
+                <div className="reports-list">
+                  {reports.list.map(report => (
+                    <div key={report._id} className="report-card">
+                      <div className="report-header">
+                        <div className="report-user-info">
+                         
+                          <a href={`mailto:${report.userEmail}`}>{report.userEmail}</a>
+                        </div>
+                        <span className="report-date">{formatDate(report.timestamp)}</span>
+                      </div>
+                      
+                      <div className="report-reason">
+                        <strong>Reason:</strong> 
+                        <span className="reason-badge">{report.reason}</span>
+                      </div>
+                      
+                      {report.description && (
+                        <div className="report-description">
+                          <strong>Description:</strong>
+                          <p>{report.description}</p>
+                        </div>
+                      )}
+                      
+                      <div className="report-actions">
+                        <button 
+                          className="btn btn-sm btn-delete"
+                          onClick={() => deleteReport(report._id)}
+                          title="Delete this report"
+                        >
+                          <FaTrash /> Delete Report
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
           {activeTab === 'reactions' && (
             <div className="reactions-analytics">
               <div className="analytics-summary">
-<div className='blog-summary-card'>
-  <h3>
-    <p className="summary-stat">{reactions.counts.likes} <FaThumbsUp /> Likes</p>
-    <p className="summary-stat">{reactions.counts.dislikes} <FaThumbsDown /> Dislikes</p>
-    <p className="summary-stat">{reactions.counts.total} <FaCommentAlt /> Total</p>
-  </h3>
-</div>
-</div>
+                <div className='blog-summary-card'>
+                  <h3>
+                    <p className="summary-stat">{reactions.counts.likes} <FaThumbsUp /> Likes</p>
+                    <p className="summary-stat">{reactions.counts.dislikes} <FaThumbsDown /> Dislikes</p>
+                    <p className="summary-stat">{reactions.counts.total} <FaCommentAlt /> Total</p>
+                  </h3>
+                </div>
+              </div>
 
               
               <h3>Reaction Details</h3>
