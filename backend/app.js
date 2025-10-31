@@ -543,7 +543,7 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
       }
       
       // Check authorization
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
       
@@ -586,7 +586,7 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
       }
       
       // Check authorization
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
       
@@ -626,7 +626,7 @@ app.post('/api/blogs', authenticateToken, async (req, res) => {
       }
       
       // Check authorization
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
       
@@ -1056,7 +1056,7 @@ app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (blog.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to update this blog post' });
     }
     
@@ -1103,7 +1103,7 @@ app.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       }
       
       // Check if user is the author or has admin rights
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to delete this blog post' });
       }
       
@@ -1201,7 +1201,7 @@ function cleanupUnusedImages(content, contentImages) {
       }
       
       // Check authorization
-      if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+      if (blog.author.toString() !== req.user.admin_id ) {
         return res.status(403).json({ message: 'Not authorized to view this blog post images' });
       }
       
@@ -1237,7 +1237,7 @@ app.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
     }
     
     // Check authorization
-    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
     
@@ -1291,7 +1291,7 @@ app.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res) =>
     }
     
     // Check authorization
-    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
     
@@ -1342,7 +1342,7 @@ app.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res)
     }
     
     // Check authorization
-    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
     
@@ -1374,7 +1374,7 @@ app.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
     }
     
     // Check authorization
-    if (blog.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to view this blog post videos' });
     }
     
@@ -4678,7 +4678,7 @@ app.put('/api/admin/image-posts/:id', authenticateToken, upload.single('image'),
     }
     
     // Check if user is authorized (author or admin)
-    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to update this post' });
     }
     
@@ -4726,7 +4726,7 @@ app.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
     }
     
     // Check if user is authorized (author or admin)
-    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
     
@@ -5231,7 +5231,7 @@ app.put('/api/admin/social-embeds/:id', authenticateToken, async (req, res) => {
     }
     
     // Check if user is authorized (author or admin)
-    if (embed.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (embed.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to update this embed' });
     }
     
@@ -5278,7 +5278,7 @@ app.delete('/api/admin/social-embeds/:id', authenticateToken, async (req, res) =
     }
     
     // Check if user is authorized (author or admin)
-    if (embed.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (embed.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to delete this embed' });
     }
     
@@ -5359,7 +5359,7 @@ app.patch('/api/admin/social-embeds/:id/toggle', authenticateToken, async (req, 
     }
     
     // Check if user is authorized
-    if (embed.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (embed.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this embed' });
     }
     
@@ -7697,7 +7697,7 @@ app.put('/api/community/posts/:id', authenticateToken, upload.fields([
     }
 
     // Check authorization
-    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to update this post' });
     }
 
@@ -7812,7 +7812,7 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
     }
 
     // Check authorization
-    if (post.author.toString() !== req.user.admin_id && req.user.role !== 'admin') {
+    if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
 
