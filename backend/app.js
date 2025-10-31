@@ -738,7 +738,7 @@ app.get('/api/blogs/:identifier', async (req, res) => {
     // Increment totalReads and get the blog
     const blog = await Blog.findOneAndUpdate(
       query,
-      { $inc: { totalReads: 1 } },
+      { $inc: { totalReads: 0.5 } },
       { new: true }
     )
       .populate('author', 'name email')
