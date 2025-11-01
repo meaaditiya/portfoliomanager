@@ -18,6 +18,7 @@ import Stream from './Components/Stream';
 import './index.css';
 import Announcement from './Components/Announcement';
 import Query from './Components/Query';
+import Admins from './Components/Admins';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('/adminpost'); // Initialize with default path
@@ -86,6 +87,7 @@ function AppContent() {
           <Route path="/stream" element={<Stream/>}/>
           <Route path="/announcement" element={<Announcement/>}/>
           <Route path="/query" element={<Query/>}/>
+          <Route path="/admins" element={<Admins/>}/>
         </Routes>
       </main>
     </div>

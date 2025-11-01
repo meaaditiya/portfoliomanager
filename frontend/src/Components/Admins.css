@@ -1,0 +1,990 @@
+/* SuperAdminPanel.css */
+
+.super-admin-panel {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.panel-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.message {
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.message.error {
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #feb2b2;
+}
+
+.message.success {
+  background: #f0fff4;
+  color: #22543d;
+  border: 1px solid #9ae6b4;
+}
+
+.loading,
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Buttons */
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-weight: 400;
+}
+
+.btn-primary {
+  background: #1a1a1a;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #333;
+}
+
+.btn-primary:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #e0e0e0;
+  color: #1a1a1a;
+  margin-left: 8px;
+}
+
+.btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+.btn-edit {
+  background: #f5f5f5;
+  color: #1a1a1a;
+  font-size: 12px;
+}
+
+.btn-edit:hover {
+  background: #e8e8e8;
+}
+
+.btn-status {
+  background: #f5f5f5;
+  color: #1a1a1a;
+  font-size: 12px;
+}
+
+.btn-status:hover {
+  background: #e8e8e8;
+}
+
+.btn-delete {
+  background: #fff5f5;
+  color: #c53030;
+  font-size: 12px;
+}
+
+.btn-delete:hover {
+  background: #fed7d7;
+}
+
+/* Form */
+.form-container {
+  background: white;
+  padding: 30px;
+  border-radius: 6px;
+  margin-bottom: 40px;
+  border: 1px solid #e0e0e0;
+}
+
+.form-container h2,
+.form-container h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.form-container h3 {
+  margin-top: 30px;
+  font-size: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group.checkbox-group {
+  flex-direction: row;
+  align-items: center;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4a4a4a;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #1a1a1a;
+}
+
+.form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Admin List */
+.admins-list h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  color: #1a1a1a;
+}
+
+.admins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.admin-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 24px;
+  transition: box-shadow 0.15s;
+}
+
+.admin-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.admin-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #f0f0f0;
+}
+
+.admin-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.admin-email {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.admin-designation {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.admin-details {
+  margin-bottom: 16px;
+}
+
+.admin-bio {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #4a4a4a;
+  line-height: 1.5;
+}
+
+.admin-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: #f5f5f5;
+  color: #4a4a4a;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.badge.status-active {
+  background: #e6ffed;
+  color: #22543d;
+}
+
+.badge.status-inactive {
+  background: #fff5f5;
+  color: #c53030;
+}
+
+.badge.status-pending {
+  background: #fef5e7;
+  color: #975a16;
+}
+
+.badge.super-admin {
+  background: #e6f7ff;
+  color: #1a5490;
+}
+
+.admin-location {
+  margin: 8px 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.admin-tags {
+  margin: 12px 0;
+}
+
+.admin-tags strong {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  color: #4a4a4a;
+  border-radius: 3px;
+}
+
+.admin-social {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.admin-social a {
+  font-size: 11px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.admin-social a:hover {
+  color: #1a1a1a;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admins-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Add these styles to your existing Admins.css */
+
+/* File Input St
+yling */
+.file-input {
+  padding: 10px;
+  background-color: black;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+.file-input:hover {
+  border-color: #4CAF50;
+}
+
+/* Image Preview */
+.image-preview {
+  margin-top: 15px;
+  position: relative;
+  display: inline-block;
+}
+
+.image-preview img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  border: 2px solid #ddd;
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s;
+}
+
+.btn-remove-image:hover {
+  background: rgba(244, 67, 54, 1);
+}
+
+.btn-remove-image::before {
+  content: '×';
+}
+
+/* Admin Avatar Styling */
+.admin-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #f0f0f0;
+  margin-right: 15px;
+}
+
+.admin-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin-right: 15px;
+  border: 3px solid #f0f0f0;
+}
+
+/* Form Grid - Full Width Class */
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Small Text Helper */
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Loading State for Images */
+.admin-avatar[src]:not([src=""]) {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Error State for Failed Image Load */
+img[alt]:empty::after {
+  content: attr(alt);
+  display: block;
+  text-align: center;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .admin-avatar,
+  .admin-avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .image-preview img {
+    max-width: 150px;
+    max-height: 150px;
+  }
+}
+/* Add these styles to your existing Admins.css */
+
+/* Image Upload Container */
+.image-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+/* Hide the actual file input */
+.file-input-hidden {
+  display: none;
+}
+
+/* Upload Button */
+.btn-upload {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #4CAF50;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: none;
+  text-align: center;
+}
+
+.btn-upload:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-upload:active {
+  transform: translateY(0);
+}
+
+/* Upload Placeholder */
+.upload-placeholder {
+  width: 100%;
+  max-width: 300px;
+  padding: 40px;
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+  color: #666;
+}
+
+.upload-placeholder:hover {
+  border-color: #4CAF50;
+  background: #f0fdf4;
+}
+
+.upload-placeholder svg {
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.upload-placeholder:hover svg {
+  color: #4CAF50;
+}
+
+.upload-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Image Preview */
+.image-preview {
+  position: relative;
+  display: inline-block;
+}
+
+.image-preview img {
+  max-width: 250px;
+  max-height: 250px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  border: 3px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.4);
+  line-height: 1;
+  font-weight: 300;
+}
+
+.btn-remove-image:hover {
+  background: #d32f2f;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.5);
+}
+
+/* Admin Avatar Styling */
+.admin-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #f0f0f0;
+  margin-right: 15px;
+}
+
+.admin-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin-right: 15px;
+  border: 3px solid #f0f0f0;
+}
+
+/* Form Grid - Full Width Class */
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Small Text Helper */
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Loading State for Images */
+.admin-avatar[src]:not([src=""]) {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Error State for Failed Image Load */
+img[alt]:empty::after {
+  content: attr(alt);
+  display: block;
+  text-align: center;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .admin-avatar,
+  .admin-avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .image-preview img {
+    max-width: 150px;
+    max-height: 150px;
+  }
+}
+/* Add these styles to your existing Admins.css */
+
+/* Image Upload Container */
+.image-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+/* Hide the actual file input */
+.file-input-hidden {
+  display: none;
+}
+
+/* Upload Button */
+.btn-upload {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #4CAF50;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: none;
+  text-align: center;
+}
+
+.btn-upload:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-upload:active {
+  transform: translateY(0);
+}
+
+/* Upload Placeholder */
+.upload-placeholder {
+  width: 100%;
+  max-width: 300px;
+  padding: 40px;
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+  color: #666;
+}
+
+.upload-placeholder:hover {
+  border-color: #4CAF50;
+  background: #f0fdf4;
+}
+
+.upload-placeholder svg {
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.upload-placeholder:hover svg {
+  color: #4CAF50;
+}
+
+.upload-placeholder p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Image Preview */
+.image-preview {
+  position: relative;
+  display: inline-block;
+}
+
+.image-preview img {
+  max-width: 250px;
+  max-height: 250px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: block;
+  border: 3px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.4);
+  line-height: 1;
+  font-weight: 300;
+}
+
+.btn-remove-image:hover {
+  background: #d32f2f;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.5);
+}
+
+/* Admin Avatar Styling */
+.admin-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #f0f0f0;
+  margin-right: 15px;
+}
+
+.admin-avatar-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin-right: 15px;
+  border: 3px solid #f0f0f0;
+}
+
+/* Form Grid - Full Width Class */
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Small Text Helper */
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Loading State for Images */
+.admin-avatar[src]:not([src=""]) {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Error State for Failed Image Load */
+img[alt]:empty::after {
+  content: attr(alt);
+  display: block;
+  text-align: center;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+/* Filter Dropdowns Styling */
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.filters select {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  transition: all 0.2s ease;
+  min-width: 130px;
+}
+
+.filters select:hover {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.filters select:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* List Header */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.list-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .admin-avatar,
+  .admin-avatar-placeholder {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .image-preview img {
+    max-width: 150px;
+    max-height: 150px;
+  }
+  
+  .filters {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .filters select {
+    width: 100%;
+  }
+  
+  .list-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
