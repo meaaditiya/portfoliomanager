@@ -4861,10 +4861,11 @@ app.get('/api/image-posts/:id', async (req, res) => {
       ? `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`
       : null;
     
-    // Get active comments
+    // Get active TOP-LEVEL comments only (no replies)
     const comments = await ImageComment.find({ 
       post: id,
-      status: 'active'
+      status: 'active',
+      parentComment: null  // ← ADD THIS LINE
     }).sort({ createdAt: -1 });
     
     res.json({
@@ -4874,7 +4875,6 @@ app.get('/api/image-posts/:id', async (req, res) => {
         image: imageData,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
-        // Only include reaction count if not hidden
         reactionCount: post.hideReactionCount ? null : post.reactionCount,
         commentCount: post.commentCount
       },
