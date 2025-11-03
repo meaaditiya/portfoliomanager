@@ -297,9 +297,10 @@ app.post('/api/admin/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      {
+      { 
         admin_id: admin._id,
         email: admin.email,
+        name: admin.name,
         role: admin.role
       },
       process.env.JWT_SECRET || 'your_jwt_secret',
