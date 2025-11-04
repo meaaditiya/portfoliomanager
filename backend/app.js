@@ -4625,72 +4625,150 @@ const extractDeviceId = (req, res, next) => {
 };
 
 // ADMIN ROUTES
-// Create a new image post (admin only)
-app.post('/api/admin/image-posts', authenticateToken, upload.single('image'), async (req, res) => {
+// Create a new image/video post (admin only)
+app.post('/api/admin/image-posts', authenticateToken, upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'video', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]), async (req, res) => {
   try {
-    const { caption, hideReactionCount } = req.body;
+    const { caption, hideReactionCount, mediaType, videoDuration } = req.body;
     
-    // Validate image is provided
-    if (!req.file) {
-      return res.status(400).json({ message: 'Image is required' });
+    // Validate media type
+    if (!mediaType || !['image', 'video'].includes(mediaType)) {
+      return res.status(400).json({ message: 'Valid mediaType (image or video) is required' });
     }
     
-    // Create new image post
-    const newImagePost = new ImagePost({
+    // Validate media is provided based on type
+    if (mediaType === 'image' && !req.files?.image) {
+      return res.status(400).json({ message: 'Image is required for image posts' });
+    }
+    
+    if (mediaType === 'video' && !req.files?.video) {
+      return res.status(400).json({ message: 'Video is required for video posts' });
+    }
+    
+    // Create new post object
+    const postData = {
       caption,
-      image: {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
-      },
+      mediaType,
       author: req.user.admin_id,
       hideReactionCount: hideReactionCount === 'true' || hideReactionCount === true
-    });
+    };
     
+    // Add image data if image type
+    if (mediaType === 'image' && req.files.image) {
+      postData.image = {
+        data: req.files.image[0].buffer,
+        contentType: req.files.image[0].mimetype
+      };
+    }
+    
+    // Add video data if video type
+    if (mediaType === 'video' && req.files.video) {
+      postData.video = {
+        data: req.files.video[0].buffer,
+        contentType: req.files.video[0].mimetype,
+        duration: videoDuration ? parseFloat(videoDuration) : null
+      };
+      
+      // Add thumbnail if provided
+      if (req.files.thumbnail) {
+        postData.video.thumbnail = {
+          data: req.files.thumbnail[0].buffer,
+          contentType: req.files.thumbnail[0].mimetype
+        };
+      }
+    }
+    
+    const newImagePost = new ImagePost(postData);
     await newImagePost.save();
     
     res.status(201).json({
-      message: 'Image post created successfully',
+      message: `${mediaType === 'video' ? 'Video' : 'Image'} post created successfully`,
       post: {
         id: newImagePost._id,
         caption: newImagePost.caption,
+        mediaType: newImagePost.mediaType,
         hideReactionCount: newImagePost.hideReactionCount,
         createdAt: newImagePost.createdAt
       }
     });
   } catch (error) {
-    console.error('Error creating image post:', error);
+    console.error('Error creating post:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Update an image post (admin only)
-app.put('/api/admin/image-posts/:id', authenticateToken, upload.single('image'), async (req, res) => {
+
+// Update an image/video post (admin only)
+app.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'video', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]), async (req, res) => {
   try {
     const { id } = req.params;
-    const { caption, hideReactionCount } = req.body;
+    const { caption, hideReactionCount, mediaType, videoDuration } = req.body;
     
     // Find post
     const post = await ImagePost.findById(id);
     if (!post) {
-      return res.status(404).json({ message: 'Image post not found' });
+      return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Check if user is authorized (author or admin)
-    if (post.author.toString() !== req.user.admin_id ) {
+    // Check if user is authorized
+    if (post.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to update this post' });
     }
     
-    // Update fields
+    // Update basic fields
     if (caption) post.caption = caption;
     if (hideReactionCount !== undefined) {
       post.hideReactionCount = hideReactionCount === 'true' || hideReactionCount === true;
     }
     
-    // Update image if provided
-    if (req.file) {
+    // Update media type if provided
+    if (mediaType && ['image', 'video'].includes(mediaType)) {
+      post.mediaType = mediaType;
+    }
+    
+    // Update image if provided and type is image
+    if (req.files?.image && post.mediaType === 'image') {
       post.image = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
+        data: req.files.image[0].buffer,
+        contentType: req.files.image[0].mimetype
+      };
+      // Clear video data if switching from video to image
+      post.video = undefined;
+    }
+    
+    // Update video if provided and type is video
+    if (req.files?.video && post.mediaType === 'video') {
+      post.video = {
+        data: req.files.video[0].buffer,
+        contentType: req.files.video[0].mimetype,
+        duration: videoDuration ? parseFloat(videoDuration) : post.video?.duration
+      };
+      
+      // Update thumbnail if provided
+      if (req.files.thumbnail) {
+        post.video.thumbnail = {
+          data: req.files.thumbnail[0].buffer,
+          contentType: req.files.thumbnail[0].mimetype
+        };
+      }
+      
+      // Clear image data if switching from image to video
+      post.image = undefined;
+    }
+    
+    // Update thumbnail separately if provided for existing video
+    if (req.files?.thumbnail && post.mediaType === 'video' && !req.files.video) {
+      if (!post.video) post.video = {};
+      post.video.thumbnail = {
+        data: req.files.thumbnail[0].buffer,
+        contentType: req.files.thumbnail[0].mimetype
       };
     }
     
@@ -4698,20 +4776,20 @@ app.put('/api/admin/image-posts/:id', authenticateToken, upload.single('image'),
     await post.save();
     
     res.json({
-      message: 'Image post updated successfully',
+      message: 'Post updated successfully',
       post: {
         id: post._id,
         caption: post.caption,
+        mediaType: post.mediaType,
         hideReactionCount: post.hideReactionCount,
         updatedAt: post.updatedAt
       }
     });
   } catch (error) {
-    console.error('Error updating image post:', error);
+    console.error('Error updating post:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // Delete an image post (admin only)
 app.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
@@ -4743,20 +4821,26 @@ app.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
 // Get all image posts for admin dashboard
 app.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, mediaType } = req.query;
     
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
+    // Build filter
+    const filter = {};
+    if (mediaType && ['image', 'video'].includes(mediaType)) {
+      filter.mediaType = mediaType;
+    }
+    
     // Get posts with reaction and comment counts
-    const posts = await ImagePost.find()
+    const posts = await ImagePost.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('-image.data') // Exclude binary data for listing
+      .select('-image.data -video.data -video.thumbnail.data') // Exclude binary data for listing
       .populate('author', 'name email');
     
-    const total = await ImagePost.countDocuments();
+    const total = await ImagePost.countDocuments(filter);
     
     res.json({
       posts,
@@ -4772,8 +4856,7 @@ app.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-// Get single image post with admin details
+// Get single image/video post with admin details
 app.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -4782,13 +4865,22 @@ app.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
       .populate('author', 'name email');
     
     if (!post) {
-      return res.status(404).json({ message: 'Image post not found' });
+      return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Convert Buffer to Base64 for easy display
-    const imageData = post.image.data
-      ? `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`
-      : null;
+    // Prepare response based on media type
+    let mediaData = null;
+    let thumbnailData = null;
+    
+    if (post.mediaType === 'image' && post.image?.data) {
+      mediaData = `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`;
+    } else if (post.mediaType === 'video' && post.video?.data) {
+      mediaData = `data:${post.video.contentType};base64,${post.video.data.toString('base64')}`;
+      
+      if (post.video.thumbnail?.data) {
+        thumbnailData = `data:${post.video.thumbnail.contentType};base64,${post.video.thumbnail.data.toString('base64')}`;
+      }
+    }
     
     // Get reactions and comments
     const reactions = await ImageReaction.find({ post: id }).countDocuments();
@@ -4797,35 +4889,45 @@ app.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
     res.json({
       post: {
         ...post._doc,
-        image: imageData
+        media: mediaData,
+        thumbnail: thumbnailData,
+        videoDuration: post.video?.duration,
+        image: undefined,
+        video: undefined
       },
       reactions,
       comments
     });
   } catch (error) {
-    console.error('Error fetching image post details for admin:', error);
+    console.error('Error fetching post details for admin:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // PUBLIC ROUTES
 // Get all published image posts (public)
+// Get all published image/video posts (public)
 app.get('/api/image-posts', async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, mediaType } = req.query;
     
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
+    // Build filter
+    const filter = {};
+    if (mediaType && ['image', 'video'].includes(mediaType)) {
+      filter.mediaType = mediaType;
+    }
+    
     // Get posts for public view
-    const posts = await ImagePost.find()
+    const posts = await ImagePost.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('-image.data') // Exclude binary data for listing
+      .select('-image.data -video.data -video.thumbnail.data') // Exclude binary data for listing
       .lean();
     
-    const total = await ImagePost.countDocuments();
+    const total = await ImagePost.countDocuments(filter);
     
     res.json({
       posts: posts.map(post => ({
@@ -4841,38 +4943,49 @@ app.get('/api/image-posts', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching public image posts:', error);
+    console.error('Error fetching public posts:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
-// Get single image post (public)
+// Get single image/video post (public)
 app.get('/api/image-posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
     const post = await ImagePost.findById(id);
     if (!post) {
-      return res.status(404).json({ message: 'Image post not found' });
+      return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Convert Buffer to Base64 for easy display
-    const imageData = post.image.data
-      ? `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`
-      : null;
+    // Prepare response based on media type
+    let mediaData = null;
+    let thumbnailData = null;
+    
+    if (post.mediaType === 'image' && post.image?.data) {
+      mediaData = `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`;
+    } else if (post.mediaType === 'video' && post.video?.data) {
+      mediaData = `data:${post.video.contentType};base64,${post.video.data.toString('base64')}`;
+      
+      if (post.video.thumbnail?.data) {
+        thumbnailData = `data:${post.video.thumbnail.contentType};base64,${post.video.thumbnail.data.toString('base64')}`;
+      }
+    }
     
     // Get active TOP-LEVEL comments only (no replies)
     const comments = await ImageComment.find({ 
       post: id,
       status: 'active',
-      parentComment: null  // ← ADD THIS LINE
+      parentComment: null
     }).sort({ createdAt: -1 });
     
     res.json({
       post: {
         id: post._id,
         caption: post.caption,
-        image: imageData,
+        mediaType: post.mediaType,
+        media: mediaData,
+        thumbnail: thumbnailData,
+        videoDuration: post.video?.duration,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         reactionCount: post.hideReactionCount ? null : post.reactionCount,
@@ -4881,11 +4994,10 @@ app.get('/api/image-posts/:id', async (req, res) => {
       comments
     });
   } catch (error) {
-    console.error('Error fetching public image post:', error);
+    console.error('Error fetching public post:', error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // Like an image post (public)
 app.post('/api/image-posts/:id/react', extractDeviceId, async (req, res) => {
   try {

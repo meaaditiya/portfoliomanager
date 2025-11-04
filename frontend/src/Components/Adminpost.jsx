@@ -13,15 +13,19 @@ const ImagePostManager = () => {
   });
 
   // State for form fields
-  const [formData, setFormData] = useState({
-    caption: '',
-    hideReactionCount: false,
-    image: null
-  });
+const [formData, setFormData] = useState({
+  caption: '',
+  hideReactionCount: false,
+  mediaType: 'image',
+  image: null,
+  video: null,
+  thumbnail: null,
+  videoDuration: null
+});
 
-  // State for image preview
-  const [imagePreview, setImagePreview] = useState(null);
-  
+const [imagePreview, setImagePreview] = useState(null);
+const [videoPreview, setVideoPreview] = useState(null);
+const [thumbnailPreview, setThumbnailPreview] = useState(null);
   // State for handling comments
   const [comments, setComments] = useState([]);
   const [commentStats, setCommentStats] = useState(null);
@@ -105,15 +109,24 @@ const ImagePostManager = () => {
       
       // Fetch comment stats
       await fetchCommentStats(id);
-      
-      // Set form data for editing
-      setFormData({
-        caption: data.post.caption,
-        hideReactionCount: data.post.hideReactionCount,
-        image: null
-      });
-      
-      setImagePreview(data.post.image);
+    // Set form data for editing
+setFormData({
+  caption: data.post.caption,
+  hideReactionCount: data.post.hideReactionCount,
+  mediaType: data.post.mediaType,
+  image: null,
+  video: null,
+  thumbnail: null,
+  videoDuration: data.post.videoDuration
+});
+
+if (data.post.mediaType === 'image') {
+  setImagePreview(data.post.media);
+} else if (data.post.mediaType === 'video') {
+  setVideoPreview(data.post.media);
+  setThumbnailPreview(data.post.thumbnail);
+}
+   
       setFormMode('edit');
     } catch (error) {
       showAlert(error.message, 'error');
@@ -217,17 +230,32 @@ const ImagePostManager = () => {
     e.preventDefault();
     
     try {
-      const formPayload = new FormData();
-      formPayload.append('caption', formData.caption);
-      formPayload.append('hideReactionCount', formData.hideReactionCount);
-      
-      if (formData.image) {
-        formPayload.append('image', formData.image);
-      } else {
-        showAlert('Please select an image', 'error');
-        return;
-      }
+    const formPayload = new FormData();
+formPayload.append('caption', formData.caption);
+formPayload.append('hideReactionCount', formData.hideReactionCount);
+formPayload.append('mediaType', formData.mediaType);
 
+if (formData.mediaType === 'image') {
+  if (formData.image) {
+    formPayload.append('image', formData.image);
+  } else {
+    showAlert('Please select an image', 'error');
+    return;
+  }
+} else if (formData.mediaType === 'video') {
+  if (formData.video) {
+    formPayload.append('video', formData.video);
+    if (formData.videoDuration) {
+      formPayload.append('videoDuration', formData.videoDuration);
+    }
+    if (formData.thumbnail) {
+      formPayload.append('thumbnail', formData.thumbnail);
+    }
+  } else {
+    showAlert('Please select a video', 'error');
+    return;
+  }
+}
       const response = await fetch(`${API_BASE_URL}/api/admin/image-posts`, {
         method: 'POST',
         headers: {
@@ -255,13 +283,23 @@ const ImagePostManager = () => {
     if (!selectedPost) return;
     
     try {
-      const formPayload = new FormData();
-      formPayload.append('caption', formData.caption);
-      formPayload.append('hideReactionCount', formData.hideReactionCount);
-      
-      if (formData.image) {
-        formPayload.append('image', formData.image);
-      }
+     const formPayload = new FormData();
+formPayload.append('caption', formData.caption);
+formPayload.append('hideReactionCount', formData.hideReactionCount);
+formPayload.append('mediaType', formData.mediaType);
+
+if (formData.image) {
+  formPayload.append('image', formData.image);
+}
+if (formData.video) {
+  formPayload.append('video', formData.video);
+  if (formData.videoDuration) {
+    formPayload.append('videoDuration', formData.videoDuration);
+  }
+}
+if (formData.thumbnail) {
+  formPayload.append('thumbnail', formData.thumbnail);
+}
 
       const response = await fetch(`${API_BASE_URL}/api/admin/image-posts/${selectedPost._id}`, {
         method: 'PUT',
@@ -565,49 +603,92 @@ const ImagePostManager = () => {
   };
 
   // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
-    
-    if (type === 'file') {
-      if (files && files[0]) {
-        const file = files[0];
-        
-        // Check file type
+ const handleInputChange = (e) => {
+  const { name, value, type, checked, files } = e.target;
+  
+  if (type === 'file') {
+    if (files && files[0]) {
+      const file = files[0];
+      
+      // Handle image upload
+      if (name === 'image') {
         if (!file.type.startsWith('image/')) {
           showAlert('Only image files are allowed', 'error');
           return;
         }
-        
-        // Check file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
           showAlert('Image size must be less than 5MB', 'error');
           return;
         }
-        
         setFormData({ ...formData, image: file });
-        
-        // Create preview
         const reader = new FileReader();
-        reader.onload = (e) => {
-          setImagePreview(e.target.result);
-        };
+        reader.onload = (e) => setImagePreview(e.target.result);
         reader.readAsDataURL(file);
       }
-    } else {
-      setFormData({
-        ...formData,
-        [name]: type === 'checkbox' ? checked : value
-      });
+      
+      // Handle video upload
+      else if (name === 'video') {
+        if (!file.type.startsWith('video/')) {
+          showAlert('Only video files are allowed', 'error');
+          return;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+          showAlert('Video size must be less than 50MB', 'error');
+          return;
+        }
+        
+        // Get video duration
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function() {
+          window.URL.revokeObjectURL(video.src);
+          setFormData(prev => ({ ...prev, video: file, videoDuration: video.duration }));
+        };
+        video.src = URL.createObjectURL(file);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => setVideoPreview(e.target.result);
+        reader.readAsDataURL(file);
+      }
+      
+      // Handle thumbnail upload
+      else if (name === 'thumbnail') {
+        if (!file.type.startsWith('image/')) {
+          showAlert('Only image files are allowed for thumbnail', 'error');
+          return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+          showAlert('Thumbnail size must be less than 2MB', 'error');
+          return;
+        }
+        setFormData({ ...formData, thumbnail: file });
+        const reader = new FileReader();
+        reader.onload = (e) => setThumbnailPreview(e.target.result);
+        reader.readAsDataURL(file);
+      }
     }
-  };
+  } else {
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  }
+};
 
   // Reset form
   const resetForm = () => {
     setFormData({
-      caption: '',
-      hideReactionCount: false,
-      image: null
-    });
+  caption: '',
+  hideReactionCount: false,
+  mediaType: 'image',
+  image: null,
+  video: null,
+  thumbnail: null,
+  videoDuration: null
+});
+setImagePreview(null);
+setVideoPreview(null);
+setThumbnailPreview(null);
     setImagePreview(null);
     setSelectedPost(null);
     setComments([]);
@@ -815,84 +896,154 @@ const ImagePostManager = () => {
         <div className="card">
           <h2 className="text-medium bold mb-4">{formMode === 'create' ? 'Create New Post' : 'Edit Post'}</h2>
           
-          <form onSubmit={formMode === 'create' ? createPost : updatePost} className="form">
-            <div className="form-group">
-              <label className="label">Caption:</label>
-              <textarea 
-                name="caption"
-                value={formData.caption}
-                onChange={handleInputChange}
-                className="textarea"
-                rows="3"
-                required
-              />
-            </div>
-            
-            <div className="form-group">
-              <label className="label">Image:</label>
-
-              <input
-                type="file"
-                id="singleFileInput"
-                name="image"
-                onChange={handleInputChange}
-                className="file-input"
-                accept="image/*"
-                required={formMode === 'create'}
-                style={{ display: 'none' }}
-              />
-
-              <button
-                type="button"
-                onClick={() => document.getElementById('singleFileInput').click()}
-                className="file-button"
-              >
-                Choose Image
-              </button>
-
-              {imagePreview && (
-                <div className="image-preview" style={{ marginTop: '10px' }}>
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="image"
-                    style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }}
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="checkbox-group">
-              <input 
-                type="checkbox" 
-                id="hideReactionCount"
-                name="hideReactionCount"
-                checked={formData.hideReactionCount}
-                onChange={handleInputChange}
-                className="checkbox"
-              />
-              <label htmlFor="hideReactionCount" className="label-inline">Hide Reaction Count</label>
-            </div>
-            
-            <div className="button-group">
-              <button 
-                type="submit" 
-                className="button button-primary"
-              >
-                {formMode === 'create' ? 'Create Post' :'Update Post'}
-              </button>
-              
-              {formMode === 'edit' && (
-                <button 
-                  type="button" 
-                  onClick={resetForm}
-                  className="button button-secondary"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
+         <form onSubmit={formMode === 'create' ? createPost : updatePost} className="form">
+  <div className="form-group">
+    <label className="label">Caption:</label>
+    <textarea 
+      name="caption"
+      value={formData.caption}
+      onChange={handleInputChange}
+      className="textarea"
+      rows="3"
+      required
+    />
+  </div>
+  
+  <div className="form-group">
+    <label className="label">Media Type:</label>
+    <div className="radio-group">
+      <label className="radio-label">
+        <input
+          type="radio"
+          name="mediaType"
+          value="image"
+          checked={formData.mediaType === 'image'}
+          onChange={handleInputChange}
+          className="radio"
+        />
+        Image
+      </label>
+      <label className="radio-label">
+        <input
+          type="radio"
+          name="mediaType"
+          value="video"
+          checked={formData.mediaType === 'video'}
+          onChange={handleInputChange}
+          className="radio"
+        />
+        Video
+      </label>
+    </div>
+  </div>
+  
+  {formData.mediaType === 'image' ? (
+    <div className="form-group">
+      <label className="label">Image:</label>
+      <input
+        type="file"
+        id="imageInput"
+        name="image"
+        onChange={handleInputChange}
+        className="file-input"
+        accept="image/*"
+        required={formMode === 'create'}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
+        onClick={() => document.getElementById('imageInput').click()}
+        className="file-button"
+      >
+        Choose Image
+      </button>
+      {imagePreview && (
+        <div className="image-preview">
+          <img src={imagePreview} alt="Preview" className="image" />
+        </div>
+      )}
+    </div>
+  ) : (
+    <>
+      <div className="form-group">
+        <label className="label">Video:</label>
+        <input
+          type="file"
+          id="videoInput"
+          name="video"
+          onChange={handleInputChange}
+          className="file-input"
+          accept="video/*"
+          required={formMode === 'create'}
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          onClick={() => document.getElementById('videoInput').click()}
+          className="file-button"
+        >
+          Choose Video
+        </button>
+        {videoPreview && (
+          <div className="video-preview">
+            <video src={videoPreview} controls className="video" />
+            {formData.videoDuration && (
+              <p className="video-duration">Duration: {Math.round(formData.videoDuration)}s</p>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <div className="form-group">
+        <label className="label">Thumbnail (Optional):</label>
+        <input
+          type="file"
+          id="thumbnailInput"
+          name="thumbnail"
+          onChange={handleInputChange}
+          className="file-input"
+          accept="image/*"
+          style={{ display: 'none' }}
+        />
+        <button
+          type="button"
+          onClick={() => document.getElementById('thumbnailInput').click()}
+          className="file-button"
+        >
+          Choose Thumbnail
+        </button>
+        {thumbnailPreview && (
+          <div className="thumbnail-preview">
+            <img src={thumbnailPreview} alt="Thumbnail" className="thumbnail" />
+          </div>
+        )}
+      </div>
+    </>
+  )}
+  
+  <div className="checkbox-group">
+    <input 
+      type="checkbox" 
+      id="hideReactionCount"
+      name="hideReactionCount"
+      checked={formData.hideReactionCount}
+      onChange={handleInputChange}
+      className="checkbox"
+    />
+    <label htmlFor="hideReactionCount" className="label-inline">Hide Reaction Count</label>
+  </div>
+  
+  <div className="button-group">
+    <button type="submit" className="button button-primary">
+      {formMode === 'create' ? 'Create Post' : 'Update Post'}
+    </button>
+    {formMode === 'edit' && (
+      <button type="button" onClick={resetForm} className="button button-secondary">
+        Cancel
+      </button>
+    )}
+  </div>
+</form>
         </div>
         
         {/* Selected Post Details */}
@@ -905,16 +1056,28 @@ const ImagePostManager = () => {
               <p>{selectedPost.caption}</p>
             </div>
             
-            <div className="detail-group">
-              <h3 className="text-small bold">Image:</h3>
-              {selectedPost.image && (
-                <img 
-                  src={selectedPost.image} 
-                  alt="Post" 
-                  className="image"
-                />
-              )}
-            </div>
+          <div className="detail-group">
+  <h3 className="text-small bold">Media:</h3>
+  <p className="media-type-badge">{selectedPost.mediaType.toUpperCase()}</p>
+  {selectedPost.mediaType === 'image' && selectedPost.image && (
+    <img src={selectedPost.image} alt="Post" className="image" />
+  )}
+  {selectedPost.mediaType === 'video' && (
+    <>
+      {selectedPost.thumbnail && (
+        <div className="video-thumbnail-container">
+          <img src={selectedPost.thumbnail} alt="Thumbnail" className="video-thumbnail" />
+        </div>
+      )}
+      {videoPreview && (
+        <video src={videoPreview} controls className="video" />
+      )}
+      {selectedPost.videoDuration && (
+        <p className="video-info">Duration: {Math.round(selectedPost.videoDuration)}s</p>
+      )}
+    </>
+  )}
+</div>
             
             <div className="detail-group">
               <h3 className="text-small bold">Settings:</h3>

@@ -1,13 +1,29 @@
 const mongoose = require('mongoose');
+
 const imagePostSchema = new mongoose.Schema({
   caption: {
     type: String,
     required: true,
     trim: true
   },
+  mediaType: {
+    type: String,
+    enum: ['image', 'video'],
+    required: true,
+    default: 'image'
+  },
   image: {
     data: Buffer,
     contentType: String
+  },
+  video: {
+    data: Buffer,
+    contentType: String,
+    duration: Number, // in seconds
+    thumbnail: {
+      data: Buffer,
+      contentType: String
+    }
   },
   author: {
     type: mongoose.Schema.Types.ObjectId,
@@ -35,4 +51,5 @@ const imagePostSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
 module.exports = mongoose.model('ImagePost', imagePostSchema);
