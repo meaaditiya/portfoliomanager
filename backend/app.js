@@ -10121,7 +10121,17 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
   { name: 'document', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    const { title, caption, link, priority, expiryType, expiryValue, expiresAt } = req.body;
+    const { 
+      title, 
+      titleColor,
+      caption, 
+      captionFormat,
+      link, 
+      priority, 
+      expiryType, 
+      expiryValue, 
+      expiresAt 
+    } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -10129,7 +10139,9 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
 
     const announcementData = {
       title,
+      titleColor: titleColor || '#000000',
       caption: caption || '',
+      captionFormat: captionFormat || 'markdown',
       link: link || '',
       priority: priority || 0
     };
@@ -10168,7 +10180,10 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
       announcement: {
         _id: announcement._id,
         title: announcement.title,
+        titleColor: announcement.titleColor,
         caption: announcement.caption,
+        captionFormat: announcement.captionFormat,
+        renderedCaption: announcement.getRenderedCaption(),
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
@@ -10184,6 +10199,7 @@ app.post('/api/admin/announcement', authenticateToken, upload.fields([
   }
 });
 
+
 app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
@@ -10195,7 +10211,10 @@ app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
     const announcementsWithInfo = announcements.map(ann => ({
       _id: ann._id,
       title: ann.title,
+      titleColor: ann.titleColor,
       caption: ann.caption,
+      captionFormat: ann.captionFormat,
+      renderedCaption: ann.getRenderedCaption(),
       link: ann.link,
       priority: ann.priority,
       isActive: ann.isActive,
@@ -10215,6 +10234,7 @@ app.get('/api/admin/announcement', authenticateToken, async (req, res) => {
   }
 });
 
+
 app.get('/api/announcement/active', async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
@@ -10228,7 +10248,10 @@ app.get('/api/announcement/active', async (req, res) => {
     const announcementsWithInfo = announcements.map(ann => ({
       _id: ann._id,
       title: ann.title,
+      titleColor: ann.titleColor,
       caption: ann.caption,
+      captionFormat: ann.captionFormat,
+      renderedCaption: ann.getRenderedCaption(),
       link: ann.link,
       priority: ann.priority,
       expiresAt: ann.expiresAt,
@@ -10243,6 +10266,7 @@ app.get('/api/announcement/active', async (req, res) => {
   }
 });
 
+// GET SINGLE ANNOUNCEMENT BY ID
 app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
@@ -10261,7 +10285,10 @@ app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
       announcement: {
         _id: announcement._id,
         title: announcement.title,
+        titleColor: announcement.titleColor,
         caption: announcement.caption,
+        captionFormat: announcement.captionFormat,
+        renderedCaption: announcement.getRenderedCaption(),
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
@@ -10280,6 +10307,7 @@ app.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// GET ANNOUNCEMENT IMAGE
 app.get('/api/announcement/:id/image', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -10295,6 +10323,7 @@ app.get('/api/announcement/:id/image', async (req, res) => {
   }
 });
 
+// GET ANNOUNCEMENT DOCUMENT
 app.get('/api/announcement/:id/document', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -10311,14 +10340,17 @@ app.get('/api/announcement/:id/document', async (req, res) => {
   }
 });
 
+// UPDATE ANNOUNCEMENT
 app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
 ]), async (req, res) => {
   try {
     const { 
-      title, 
-      caption, 
+      title,
+      titleColor,
+      caption,
+      captionFormat,
       link, 
       priority, 
       isActive, 
@@ -10337,7 +10369,9 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
     }
 
     if (title) announcement.title = title;
+    if (titleColor !== undefined) announcement.titleColor = titleColor;
     if (caption !== undefined) announcement.caption = caption;
+    if (captionFormat !== undefined) announcement.captionFormat = captionFormat;
     if (link !== undefined) announcement.link = link;
     if (priority !== undefined) announcement.priority = priority;
     if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
@@ -10387,7 +10421,10 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       announcement: {
         _id: announcement._id,
         title: announcement.title,
+        titleColor: announcement.titleColor,
         caption: announcement.caption,
+        captionFormat: announcement.captionFormat,
+        renderedCaption: announcement.getRenderedCaption(),
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
@@ -10403,6 +10440,7 @@ app.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
   }
 });
 
+// TOGGLE ANNOUNCEMENT ACTIVE STATUS
 app.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -10432,6 +10470,7 @@ app.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, r
   }
 });
 
+// DELETE SINGLE ANNOUNCEMENT
 app.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findByIdAndDelete(req.params.id);
@@ -10446,6 +10485,7 @@ app.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) =>
   }
 });
 
+// DELETE ALL ANNOUNCEMENTS
 app.delete('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
     const result = await Announcement.deleteMany({});
@@ -10457,7 +10497,6 @@ app.delete('/api/admin/announcement', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 // POST - Create a new query (Public route - no authentication needed)
 app.post('/api/queries/create', async (req, res) => {

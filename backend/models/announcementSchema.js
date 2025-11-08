@@ -1,4 +1,13 @@
 const mongoose = require('mongoose');
+const marked = require('marked');
+const DOMPurify = require('isomorphic-dompurify'); // npm install isomorphic-dompurify
+
+// Configure marked to allow HTML
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  sanitize: false // We'll use DOMPurify instead for better control
+});
 
 const announcementSchema = new mongoose.Schema({
   title: {
@@ -6,9 +15,19 @@ const announcementSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  titleColor: {
+    type: String,
+    default: '#000000',
+    trim: true
+  },
   caption: {
     type: String,
     trim: true
+  },
+  captionFormat: {
+    type: String,
+    enum: ['markdown', 'plain'],
+    default: 'markdown'
   },
   link: {
     type: String,
@@ -32,7 +51,6 @@ const announcementSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  // Expiry fields
   expiresAt: {
     type: Date,
     default: null
@@ -63,6 +81,45 @@ announcementSchema.pre('save', function(next) {
   
   next();
 });
+
+// Method to get rendered HTML from markdown with inline styles
+announcementSchema.methods.getRenderedCaption = function() {
+  if (this.captionFormat === 'markdown' && this.caption) {
+    // Parse markdown to HTML
+    const rawHtml = marked.parse(this.caption);
+    
+    // Sanitize HTML but allow style attributes and color-related tags
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li',
+        'blockquote', 'pre', 'code',
+        'a', 'span', 'div',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'mark', 'small', 'sub', 'sup'
+      ],
+      ALLOWED_ATTR: [
+        'style', 'class', 'href', 'target', 'rel',
+        'color', 'bgcolor'
+      ],
+      ALLOWED_STYLES: {
+        '*': {
+          'color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/],
+          'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/],
+          'font-weight': [/^\d+$/, /^bold$/, /^normal$/],
+          'font-style': [/^italic$/, /^normal$/],
+          'text-decoration': [/^underline$/, /^line-through$/, /^none$/],
+          'font-size': [/^\d+(?:px|em|rem|%)$/],
+          'text-align': [/^left$/, /^right$/, /^center$/, /^justify$/]
+        }
+      }
+    });
+    
+    return cleanHtml;
+  }
+  return this.caption;
+};
 
 // Method to check if announcement is expired
 announcementSchema.methods.checkExpiry = function() {

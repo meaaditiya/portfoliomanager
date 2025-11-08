@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Eye, EyeOff, Pencil, Trash2, Plus, FileText, Image, Calendar, Clock } from 'lucide-react';
+import { X, Upload, Eye, EyeOff, Pencil, Trash2, Plus, FileText, Image, Calendar, Clock, Palette, Type, Bold, Italic, List, Code } from 'lucide-react';
 import './Announcement.css';
 
 const AnnouncementAdmin = () => {
@@ -8,9 +8,12 @@ const AnnouncementAdmin = () => {
   const [editMode, setEditMode] = useState(false);
   const [currentAnnouncement, setCurrentAnnouncement] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showMarkdownHelper, setShowMarkdownHelper] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
+    titleColor: '#000000',
     caption: '',
+    captionFormat: 'markdown',
     link: '',
     priority: 0,
     isActive: true,
@@ -67,12 +70,120 @@ const AnnouncementAdmin = () => {
     }
   };
 
+  const insertMarkdownSyntax = (syntax) => {
+    const textarea = document.getElementById('caption');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = formData.caption;
+    const selectedText = text.substring(start, end);
+    
+    let newText = '';
+    let cursorPos = start;
+
+    switch(syntax) {
+      case 'bold':
+        newText = text.substring(0, start) + `**${selectedText || 'bold text'}**` + text.substring(end);
+        cursorPos = start + 2;
+        break;
+      case 'italic':
+        newText = text.substring(0, start) + `*${selectedText || 'italic text'}*` + text.substring(end);
+        cursorPos = start + 1;
+        break;
+      case 'heading':
+        newText = text.substring(0, start) + `## ${selectedText || 'Heading'}` + text.substring(end);
+        cursorPos = start + 3;
+        break;
+      case 'list':
+        newText = text.substring(0, start) + `- ${selectedText || 'List item'}` + text.substring(end);
+        cursorPos = start + 2;
+        break;
+      case 'numberedList':
+        newText = text.substring(0, start) + `1. ${selectedText || 'List item'}` + text.substring(end);
+        cursorPos = start + 3;
+        break;
+      case 'link':
+        newText = text.substring(0, start) + `[${selectedText || 'link text'}](url)` + text.substring(end);
+        cursorPos = start + 1;
+        break;
+      case 'code':
+        newText = text.substring(0, start) + `\`${selectedText || 'code'}\`` + text.substring(end);
+        cursorPos = start + 1;
+        break;
+      case 'table':
+        newText = text.substring(0, start) + `\n| Column 1 | Column 2 |\n|----------|----------|\n| Data 1   | Data 2   |\n` + text.substring(end);
+        cursorPos = start + 1;
+        break;
+      default:
+        newText = text;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      caption: newText
+    }));
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursorPos, cursorPos);
+    }, 0);
+  };
+
+  const insertColorSpan = () => {
+    const textarea = document.getElementById('caption');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = formData.caption;
+    const selectedText = text.substring(start, end);
+    
+    const colorInput = prompt('Enter color (hex code like #FF5733 or color name):', '#FF5733');
+    if (!colorInput) return;
+
+    const newText = text.substring(0, start) + 
+      `<span style="color: ${colorInput}">${selectedText || 'colored text'}</span>` + 
+      text.substring(end);
+
+    setFormData(prev => ({
+      ...prev,
+      caption: newText
+    }));
+
+    setTimeout(() => {
+      textarea.focus();
+    }, 0);
+  };
+
+  const insertBackgroundColor = () => {
+    const textarea = document.getElementById('caption');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = formData.caption;
+    const selectedText = text.substring(start, end);
+    
+    const colorInput = prompt('Enter background color (hex code like #FFEB3B):', '#FFEB3B');
+    if (!colorInput) return;
+
+    const newText = text.substring(0, start) + 
+      `<span style="background-color: ${colorInput}">${selectedText || 'highlighted text'}</span>` + 
+      text.substring(end);
+
+    setFormData(prev => ({
+      ...prev,
+      caption: newText
+    }));
+
+    setTimeout(() => {
+      textarea.focus();
+    }, 0);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     const formDataToSend = new FormData();
     formDataToSend.append('title', formData.title);
+    formDataToSend.append('titleColor', formData.titleColor);
     formDataToSend.append('caption', formData.caption);
+    formDataToSend.append('captionFormat', formData.captionFormat);
     formDataToSend.append('link', formData.link);
     formDataToSend.append('priority', formData.priority);
     
@@ -155,7 +266,9 @@ const AnnouncementAdmin = () => {
     
     setFormData({
       title: announcement.title,
+      titleColor: announcement.titleColor || '#000000',
       caption: announcement.caption || '',
+      captionFormat: announcement.captionFormat || 'markdown',
       link: announcement.link || '',
       priority: announcement.priority || 0,
       isActive: announcement.isActive,
@@ -252,7 +365,9 @@ const AnnouncementAdmin = () => {
   const openCreateModal = () => {
     setFormData({
       title: '',
+      titleColor: '#000000',
       caption: '',
+      captionFormat: 'markdown',
       link: '',
       priority: 0,
       isActive: true,
@@ -274,6 +389,7 @@ const AnnouncementAdmin = () => {
     setShowModal(false);
     setEditMode(false);
     setCurrentAnnouncement(null);
+    setShowMarkdownHelper(false);
   };
 
   const formatExpiryDate = (dateString) => {
@@ -308,7 +424,7 @@ const AnnouncementAdmin = () => {
         {announcements.map((announcement) => (
           <div key={announcement._id} className="annc-admin-single-card">
             <div className="annc-admin-card-top-section">
-              <h3>{announcement.title}</h3>
+              <h3 style={{ color: announcement.titleColor }}>{announcement.title}</h3>
               <div className="annc-admin-status-badges-group">
                 <span className={`annc-admin-status-badge ${announcement.isActive ? 'annc-admin-active' : 'annc-admin-inactive'}`}>
                   {announcement.isActive ? 'Active' : 'Inactive'}
@@ -320,12 +436,21 @@ const AnnouncementAdmin = () => {
             </div>
 
             {announcement.caption && (
-              <p className="annc-admin-card-caption">{announcement.caption}</p>
+              <div className="annc-admin-card-caption">
+                {announcement.captionFormat === 'markdown' ? (
+                  <div dangerouslySetInnerHTML={{ __html: announcement.renderedCaption }} />
+                ) : (
+                  <p>{announcement.caption}</p>
+                )}
+              </div>
             )}
 
             <div className="annc-admin-card-metadata">
               <div className="annc-admin-meta-single-item">
                 <strong>Priority:</strong> {announcement.priority}
+              </div>
+              <div className="annc-admin-meta-single-item">
+                <strong>Format:</strong> {announcement.captionFormat}
               </div>
               {announcement.link && (
                 <div className="annc-admin-meta-single-item">
@@ -395,7 +520,7 @@ const AnnouncementAdmin = () => {
 
       {showModal && (
         <div className="annc-admin-modal-backdrop" onClick={closeModal}>
-          <div className="annc-admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="annc-admin-modal-dialog annc-admin-modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="annc-admin-modal-top-bar">
               <h2>{editMode ? 'Edit Announcement' : 'Create Announcement'}</h2>
               <button className="annc-admin-btn-close-modal" onClick={closeModal}>
@@ -404,26 +529,139 @@ const AnnouncementAdmin = () => {
             </div>
 
             <div className="annc-admin-form-container">
-              <div className="annc-admin-form-field-group">
-                <label htmlFor="title">Title *</label>
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  required
-                />
+              <div className="annc-admin-form-row">
+                <div className="annc-admin-form-field-group annc-admin-flex-grow">
+                  <label htmlFor="title">Title *</label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="annc-admin-form-field-group annc-admin-color-picker-group">
+                  <label htmlFor="titleColor">
+                    <Palette size={16} /> Title Color
+                  </label>
+                  <div className="annc-admin-color-input-wrapper">
+                    <input
+                      type="color"
+                      id="titleColor"
+                      name="titleColor"
+                      value={formData.titleColor}
+                      onChange={handleInputChange}
+                      className="annc-admin-color-picker"
+                    />
+                    <input
+                      type="text"
+                      value={formData.titleColor}
+                      onChange={(e) => setFormData(prev => ({ ...prev, titleColor: e.target.value }))}
+                      className="annc-admin-color-text-input"
+                      placeholder="#000000"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="annc-admin-form-field-group">
-                <label htmlFor="caption">Caption</label>
+                <div className="annc-admin-caption-header">
+                  <label htmlFor="caption">Caption</label>
+                  <div className="annc-admin-format-switch">
+                    <label>
+                      <input
+                        type="radio"
+                        name="captionFormat"
+                        value="markdown"
+                        checked={formData.captionFormat === 'markdown'}
+                        onChange={handleInputChange}
+                      />
+                      Markdown
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="captionFormat"
+                        value="plain"
+                        checked={formData.captionFormat === 'plain'}
+                        onChange={handleInputChange}
+                      />
+                      Plain Text
+                    </label>
+                  </div>
+                </div>
+
+                {formData.captionFormat === 'markdown' && (
+                  <div className="annc-admin-markdown-toolbar">
+                    <button type="button" onClick={() => insertMarkdownSyntax('bold')} title="Bold">
+                      <Bold size={16} />
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('italic')} title="Italic">
+                      <Italic size={16} />
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('heading')} title="Heading">
+                      <Type size={16} />
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('list')} title="Bullet List">
+                      <List size={16} />
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('numberedList')} title="Numbered List">
+                      1.
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('link')} title="Link">
+                      🔗
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('code')} title="Code">
+                      <Code size={16} />
+                    </button>
+                    <button type="button" onClick={() => insertMarkdownSyntax('table')} title="Table">
+                      ⊞
+                    </button>
+                    <button type="button" onClick={insertColorSpan} title="Text Color" className="annc-admin-color-btn">
+                      <Palette size={16} /> Color
+                    </button>
+                    <button type="button" onClick={insertBackgroundColor} title="Background Color" className="annc-admin-highlight-btn">
+                      🎨 Highlight
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowMarkdownHelper(!showMarkdownHelper)} 
+                      className="annc-admin-help-btn"
+                    >
+                      ?
+                    </button>
+                  </div>
+                )}
+
+                {showMarkdownHelper && formData.captionFormat === 'markdown' && (
+                  <div className="annc-admin-markdown-helper">
+                    <h4>Markdown & Styling Guide:</h4>
+                    <ul>
+                      <li><strong>Bold:</strong> **text** or __text__</li>
+                      <li><strong>Italic:</strong> *text* or _text_</li>
+                      <li><strong>Heading:</strong> # H1, ## H2, ### H3</li>
+                      <li><strong>List:</strong> - item or 1. item</li>
+                      <li><strong>Link:</strong> [text](url)</li>
+                      <li><strong>Code:</strong> `code` or ```block```</li>
+                      <li><strong>Color Text:</strong> &lt;span style="color: #FF5733"&gt;text&lt;/span&gt;</li>
+                      <li><strong>Background:</strong> &lt;span style="background-color: #FFEB3B"&gt;text&lt;/span&gt;</li>
+                      <li><strong>Multiple Styles:</strong> &lt;span style="color: #E74C3C; font-weight: bold; font-size: 18px"&gt;text&lt;/span&gt;</li>
+                    </ul>
+                  </div>
+                )}
+
                 <textarea
                   id="caption"
                   name="caption"
                   value={formData.caption}
                   onChange={handleInputChange}
-                  rows="3"
+                  rows="8"
+                  placeholder={formData.captionFormat === 'markdown' 
+                    ? 'Enter markdown text with inline HTML for colors...\nExample: This is **bold** and this is <span style="color: #FF5733">red text</span>'
+                    : 'Enter plain text...'
+                  }
                 />
               </div>
 
@@ -435,6 +673,7 @@ const AnnouncementAdmin = () => {
                   name="link"
                   value={formData.link}
                   onChange={handleInputChange}
+                  placeholder="https://example.com"
                 />
               </div>
 
