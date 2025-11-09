@@ -3689,6 +3689,143 @@ app.post('/api/contact', async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   });
+
+// Content moderation function using Gemini
+async function moderateContent(content, userName) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    
+    const prompt = `You are a strict content moderator for a professional blog platform. Analyze the following comment for ANY violations of community guidelines.
+
+Community Guidelines (VERY STRICT):
+- No hate speech, discrimination, or prejudice of any kind
+- No harassment, bullying, or personal attacks
+- No profanity, vulgar language, or inappropriate content
+- No spam, promotional content, or irrelevant links
+- No threats, violence, or harmful content
+- No sexual content or inappropriate references
+- No misinformation or deliberately false statements
+- No trolling, baiting, or inflammatory remarks
+- Must be respectful and constructive
+- Must be relevant to the blog topic
+
+User Name: "${userName}"
+Comment Content: "${content}"
+
+Respond ONLY in this exact JSON format (no markdown, no extra text):
+{
+  "approved": true/false,
+  "reason": "brief explanation if rejected",
+  "severity": "low/medium/high/critical"
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let jsonResponse = response.text().trim();
+    
+    // Clean up potential markdown formatting
+    jsonResponse = jsonResponse
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+    
+    const moderation = JSON.parse(jsonResponse);
+    
+    return {
+      approved: moderation.approved === true,
+      reason: moderation.reason || 'Content does not meet community guidelines',
+      severity: moderation.severity || 'medium'
+    };
+    
+  } catch (error) {
+    console.error('Content moderation error:', error);
+    // On error, default to manual review (reject with specific code)
+    return {
+      approved: false,
+      reason: 'Content pending manual review due to system error',
+      severity: 'unknown',
+      systemError: true
+    };
+  }
+}
+
+// POST comment route with content moderation
+app.post(
+  '/api/blogs/:blogId/comments',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('content').trim().notEmpty().withMessage('Comment content is required')
+      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { blogId } = req.params;
+      const { name, email, content } = req.body;
+
+      // Check if blog exists
+      const blog = await Blog.findById(blogId);
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog not found' });
+      }
+
+      // CONTENT MODERATION CHECK
+      console.log(`🔍 Moderating comment from ${name}...`);
+      const moderation = await moderateContent(content, name);
+      
+      if (!moderation.approved) {
+        // Log moderation rejection (green/info level, not error)
+        console.log(`✅ Content moderation blocked comment from ${name} - Reason: ${moderation.reason}`);
+        
+        // Return user-friendly error with unique code
+        return res.status(422).json({
+          message: 'Your comment cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
+          code: 'CONTENT_POLICY_VIOLATION',
+          severity: moderation.severity,
+          moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          hint: moderation.systemError 
+            ? 'Your comment is under review. Please try again later.' 
+            : 'Please review our community guidelines and post respectful, constructive content.'
+        });
+      }
+
+      console.log(`✅ Content approved for ${name}`);
+
+      // Create new comment (only if moderation passed)
+      const newComment = new Comment({
+        blog: blogId,
+        user: { name, email },
+        content
+      });
+
+      await newComment.save();
+      
+      // Update blog comments count
+      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Comment added successfully',
+        comment: newComment
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      res.status(500).json({ 
+        message: 'Server error', 
+        error: error.message,
+        code: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+
+// POST reply route with content moderation
 app.post(
   '/api/comments/:commentId/replies',
   [
@@ -3716,10 +3853,35 @@ app.post(
 
       // Check if parent comment is approved
       if (parentComment.status !== 'approved') {
-        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
+        return res.status(400).json({ 
+          message: 'Cannot reply to unapproved comment',
+          code: 'PARENT_NOT_APPROVED'
+        });
       }
 
-      // Create new reply
+      // CONTENT MODERATION CHECK
+      console.log(`🔍 Moderating reply from ${name}...`);
+      const moderation = await moderateContent(content, name);
+      
+      if (!moderation.approved) {
+        // Log moderation rejection (green/info level, not error)
+        console.log(`✅ Content moderation blocked reply from ${name} - Reason: ${moderation.reason}`);
+        
+        // Return user-friendly error with unique code
+        return res.status(422).json({
+          message: 'Your reply cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
+          code: 'CONTENT_POLICY_VIOLATION',
+          severity: moderation.severity,
+          moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          hint: moderation.systemError 
+            ? 'Your reply is under review. Please try again later.' 
+            : 'Please review our community guidelines and post respectful, constructive content.'
+        });
+      }
+
+      console.log(`✅ Content approved for ${name}`);
+
+      // Create new reply (only if moderation passed)
       const newReply = new Comment({
         blog: parentComment.blog,
         user: { name, email },
@@ -3738,10 +3900,21 @@ app.post(
       });
     } catch (error) {
       console.error('Error adding reply:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({ 
+        message: 'Server error', 
+        error: error.message,
+        code: 'INTERNAL_SERVER_ERROR'
+      });
     }
   }
 );
+
+
+
+
+
+
+
 
 // AUTHOR ROUTE: Add author reply to a comment
 app.post(
@@ -4314,53 +4487,7 @@ app.delete('/api/author-comments/:commentId', authenticateToken, async (req, res
   
   // routes/commentRoutes.js
   // Add a comment
-  app.post(
-    '/api/blogs/:blogId/comments',
-    [
-      body('name').trim().notEmpty().withMessage('Name is required'),
-      body('email').isEmail().withMessage('Valid email is required'),
-      body('content').trim().notEmpty().withMessage('Comment content is required')
-        .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
-    ],
-    async (req, res) => {
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-  
-      try {
-        const { blogId } = req.params;
-        const { name, email, content } = req.body;
-  
-        // Check if blog exists
-        const blog = await Blog.findById(blogId);
-        if (!blog) {
-          return res.status(404).json({ message: 'Blog not found' });
-        }
-  
-        // Create new comment
-        const newComment = new Comment({
-          blog: blogId,
-          user: { name, email },
-          content
-        });
-  
-        await newComment.save();
-        
-        // Update blog comments count
-        await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
-  
-        res.status(201).json({ 
-          message: 'Comment added successfully',
-          comment: newComment
-        });
-      } catch (error) {
-        console.error('Error adding comment:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-      }
-    }
-  );
+ 
   app.get('/api/blogs/:blogId/comments', async (req, res) => {
   try {
     const { blogId } = req.params;
