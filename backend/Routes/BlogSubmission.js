@@ -213,7 +213,7 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
       content: submission.content,
       summary: submission.summary,
       author: req.user.admin_id,
-      status: 'published',
+      status: 'draft',
       tags: submission.tags,
       featuredImage: submission.featuredImage,
       contentImages: submission.contentImages,
