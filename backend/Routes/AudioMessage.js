@@ -11,7 +11,6 @@ const Admin = require('../models/admin');
 const sendEmail = require('../utils/email');
 const getOTPEmailTemplate = require('../EmailTemplates/getOTPEmailTemplate');
 const getEmailTemplate = require('../EmailTemplates/getEmailTemplate');
-// PUBLIC ROUTES
 router.post('/api/audio-contact/send-otp', async (req, res) => {
   try {
     const { email } = req.body;

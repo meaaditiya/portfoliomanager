@@ -16,7 +16,6 @@ const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const Reply = require("../models/reply");
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;

@@ -318,11 +318,6 @@
   border-radius: 10px;
 }
 
-.author-comment-textarea:focus,
-.author-reply-textarea:focus {
-  
- 
-}
 
 .character-count {
   text-align: right;

@@ -13,7 +13,7 @@ const sendEmail = require("../utils/email");
 // Login
 router.post('/login', async (req, res) => {
   try {
-   
+    const { email, password } = req.body;
     const admin = await Admin.findOne({ email });
     if (!admin) {
       return res.status(401).json({ message: 'Invalid credentials' });

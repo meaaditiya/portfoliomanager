@@ -2,13 +2,10 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
-const Admin = require("../models/admin");          // Admin model
-
-const authenticateToken = require("../middlewares/authMiddleware"); // Login check
-const isSuperAdmin = require("../middlewares/isSuperAdmin");        // Super admin check
-const upload = require("../middlewares/upload");                    // File upload middleware
-
+const Admin = require("../models/admin");          
+const authenticateToken = require("../middlewares/authMiddleware"); 
+const isSuperAdmin = require("../middlewares/isSuperAdmin");        
+const upload = require("../middlewares/upload");                    
 
 router.post('/api/admins', authenticateToken, isSuperAdmin, upload.single('profileImage'), async (req, res) => {
   try {
