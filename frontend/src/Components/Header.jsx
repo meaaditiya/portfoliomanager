@@ -42,6 +42,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     {name: 'Announcement', path: '/announcement'},
     {name: 'Query', path: '/query'},
     {name: 'Admins', path: '/admins'},
+    {name: 'Blog Submissions' , path: '/blogsubmissions'},
     
   ];
 
