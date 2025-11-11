@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const path = require('path');
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
+const cacheMiddleware = require("./middlewares/cacheMiddleware.js");
 const connectDB = require("./Config/db");
 
 const adminRoutes = require("./Routes/AdminRoutes.js");
@@ -31,6 +32,8 @@ app.use(cookieParser());
 app.use(corsMiddleware);
 const PORT = process.env.PORT || 5000;
 connectDB();
+
+app.use(cacheMiddleware);
 app.use("/api/admin", adminRoutes);
 app.use(queryRoutes);
 app.use(superAdminRoutes);
