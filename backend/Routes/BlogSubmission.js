@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");  
-const UserBlogSubmission = require("../models/userBlogSubmissionSchema.js")                 
+const UserBlogSubmission = require("../models/userBlogSubmissionSchema.js");
+const Blog = require("../models/blog.js");             
 router.post('/api/blog-submissions', async (req, res) => {
   try {
     const { 
