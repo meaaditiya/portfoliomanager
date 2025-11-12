@@ -1,59 +1,134 @@
 const express = require("express");
 const router = express.Router();
-const authenticateToken = require("../middlewares/authMiddleware");  
+const mongoose = require('mongoose');
+const authenticateToken = require("../middlewares/authMiddleware");
+const cleanupUnusedImages = require("../utils/cleanupUnusedImages");
+const cleanupUnusedVideos = require("../utils/cleanupUnusedVideos");
+const extractPlainText = require("../utils/extractPlainText");
+const processContent = require("../utils/processContent");
+const validateApiKey = require("../utils/validateApiKey");
+const moderateContent = require("../utils/moderateContent");
+const { body, validationResult } = require('express-validator');
 const UserBlogSubmission = require("../models/userBlogSubmissionSchema.js");
-const Blog = require("../models/blog.js");             
-router.post('/api/blog-submissions', async (req, res) => {
-  try {
-    const { 
-      userName, 
-      userEmail, 
-      title, 
-      content, 
-      summary, 
-      tags, 
-      featuredImage, 
-      contentImages, 
-      contentVideos 
-    } = req.body;
-    
-    // Validate required fields
-    if (!userName || !userEmail || !title || !content || !featuredImage) {
-      return res.status(400).json({ 
-        message: 'Name, email, title, content, and featured image are required' 
+const Blog = require("../models/blog.js");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// ==================== PUBLIC ROUTES ====================
+
+// Submit a new blog (Public route with content moderation and media processing)
+router.post('/api/blog-submissions',
+  [
+    body('userName').trim().notEmpty().withMessage('Name is required'),
+    body('userEmail').isEmail().withMessage('Valid email is required'),
+    body('title').trim().notEmpty().withMessage('Title is required'),
+    body('content').trim().notEmpty().withMessage('Content is required'),
+    body('featuredImage').notEmpty().withMessage('Featured image is required')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { 
+        userName, 
+        userEmail, 
+        title, 
+        content, 
+        summary, 
+        tags, 
+        featuredImage, 
+        contentImages, 
+        contentVideos 
+      } = req.body;
+
+      // CONTENT MODERATION CHECK
+      console.log(`🔍 Moderating blog submission from ${userName}...`);
+      
+      // Moderate title
+      const titleModeration = await moderateContent(title, userName);
+      if (!titleModeration.approved) {
+        console.log(`✅ Content moderation blocked title from ${userName}`);
+        return res.status(422).json({
+          message: 'Your blog title violates our community guidelines.',
+          code: 'TITLE_POLICY_VIOLATION',
+          field: 'title',
+          severity: titleModeration.severity
+        });
+      }
+
+      // Moderate content
+      const plainTextContent = extractPlainText(content);
+      const contentModeration = await moderateContent(plainTextContent, userName);
+      if (!contentModeration.approved) {
+        console.log(`✅ Content moderation blocked blog content from ${userName}`);
+        return res.status(422).json({
+          message: 'Your blog content violates our community guidelines. Please ensure your content is respectful and constructive.',
+          code: 'CONTENT_POLICY_VIOLATION',
+          field: 'content',
+          severity: contentModeration.severity
+        });
+      }
+
+      // Moderate summary if provided
+      if (summary && summary.trim() !== '') {
+        const summaryModeration = await moderateContent(summary, userName);
+        if (!summaryModeration.approved) {
+          console.log(`✅ Content moderation blocked summary from ${userName}`);
+          return res.status(422).json({
+            message: 'Your blog summary violates our community guidelines.',
+            code: 'SUMMARY_POLICY_VIOLATION',
+            field: 'summary',
+            severity: summaryModeration.severity
+          });
+        }
+      }
+
+      console.log(`✅ All content approved for ${userName}`);
+
+      // Clean up unused images and videos (same as admin blog creation)
+      const cleanedImages = cleanupUnusedImages(content, contentImages || []);
+      const cleanedVideos = cleanupUnusedVideos(content, contentVideos || []);
+
+      const newSubmission = new UserBlogSubmission({
+        userName,
+        userEmail,
+        title,
+        content,
+        summary: summary || '',
+        tags: tags || [],
+        featuredImage,
+        contentImages: cleanedImages,
+        contentVideos: cleanedVideos
+      });
+
+      await newSubmission.save();
+
+      res.status(201).json({
+        message: 'Blog submission received successfully. Your submission is under review.',
+        blogSubmissionId: newSubmission.blogSubmissionId,
+        status: newSubmission.status,
+        submission: {
+          id: newSubmission._id,
+          blogSubmissionId: newSubmission.blogSubmissionId,
+          title: newSubmission.title,
+          userName: newSubmission.userName,
+          userEmail: newSubmission.userEmail,
+          status: newSubmission.status,
+          submittedAt: newSubmission.submittedAt
+        }
+      });
+    } catch (error) {
+      console.error('Error submitting blog:', error);
+      res.status(500).json({ 
+        message: 'Failed to submit blog',
+        code: 'INTERNAL_SERVER_ERROR'
       });
     }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userEmail)) {
-      return res.status(400).json({ message: 'Invalid email format' });
-    }
-    
-    const newSubmission = new UserBlogSubmission({
-      userName,
-      userEmail,
-      title,
-      content,
-      summary: summary || '',
-      tags: tags || [],
-      featuredImage,
-      contentImages: contentImages || [],
-      contentVideos: contentVideos || []
-    });
-    
-    await newSubmission.save();
-    
-    res.status(201).json({
-      message: 'Blog submission received successfully',
-      blogSubmissionId: newSubmission.blogSubmissionId,
-      status: newSubmission.status
-    });
-  } catch (error) {
-    console.error('Error submitting blog:', error);
-    res.status(500).json({ message: 'Failed to submit blog' });
   }
-});
+);
 
 // Check status of blog submission using blogSubmissionId
 router.get('/api/blog-submissions/status/:blogSubmissionId', async (req, res) => {
@@ -75,7 +150,8 @@ router.get('/api/blog-submissions/status/:blogSubmissionId', async (req, res) =>
       submittedAt: submission.submittedAt,
       reviewedAt: submission.reviewedAt,
       rejectionReason: submission.rejectionReason,
-      changesSuggested: submission.changesSuggested
+      changesSuggested: submission.changesSuggested,
+      publishedBlogId: submission.publishedBlogId
     });
   } catch (error) {
     console.error('Error checking submission status:', error);
@@ -83,23 +159,148 @@ router.get('/api/blog-submissions/status/:blogSubmissionId', async (req, res) =>
   }
 });
 
-// Get full submission details using blogSubmissionId
+// Get full submission details using blogSubmissionId with processed content
 router.get('/api/blog-submissions/details/:blogSubmissionId', async (req, res) => {
   try {
     const { blogSubmissionId } = req.params;
     
     const submission = await UserBlogSubmission.findOne({ 
       blogSubmissionId: blogSubmissionId.toUpperCase() 
-    });
+    }).populate('publishedBlogId', 'title slug status');
+    
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    // Process content to replace image and video placeholders (same as blog processing)
+    const submissionObj = submission.toObject();
+    submissionObj.processedContent = processContent(
+      submissionObj.content, 
+      submissionObj.contentImages, 
+      submissionObj.contentVideos
+    );
+    
+    res.status(200).json(submissionObj);
+  } catch (error) {
+    console.error('Error fetching submission details:', error);
+    res.status(500).json({ message: 'Failed to fetch submission details' });
+  }
+});
+
+// Generate summary for blog submission (Public route)
+router.post('/api/blog-submissions/:identifier/generate-summary', async (req, res) => {
+  try {
+    validateApiKey();
+    
+    const { identifier } = req.params;
+    const { wordLimit = 300, temperature = 0.7 } = req.body;
+    
+    // Find submission by ID or blogSubmissionId
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { blogSubmissionId: identifier.toUpperCase() };
+    
+    const submission = await UserBlogSubmission.findOne(query);
     
     if (!submission) {
       return res.status(404).json({ message: 'Submission not found' });
     }
     
-    res.status(200).json(submission);
+    // Extract plain text from submission content
+    const plainTextContent = extractPlainText(submission.content);
+    
+    if (plainTextContent.length < 100) {
+      return res.status(400).json({ 
+        message: 'Submission content is too short to generate a meaningful summary' 
+      });
+    }
+    
+    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
+    - Be approximately ${wordLimit} words long
+    - Capture the main points and key insights
+    - Be engaging and well-structured with clear paragraphs
+    - Maintain the tone and style of the original content
+    - Be suitable for readers who want a quick overview
+    - Focus on the most important information and actionable insights
+    - Generate different answer every time but same meaning
+    
+    Blog Title: "${submission.title}"
+    
+    Blog Content:
+    ${plainTextContent}
+    
+    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+    
+    const generationConfig = {
+      temperature: temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: Math.ceil(wordLimit * 1.5),
+    };
+    
+    const modelWithConfig = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: generationConfig
+    });
+    
+    let result;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        result = await modelWithConfig.generateContent(prompt);
+        break;
+      } catch (retryError) {
+        attempts++;
+        if (attempts >= maxAttempts) throw retryError;
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+      }
+    }
+    
+    const response = await result.response;
+    let generatedSummary = response.text().trim();
+    
+    generatedSummary = generatedSummary
+      .replace(/^\*\*Summary\*\*:?\s*/i, '')
+      .replace(/^\*\*\s*|\s*\*\*$/g, '')
+      .trim();
+    
+    const wordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
+    
+    res.json({
+      message: 'Summary generated successfully',
+      summary: generatedSummary,
+      wordCount: wordCount,
+      targetWordLimit: wordLimit,
+      submissionId: submission._id,
+      blogSubmissionId: submission.blogSubmissionId,
+      title: submission.title,
+      generatedAt: new Date().toISOString()
+    });
+    
   } catch (error) {
-    console.error('Error fetching submission details:', error);
-    res.status(500).json({ message: 'Failed to fetch submission details' });
+    console.error('Error generating submission summary:', error);
+    
+    if (error.message.includes('API_KEY') || error.message.includes('key')) {
+      return res.status(500).json({ 
+        message: 'Gemini API configuration error.',
+        code: 'API_KEY_ERROR'
+      });
+    }
+    
+    if (error.message.includes('quota') || error.message.includes('limit') || error.status === 429) {
+      return res.status(429).json({ 
+        message: 'API quota exceeded. Please try again later.',
+        code: 'QUOTA_EXCEEDED'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Failed to generate summary. Please try again.',
+      code: 'GENERATION_FAILED'
+    });
   }
 });
 
@@ -108,7 +309,6 @@ router.get('/api/blog-submissions/details/:blogSubmissionId', async (req, res) =
 // Get all blog submissions with filters
 router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -116,12 +316,10 @@ router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) =>
     const { status, page = 1, limit = 20, search } = req.query;
     const query = {};
 
-    // Filter by status if provided
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
       query.status = status;
     }
 
-    // Search by title, userName, or userEmail
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -142,7 +340,6 @@ router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) =>
 
     const total = await UserBlogSubmission.countDocuments(query);
 
-    // Get statistics
     const stats = {
       total: await UserBlogSubmission.countDocuments(),
       pending: await UserBlogSubmission.countDocuments({ status: 'pending' }),
@@ -166,10 +363,9 @@ router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) =>
   }
 });
 
-// Get single blog submission by ID (for admin review)
+// Get single blog submission by ID (for admin review with processed content)
 router.get('/api/admin/blog-submissions/:id', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -182,17 +378,24 @@ router.get('/api/admin/blog-submissions/:id', authenticateToken, async (req, res
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    res.status(200).json(submission);
+    // Process content to replace image and video placeholders
+    const submissionObj = submission.toObject();
+    submissionObj.processedContent = processContent(
+      submissionObj.content, 
+      submissionObj.contentImages, 
+      submissionObj.contentVideos
+    );
+
+    res.status(200).json(submissionObj);
   } catch (error) {
     console.error('Error fetching submission:', error);
     res.status(500).json({ message: 'Failed to fetch submission' });
   }
 });
 
-// Approve blog submission
+// Approve blog submission and create published blog
 router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -207,13 +410,13 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
       return res.status(400).json({ message: 'Submission already approved' });
     }
 
-    // Create actual blog post
+    // Create actual blog post with all processed content
     const newBlog = new Blog({
       title: submission.title,
       content: submission.content,
       summary: submission.summary,
       author: req.user.admin_id,
-      status: 'draft',
+      status: 'published',
       tags: submission.tags,
       featuredImage: submission.featuredImage,
       contentImages: submission.contentImages,
@@ -245,7 +448,6 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
 // Reject blog submission
 router.post('/api/admin/blog-submissions/:id/reject', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -286,7 +488,6 @@ router.post('/api/admin/blog-submissions/:id/reject', authenticateToken, async (
 // Suggest changes to blog submission
 router.post('/api/admin/blog-submissions/:id/suggest-changes', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -322,7 +523,6 @@ router.post('/api/admin/blog-submissions/:id/suggest-changes', authenticateToken
 // Delete blog submission
 router.delete('/api/admin/blog-submissions/:id', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -345,7 +545,6 @@ router.delete('/api/admin/blog-submissions/:id', authenticateToken, async (req, 
 // Get dashboard statistics
 router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -365,7 +564,7 @@ router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, asy
       submittedAt: { $gte: sevenDaysAgo }
     });
 
-    // Get top contributors (users with most submissions)
+    // Get top contributors
     const topContributors = await UserBlogSubmission.aggregate([
       {
         $group: {
@@ -393,7 +592,6 @@ router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, asy
 // Bulk approve submissions
 router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -418,7 +616,7 @@ router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async
           continue;
         }
 
-        // Create blog post
+        // Create blog post with processed content
         const newBlog = new Blog({
           title: submission.title,
           content: submission.content,
@@ -461,7 +659,6 @@ router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async
 // Bulk reject submissions
 router.post('/api/admin/blog-submissions/bulk/reject', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -500,4 +697,5 @@ router.post('/api/admin/blog-submissions/bulk/reject', authenticateToken, async 
     res.status(500).json({ message: 'Failed to perform bulk rejection' });
   }
 });
+
 module.exports = router;
