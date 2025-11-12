@@ -17,6 +17,7 @@ const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cacheMiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const apicache = require("apicache");
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;

@@ -9,6 +9,7 @@ const extractDeviceId = require("../middlewares/extractDeviceId");
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const cacheMiddleware = require("../middlewares/cacheMiddleware");
+const apicache = require("apicache");
 router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
