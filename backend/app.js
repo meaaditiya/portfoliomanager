@@ -4,7 +4,6 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const path = require('path');
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
-const cacheMiddleware = require("./middlewares/cacheMiddleware.js");
 const connectDB = require("./Config/db");
 
 const adminRoutes = require("./Routes/AdminRoutes.js");
@@ -47,7 +46,6 @@ app.use(AudioMessageRoutes);
 app.use(StreamRoutes);
 app.use(ProfileRoutes);
 app.use(QuoteRoutes);
-app.use(cacheMiddleware);
 app.use(ImageRoutes);
 app.use(SocialMediaEmbed);
 app.use(CommunityPostRoutes);

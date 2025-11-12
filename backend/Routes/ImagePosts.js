@@ -8,6 +8,7 @@ const upload = require("../middlewares/upload");
 const extractDeviceId = require("../middlewares/extractDeviceId");
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
+const cacheMiddleware = require("../middlewares/cacheMiddleware");
 router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
@@ -65,7 +66,7 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
     
     const newImagePost = new ImagePost(postData);
     await newImagePost.save();
-    
+    apicache.clear('/api/image-posts');
     res.status(201).json({
       message: `${mediaType === 'video' ? 'Video' : 'Image'} post created successfully`,
       post: {
@@ -192,7 +193,8 @@ router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) 
     await ImageReaction.deleteMany({ post: id });
     await ImageComment.deleteMany({ post: id });
     await ImagePost.findByIdAndDelete(id);
-    
+     apicache.clear('/api/image-posts');
+    apicache.clear(`/api/image-posts/${id}`);
     res.json({ message: 'Image post and associated data deleted successfully' });
   } catch (error) {
     console.error('Error deleting image post:', error);
@@ -288,7 +290,7 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
 // PUBLIC ROUTES
 // Get all published image posts (public)
 // Get all published image/video posts (public)
-router.get('/api/image-posts', async (req, res) => {
+router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10, mediaType } = req.query;
     
@@ -330,7 +332,7 @@ router.get('/api/image-posts', async (req, res) => {
   }
 });
 // Get single image/video post (public)
-router.get('/api/image-posts/:id', async (req, res) => {
+router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -448,7 +450,7 @@ router.post('/api/image-posts/:id/react', extractDeviceId, async (req, res) => {
 });
 
 // Check if user has reacted to a post
-router.get('/api/image-posts/:id/has-reacted', extractDeviceId, async (req, res) => {
+router.get('/api/image-posts/:id/has-reacted', extractDeviceId, cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.query;
@@ -557,7 +559,7 @@ router.post('/api/image-posts/:id/comments',
 );
 
 // Get comments for an image post (public - active comments only)
-router.get('/api/image-posts/:id/comments', async (req, res) => {
+router.get('/api/image-posts/:id/comments', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -600,7 +602,7 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
 });
 
 // Get replies for a comment (public)
-router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
+router.get('/api/image-posts/comments/:commentId/replies', cacheMiddleware,  async (req, res) => {
   try {
     const { commentId } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -756,7 +758,7 @@ router.post('/api/image-posts/comments/:commentId/dislike',
 
 // Check user's reaction on a comment (public)
 router.get('/api/image-posts/comments/:commentId/user-reaction',
-  extractDeviceId,
+  extractDeviceId, cacheMiddleware, 
   async (req, res) => {
     try {
       const { commentId } = req.params;
