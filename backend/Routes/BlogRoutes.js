@@ -15,9 +15,7 @@ const  Comment = require('../models/comment');
 const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const cacheMiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const apicache = require("apicache");
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;
@@ -44,8 +42,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     });
     
     await newBlog.save();
-     apicache.clear('/api/blogs');
-    apicache.clear('/api/blogs/stats/overview');
+    
     res.status(201).json({
       message: 'Blog post created successfully',
       blog: newBlog
@@ -90,8 +87,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       
       blog.contentImages.push(newImage);
       await blog.save();
-      apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/images`);
+      
       res.status(201).json({
         message: 'Image added successfully',
         image: newImage,
@@ -134,8 +130,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       if (position) blog.contentImages[imageIndex].position = position;
       
       await blog.save();
-      apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/images`);
+      
       res.json({
         message: 'Image updated successfully',
         image: blog.contentImages[imageIndex]
@@ -170,8 +165,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       
       blog.contentImages.splice(imageIndex, 1);
       await blog.save();
-      apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/images`);
+      
       res.json({ message: 'Image deleted successfully' });
     } catch (error) {
       console.error('Error deleting image:', error);
@@ -180,7 +174,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
   });
   
   // Get all blog posts (with pagination and filtering)
-router.get('/api/blogs', cacheMiddleware, async (req, res) => {
+router.get('/api/blogs', async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -253,7 +247,7 @@ router.get('/api/blogs', cacheMiddleware, async (req, res) => {
 });
   
  // UPDATED: Get a single blog post (with read tracking)
-router.get('/api/blogs/:identifier', cacheMiddleware, async (req, res) => {
+router.get('/api/blogs/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
     
@@ -355,9 +349,7 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
     });
     
     await blog.save();
-     apicache.clear(`/api/blogs/${identifier}`);
-    apicache.clear(`/api/blogs/${identifier}/reports`);
-    apicache.clear('/api/blogs/reports/all');
+    
     res.status(201).json({ 
       message: 'Report submitted successfully',
       totalReports: blog.totalReports
@@ -425,8 +417,7 @@ router.delete('/api/blogs/:identifier/reports/:reportId', authenticateToken, asy
     
     blog.reports.splice(reportIndex, 1);
     await blog.save();
-    apicache.clear(`/api/blogs/${identifier}/reports`);
-    apicache.clear('/api/blogs/reports/all');
+    
     res.json({ 
       message: 'Report deleted successfully',
       totalReports: blog.totalReports
@@ -455,8 +446,7 @@ router.delete('/api/blogs/:identifier/reports', authenticateToken, async (req, r
     
     blog.reports = [];
     await blog.save();
-    apicache.clear(`/api/blogs/${identifier}/reports`);
-    apicache.clear('/api/blogs/reports/all');
+    
     res.json({ 
       message: 'All reports cleared successfully',
       totalReports: blog.totalReports
@@ -615,10 +605,7 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
     
     const blogObj = blog.toObject();
     blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
-    apicache.clear('/api/blogs');
-    apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${blog.slug}`);
-    apicache.clear('/api/blogs/stats/overview');
+    
     res.json({
       message: 'Blog post updated successfully',
       blog: blogObj
@@ -648,10 +635,7 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       }
       
       await Blog.findByIdAndDelete(id);
-      apicache.clear('/api/blogs');
-    apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${blog.slug}`);
-    apicache.clear('/api/blogs/stats/overview');
+      
       res.json({ message: 'Blog post deleted successfully' });
     } catch (error) {
       console.error('Error deleting blog:', error);
@@ -734,8 +718,7 @@ router.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
     
     blog.contentVideos.push(newVideo);
     await blog.save();
-     apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/videos`);
+    
     res.status(201).json({
       message: 'Video added successfully',
       video: newVideo,
@@ -789,8 +772,7 @@ router.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res)
     if (muted !== undefined) blog.contentVideos[videoIndex].muted = muted;
     
     await blog.save();
-    apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/videos`);
+    
     res.json({
       message: 'Video updated successfully',
       video: blog.contentVideos[videoIndex]
@@ -825,8 +807,7 @@ router.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, r
     
     blog.contentVideos.splice(videoIndex, 1);
     await blog.save();
-    apicache.clear(`/api/blogs/${id}`);
-    apicache.clear(`/api/blogs/${id}/videos`);
+    
     res.json({ message: 'Video deleted successfully' });
   } catch (error) {
     console.error('Error deleting video:', error);
@@ -1230,7 +1211,7 @@ router.get('/api/gemini/health', async (req, res) => {
     });
   }
 });
- router.get('/api/blogs/:blogId/comments', cacheMiddleware,  async (req, res) => {
+ router.get('/api/blogs/:blogId/comments', async (req, res) => {
   try {
     const { blogId } = req.params;
     
@@ -1325,11 +1306,7 @@ router.delete('/api/comments/:commentId/user',
       await CommentReaction.deleteMany({ comment: commentId });
       
       await Comment.deleteOne({ _id: commentId });
-      apicache.clear(`/api/blogs/${comment.blog}/comments`);
-    apicache.clear(`/api/comments/${commentId}/replies`);
-    if (comment.parentComment) {
-      apicache.clear(`/api/comments/${comment.parentComment}/replies`);
-    }
+      
       res.status(200).json({ message: 'Comment deleted successfully' });
     } catch (error) {
       console.error('Error deleting user comment:', error);
@@ -1405,7 +1382,7 @@ router.delete('/api/comments/:commentId/user',
       
       comment.status = status;
       await comment.save();
-      apicache.clear(`/api/blogs/${comment.blog}/comments`);
+      
       res.status(200).json({ 
         message: 'Comment status updated',
         comment
@@ -1432,8 +1409,7 @@ router.delete('/api/comments/:commentId/user',
       }
       
       await Comment.deleteOne({ _id: commentId });
-      apicache.clear(`/api/blogs/${comment.blog}/comments`);
-    apicache.clear(`/api/comments/${commentId}/replies`);
+      
       res.status(200).json({ message: 'Comment deleted successfully' });
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -1500,8 +1476,7 @@ router.post(
       
       // Update blog comments count
       await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
-      apicache.clear(`/api/blogs/${blogId}`);
-    apicache.clear(`/api/blogs/${blogId}/comments`);
+
       res.status(201).json({ 
         message: 'Comment added successfully',
         comment: newComment
@@ -1586,10 +1561,7 @@ router.post(
       
       // Update parent comment's replies count
       await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
-apicache.clear(`/api/comments/${commentId}/replies`);
-    if (parentComment) {
-      apicache.clear(`/api/blogs/${parentComment.blog}/comments`);
-    }
+
       res.status(201).json({ 
         message: 'Reply added successfully',
         reply: newReply
@@ -1605,7 +1577,7 @@ apicache.clear(`/api/comments/${commentId}/replies`);
   }
 );
 // Get replies for a comment
-router.get('/api/comments/:commentId/replies',cacheMiddleware, async (req, res) => {
+router.get('/api/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
     
@@ -1733,8 +1705,7 @@ router.post(
       } else {
         await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.dislikes': 1 } });
       }
-apicache.clear(`/api/blogs/${blogId}/reactions/count`);
-    apicache.clear(`/api/blogs/${blogId}`);
+
       res.status(201).json({ 
         message: `${type} added successfully`,
         reaction: newReaction
@@ -1751,7 +1722,7 @@ apicache.clear(`/api/blogs/${blogId}/reactions/count`);
 );
 
 // Get user's reaction to a comment
-router.get('/api/comments/:commentId/reactions/user',cacheMiddleware, async (req, res) => {
+router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
   try {
     const { commentId } = req.params;
     const { email } = req.query;
@@ -1780,7 +1751,7 @@ router.get('/api/comments/:commentId/reactions/user',cacheMiddleware, async (req
 });
 
 // Get reaction counts for a comment
-router.get('/api/comments/:commentId/reactions/count', cacheMiddleware, async (req, res) => {
+router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
   try {
     const { commentId } = req.params;
     
@@ -1839,8 +1810,7 @@ router.post(
       
       // Update blog comments count
       await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
-apicache.clear(`/api/blogs/${blogId}/comments`);
-    apicache.clear(`/api/blogs/${blogId}`);
+
       res.status(201).json({ 
         message: 'Author comment added successfully',
         comment: newComment
@@ -1927,8 +1897,7 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
     await CommentReaction.deleteMany({ comment: commentId });
     
     await Comment.deleteOne({ _id: commentId });
-    apicache.clear(`/api/blogs/${comment.blog}/comments`);
-    apicache.clear(`/api/comments/${commentId}/replies`);
+    
     res.status(200).json({ message: 'Author comment deleted successfully' });
   } catch (error) {
     console.error('Error deleting author comment:', error);
@@ -2043,7 +2012,7 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
   );
   
   // Get user's reaction to a blog
-  router.get('/api/blogs/:blogId/reactions/user',cacheMiddleware, async (req, res) => {
+  router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {
     try {
       const { blogId } = req.params;
       const { email } = req.query;
@@ -2072,7 +2041,7 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
   });
   
   // Get reaction counts for a blog
-  router.get('/api/blogs/:blogId/reactions/count',cacheMiddleware, async (req, res) => {
+  router.get('/api/blogs/:blogId/reactions/count', async (req, res) => {
     try {
       const { blogId } = req.params;
       
@@ -2161,10 +2130,7 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
         
         // Update parent comment's replies count
         await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
-    apicache.clear(`/api/comments/${commentId}/replies`);
-    if (parentComment) {
-      apicache.clear(`/api/blogs/${parentComment.blog}/comments`);
-    }
+  
         res.status(201).json({ 
           message: 'Author reply added successfully',
           reply: newReply
