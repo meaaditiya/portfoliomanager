@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 const marked = require('marked');
-const DOMPurify = require('isomorphic-dompurify'); // npm install isomorphic-dompurify
+const DOMPurify = require('isomorphic-dompurify');
 
-// Configure marked to allow HTML
+// Configure marked for better markdown support
 marked.setOptions({
   breaks: true,
   gfm: true,
-  sanitize: false // We'll use DOMPurify instead for better control
+  sanitize: false
 });
 
 const announcementSchema = new mongoose.Schema({
@@ -22,22 +22,104 @@ const announcementSchema = new mongoose.Schema({
   },
   caption: {
     type: String,
-    trim: true
+    trim: true,
+    required: true
   },
   captionFormat: {
     type: String,
     enum: ['markdown', 'plain'],
     default: 'markdown'
   },
+  // Array to store inline images used in caption
+  captionImages: [{
+    url: {
+      type: String,
+      required: true
+    },
+    alt: {
+      type: String,
+      default: ''
+    },
+    caption: {
+      type: String,
+      default: ''
+    },
+    position: {
+      type: String,
+      enum: ['left', 'right', 'center', 'full-width'],
+      default: 'center'
+    },
+    imageId: {
+      type: String,
+      required: true,
+      // REMOVED unique: true - this was causing the duplicate key error
+    }
+  }],
+  // Array to store inline videos used in caption
+  captionVideos: [{
+    url: {
+      type: String,
+      required: true
+    },
+    videoId: {
+      type: String,
+      required: true
+    },
+    platform: {
+      type: String,
+      enum: ['youtube', 'vimeo', 'dailymotion'],
+      default: 'youtube'
+    },
+    title: {
+      type: String,
+      default: ''
+    },
+    caption: {
+      type: String,
+      default: ''
+    },
+    position: {
+      type: String,
+      enum: ['left', 'right', 'center', 'full-width'],
+      default: 'center'
+    },
+    autoplay: {
+      type: Boolean,
+      default: false
+    },
+    muted: {
+      type: Boolean,
+      default: false
+    },
+    embedId: {
+      type: String,
+      required: true,
+      // REMOVED unique: true - this was causing the duplicate key error
+    }
+  }],
+  // Enhanced link with name
   link: {
-    type: String,
-    trim: true
+    url: {
+      type: String,
+      trim: true
+    },
+    name: {
+      type: String,
+      trim: true,
+      default: 'Learn More'
+    },
+    openInNewTab: {
+      type: Boolean,
+      default: true
+    }
   },
+  // Featured image (separate from caption images)
   image: {
     data: Buffer,
     contentType: String,
     filename: String
   },
+  // Downloadable document
   document: {
     data: Buffer,
     contentType: String,
@@ -59,6 +141,11 @@ const announcementSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    required: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -69,9 +156,27 @@ const announcementSchema = new mongoose.Schema({
   }
 });
 
-// Update the updatedAt timestamp before saving
+// Pre-save middleware
 announcementSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
+  
+  // Generate unique IDs for new caption images
+  if (this.isModified('captionImages')) {
+    this.captionImages.forEach(image => {
+      if (!image.imageId) {
+        image.imageId = 'ann_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      }
+    });
+  }
+  
+  // Generate unique IDs for new caption videos
+  if (this.isModified('captionVideos')) {
+    this.captionVideos.forEach(video => {
+      if (!video.embedId) {
+        video.embedId = 'ann_vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      }
+    });
+  }
   
   // Auto-mark as expired if expiresAt is in the past
   if (this.expiresAt && this.expiresAt < new Date()) {
@@ -85,10 +190,8 @@ announcementSchema.pre('save', function(next) {
 // Method to get rendered HTML from markdown with inline styles
 announcementSchema.methods.getRenderedCaption = function() {
   if (this.captionFormat === 'markdown' && this.caption) {
-    // Parse markdown to HTML
     const rawHtml = marked.parse(this.caption);
     
-    // Sanitize HTML but allow style attributes and color-related tags
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del',
@@ -131,7 +234,7 @@ announcementSchema.methods.checkExpiry = function() {
   return false;
 };
 
-// Static method to expire all announcements that have passed their expiry time
+// Static method to expire old announcements
 announcementSchema.statics.expireOldAnnouncements = async function() {
   const now = new Date();
   const result = await this.updateMany(

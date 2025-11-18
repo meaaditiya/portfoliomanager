@@ -1,19 +1,16 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Turnstile } from '@marsidev/react-turnstile';
-import '../ComponentsCSS/auth.css'; // Updated to unique CSS file
+import '../ComponentsCSS/auth.css';
 
 const Login = () => {
   const navigate = useNavigate();
-  const turnstileRef = useRef(null);
   
   const [view, setView] = useState('login');
   const [animating, setAnimating] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState(null);
   
   const [loginData, setLoginData] = useState({
     email: '',
@@ -30,9 +27,6 @@ const Login = () => {
   });
 
   const [passwordStrength, setPasswordStrength] = useState(0);
-  
-  // Use the direct site key
-  const siteKey = "0x4AAAAAABUex35iY9OmXSBB";
   
   const handleLoginChange = (e) => {
     setLoginData({
@@ -76,10 +70,6 @@ const Login = () => {
       setError('');
       setMessage('');
       setAnimating(false);
-      setTurnstileToken(null); // Reset token on view change
-      if (turnstileRef.current) {
-        turnstileRef.current.reset();
-      }
     }, 300);
   };
   
@@ -88,30 +78,20 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    if (!turnstileToken) {
-      setError('Please complete the CAPTCHA verification');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/login', {
+      const response = await axios.post('http://localhost:5000/api/admin/login', {
         email: loginData.email,
         password: loginData.password
       }, {
-        withCredentials: true // Important for handling cookies
+        withCredentials: true
       });
+      
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
       }
-      // Navigate to success page
       navigate('/welcome');
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
-      setTurnstileToken(null);
-      if (turnstileRef.current) {
-        turnstileRef.current.reset();
-      }
     } finally {
       setLoading(false);
     }
@@ -123,16 +103,13 @@ const Login = () => {
       setError('Please enter your email address');
       return;
     }
-    if (!turnstileToken) {
-      setError('Please complete the CAPTCHA verification');
-      return;
-    }
+    
     setError('');
     setMessage('');
     setLoading(true);
 
     try {
-      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/forgot-password', { 
+      const response = await axios.post('http://localhost:5000/api/admin/forgot-password', { 
         email: forgotEmail
       });
 
@@ -141,10 +118,6 @@ const Login = () => {
       changeView('resetOTP');
     } catch (error) {
       setError(error.response?.data?.message || 'Failed to process request');
-      setTurnstileToken(null);
-      if (turnstileRef.current) {
-        turnstileRef.current.reset();
-      }
     } finally {
       setLoading(false);
     }
@@ -169,7 +142,7 @@ const Login = () => {
     }
 
     try {
-      const response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/admin/reset-password', {
+      const response = await axios.post('http://localhost:5000/api/admin/reset-password', {
         email: resetData.email,
         otp: resetData.otp,
         newPassword: resetData.newPassword
@@ -232,33 +205,11 @@ const Login = () => {
             required
           />
         </div>
-        <div className="login-form-group login-turnstile-container">
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={siteKey}
-            onSuccess={(token) => {
-              setTurnstileToken(token);
-              setError('');
-            }}
-            onError={() => {
-              setError('CAPTCHA verification failed. Please try again.');
-              setTurnstileToken(null);
-            }}
-            onExpire={() => {
-              setError('CAPTCHA expired. Please verify again.');
-              setTurnstileToken(null);
-            }}
-            theme="light"
-            size="normal"
-            responseField={false}
-            refreshExpired="auto"
-          />
-        </div>
         <div className="login-form-actions">
           <button 
             type="submit" 
             className="login-submit-btn"
-            disabled={loading || !turnstileToken}
+            disabled={loading}
           >
             {loading ? 'Processing...' : 'Login'}
           </button>
@@ -292,28 +243,6 @@ const Login = () => {
             autoFocus
           />
         </div>
-        <div className="login-form-group login-turnstile-container">
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={siteKey}
-            onSuccess={(token) => {
-              setTurnstileToken(token);
-              setError('');
-            }}
-            onError={() => {
-              setError('CAPTCHA verification failed. Please try again.');
-              setTurnstileToken(null);
-            }}
-            onExpire={() => {
-              setError('CAPTCHA expired. Please verify again.');
-              setTurnstileToken(null);
-            }}
-            theme="light"
-            size="normal"
-            responseField={false}
-            refreshExpired="auto"
-          />
-        </div>
         <div className="login-form-actions">
           <button 
             type="button" 
@@ -325,7 +254,7 @@ const Login = () => {
           <button 
             type="submit" 
             className="login-submit-btn"
-            disabled={loading || !turnstileToken}
+            disabled={loading}
           >
             {loading ? 'Processing...' : 'Send Reset Link'}
           </button>
@@ -352,7 +281,6 @@ const Login = () => {
             required
             autoFocus
           />
-       Block
         </div>
         <div className="login-form-group">
           <label>New Password</label>

@@ -1,439 +1,476 @@
-/* Announcement Admin Styles - Subtle Theme */
-:root {
-  --color-black: #0f172a;
-  --color-white: #f5f3f0;
-  --color-gray-50: #f5f3f0;
-  --color-gray-100: #ede8e3;
-  --color-gray-200: #e2d9d0;
-  --color-gray-300: #d4c7b8;
-  --color-gray-400: #b8a894;
-  --color-gray-500: #9c8a70;
-  --color-gray-600: #7d6b53;
-  --color-gray-700: #5e4d3a;
-  --color-gray-800: #453629;
-  --color-gray-900: #2d201a;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-sm: 0 2px 8px 0 rgb(15 23 42 / 0.08);
-  --shadow-md: 0 8px 25px -5px rgb(15 23 42 / 0.1), 0 4px 6px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg: 0 15px 35px -5px rgb(15 23 42 / 0.15), 0 8px 15px -8px rgb(15 23 42 / 0.1);
-  --border-radius: 1rem;
+/* ==================== GLOBAL STYLES ==================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-/* Main Container */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  background: #f5f7fa;
+  color: #2c3e50;
+  line-height: 1.6;
+}
+
+/* ==================== MAIN WRAPPER ==================== */
 .annc-admin-main-wrapper {
-  margin-top:20px;
-  min-height: 100vh;
-  background: var(--color-gray-50);
-  padding: 2rem;
-  font-family: var(--font-sans);
-  color: var(--color-black);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-/* Top Header */
+/* ==================== TOP HEADER ==================== */
 .annc-admin-top-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 2px solid var(--color-gray-200);
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
 .annc-admin-top-header h1 {
-  font-size: 2rem;
+  font-size: 28px;
+  color: #2c3e50;
   font-weight: 700;
-  color: var(--color-black);
-  margin: 0;
-  letter-spacing: -0.02em;
 }
 
 .annc-admin-header-actions {
   display: flex;
-  gap: 1rem;
-  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/* Buttons */
+/* ==================== BUTTONS ==================== */
 .annc-admin-btn {
-  padding: 0.75rem 1.5rem;
+  padding: 10px 20px;
   border: none;
-  border-radius: var(--border-radius);
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-sans);
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  box-shadow: var(--shadow-sm);
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .annc-admin-btn-primary {
-  background: var(--color-black);
-  color: var(--color-white);
+  background: #3498db;
+  color: white;
 }
 
 .annc-admin-btn-primary:hover {
-  background: var(--color-gray-900);
-  box-shadow: var(--shadow-md);
+  background: #2980b9;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
 }
 
-.annc-admin-btn-primary:disabled {
-  background: var(--color-gray-400);
+.annc-admin-btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.annc-admin-btn-secondary:hover {
+  background: #7f8c8d;
+}
+
+.annc-admin-btn-danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.annc-admin-btn-danger:hover {
+  background: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+.annc-admin-btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
-.annc-admin-btn-secondary {
-  background: var(--color-gray-100);
-  color: var(--color-black);
-  border: 2px solid var(--color-gray-300);
-}
-
-.annc-admin-btn-secondary:hover {
-  background: var(--color-gray-200);
-  border-color: var(--color-gray-400);
-  box-shadow: var(--shadow-sm);
-}
-
-.annc-admin-btn-danger {
-  background: #dc2626;
-  color: var(--color-white);
-}
-
-.annc-admin-btn-danger:hover {
-  background: #b91c1c;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-/* Icon Buttons */
 .annc-admin-btn-icon {
-  width: 40px;
-  height: 40px;
+  background: none;
   border: none;
-  border-radius: 0.75rem;
+  padding: 8px;
   cursor: pointer;
-  transition: var(--transition);
-  display: flex;
+  color: #7f8c8d;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-gray-100);
-  color: var(--color-black);
 }
 
 .annc-admin-btn-icon:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.annc-admin-btn-toggle-visibility {
-  background: var(--color-gray-200);
+  background: #ecf0f1;
+  color: #2c3e50;
 }
 
 .annc-admin-btn-toggle-visibility:hover {
-  background: var(--color-gray-300);
-}
-
-.annc-admin-btn-edit-item {
-  background: var(--color-gray-600);
-  color: var(--color-white);
+  color: #3498db;
 }
 
 .annc-admin-btn-edit-item:hover {
-  background: var(--color-gray-700);
-}
-
-.annc-admin-btn-delete-item {
-  background: #dc2626;
-  color: var(--color-white);
+  color: #f39c12;
 }
 
 .annc-admin-btn-delete-item:hover {
-  background: #b91c1c;
+  color: #e74c3c;
 }
 
-/* Loading State */
+/* ==================== MESSAGES ==================== */
+.annc-admin-success-message,
+.annc-admin-error-message {
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: slideDown 0.3s ease;
+}
+
+.annc-admin-success-message {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.annc-admin-error-message {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.annc-admin-close-error {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+  line-height: 1;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== LOADING STATE ==================== */
 .annc-admin-loading-state {
   text-align: center;
-  padding: 3rem;
-  font-size: 1.125rem;
-  color: var(--color-gray-600);
-  font-weight: 500;
+  padding: 40px;
+  font-size: 18px;
+  color: #7f8c8d;
 }
 
-/* Cards Grid */
+/* ==================== CARDS GRID ==================== */
 .annc-admin-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-/* Single Card */
 .annc-admin-single-card {
-  background: var(--color-white);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition);
-  border: 2px solid var(--color-gray-200);
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .annc-admin-single-card:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   transform: translateY(-4px);
-  border-color: var(--color-gray-300);
 }
 
-/* Card Top Section */
 .annc-admin-card-top-section {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
-  gap: 1rem;
+  gap: 10px;
 }
 
 .annc-admin-card-top-section h3 {
-  font-size: 1.25rem;
+  font-size: 18px;
   font-weight: 700;
-  color: var(--color-black);
-  margin: 0;
-  line-height: 1.3;
   flex: 1;
+  word-break: break-word;
 }
 
-/* Status Badges */
 .annc-admin-status-badges-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 5px;
   align-items: flex-end;
 }
 
 .annc-admin-status-badge {
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
 .annc-admin-status-badge.annc-admin-active {
-  background: #10b981;
-  color: white;
+  background: #d4edda;
+  color: #155724;
 }
 
 .annc-admin-status-badge.annc-admin-inactive {
-  background: var(--color-gray-400);
-  color: var(--color-white);
+  background: #f8d7da;
+  color: #721c24;
 }
 
 .annc-admin-status-badge.annc-admin-expired {
-  background: #ef4444;
-  color: white;
+  background: #fff3cd;
+  color: #856404;
 }
 
-/* Card Caption */
 .annc-admin-card-caption {
-  color: var(--color-gray-700);
+  font-size: 14px;
+  color: #555;
   line-height: 1.6;
-  margin: 0 0 1rem;
-  font-size: 0.95rem;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
-/* Card Metadata */
 .annc-admin-card-metadata {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--color-gray-200);
+  gap: 8px;
+  font-size: 13px;
+  color: #7f8c8d;
 }
 
 .annc-admin-meta-single-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-gray-700);
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .annc-admin-meta-single-item strong {
-  color: var(--color-black);
-  font-weight: 600;
+  color: #2c3e50;
 }
 
 .annc-admin-meta-single-item a {
-  color: var(--color-gray-600);
-  text-decoration: underline;
-  transition: var(--transition);
+  color: #3498db;
+  text-decoration: none;
 }
 
 .annc-admin-meta-single-item a:hover {
-  color: var(--color-black);
+  text-decoration: underline;
 }
 
 .annc-admin-expiry-display {
-  color: var(--color-gray-800);
+  color: #e67e22;
   font-weight: 500;
 }
 
-/* Card Attachments */
 .annc-admin-card-attachments-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 8px;
 }
 
 .annc-admin-attachment-item-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.875rem;
-  background: var(--color-gray-100);
-  border: 1px solid var(--color-gray-300);
-  border-radius: 0.625rem;
-  font-size: 0.8125rem;
-  color: var(--color-gray-700);
-  font-weight: 500;
+  gap: 5px;
+  padding: 4px 10px;
+  background: #ecf0f1;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #2c3e50;
 }
 
-/* Card Footer */
 .annc-admin-card-bottom-footer {
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--color-gray-200);
+  font-size: 12px;
+  color: #95a5a6;
+  padding-top: 10px;
+  border-top: 1px solid #ecf0f1;
 }
 
-.annc-admin-card-bottom-footer small {
-  font-size: 0.8125rem;
-  color: var(--color-gray-500);
-  font-weight: 500;
-}
-
-/* Card Actions */
 .annc-admin-card-action-buttons {
   display: flex;
-  gap: 0.5rem;
   justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #ecf0f1;
 }
 
-/* Empty State */
+/* ==================== EMPTY STATE ==================== */
 .annc-admin-empty-placeholder {
   text-align: center;
-  padding: 4rem 2rem;
-  background: var(--color-white);
-  border-radius: var(--border-radius);
-  border: 2px dashed var(--color-gray-300);
+  padding: 60px 20px;
+  color: #95a5a6;
+  font-size: 16px;
 }
 
-.annc-admin-empty-placeholder p {
-  font-size: 1.125rem;
-  color: var(--color-gray-600);
-  margin: 0;
-  font-weight: 500;
-}
-
-/* Modal */
+/* ==================== MODAL BACKDROP ==================== */
 .annc-admin-modal-backdrop {
   position: fixed;
-  top: 90px;;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
   overflow-y: auto;
- 
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ==================== MODAL DIALOG - SMALL (Image/Video) ==================== */
 .annc-admin-modal-dialog {
-  background: var(--color-white);
-  border-radius: var(--border-radius);
+  background: white;
+  border-radius: 12px;
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-  border: 2px solid var(--color-gray-200);
-  margin: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease;
+  position: relative;
+  z-index: 1001;
+  overflow: hidden;
 }
 
-/* Modal Header */
+/* ==================== MODAL DIALOG - LARGE (Main Editor) ==================== */
+.annc-admin-modal-dialog.annc-admin-modal-large {
+  max-width: 100%;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  margin: 0;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ==================== MODAL TOP BAR ==================== */
 .annc-admin-modal-top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 2px solid var(--color-gray-200);
-  position: sticky;
-  top: 0;
-  background: var(--color-white);
-  z-index: 10;
+  padding: 20px 24px;
+  border-bottom: 1px solid #ecf0f1;
+  flex-shrink: 0;
+  background: #fff;
 }
 
-.annc-admin-modal-top-bar h2 {
-  font-size: 1.5rem;
+.annc-admin-modal-top-bar h2,
+.annc-admin-modal-top-bar h3 {
+  font-size: 20px;
   font-weight: 700;
-  color: var(--color-black);
+  color: #2c3e50;
   margin: 0;
 }
 
 .annc-admin-btn-close-modal {
-  width: 40px;
-  height: 40px;
+  background: none;
   border: none;
-  background: var(--color-gray-100);
-  border-radius: 0.75rem;
   cursor: pointer;
+  color: #7f8c8d;
+  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-gray-700);
-  transition: var(--transition);
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .annc-admin-btn-close-modal:hover {
-  background: var(--color-gray-200);
-  color: var(--color-black);
-  transform: rotate(90deg);
+  background: #ecf0f1;
+  color: #2c3e50;
 }
 
-/* Form Container */
+/* ==================== FORM CONTAINER ==================== */
 .annc-admin-form-container {
-  padding: 1.5rem;
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-/* Form Fields */
+/* Scrollbar styling */
+.annc-admin-form-container::-webkit-scrollbar,
+.annc-admin-card-caption::-webkit-scrollbar {
+  width: 8px;
+}
+
+.annc-admin-form-container::-webkit-scrollbar-track,
+.annc-admin-card-caption::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.annc-admin-form-container::-webkit-scrollbar-thumb,
+.annc-admin-card-caption::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 4px;
+}
+
+.annc-admin-form-container::-webkit-scrollbar-thumb:hover,
+.annc-admin-card-caption::-webkit-scrollbar-thumb:hover {
+  background: #95a5a6;
+}
+
+/* ==================== FORM FIELDS ==================== */
 .annc-admin-form-field-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 20px;
 }
 
 .annc-admin-form-field-group label {
   display: block;
-  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--color-black);
-  margin-bottom: 0.5rem;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 6px;
 }
 
 .annc-admin-form-field-group input[type="text"],
@@ -443,327 +480,867 @@
 .annc-admin-form-field-group textarea,
 .annc-admin-form-field-group select {
   width: 100%;
-  padding: 0.875rem 1rem;
-  border: 2px solid var(--color-gray-300);
-  border-radius: 0.75rem;
-  font-size: 0.9375rem;
-  font-family: var(--font-sans);
-  color: var(--color-black);
-  background: var(--color-white);
-  transition: var(--transition);
-  outline: none;
+  padding: 10px 12px;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  background: white;
 }
 
 .annc-admin-form-field-group input:focus,
 .annc-admin-form-field-group textarea:focus,
 .annc-admin-form-field-group select:focus {
-  border-color: var(--color-gray-600);
-  box-shadow: 0 0 0 3px rgba(125, 107, 83, 0.1);
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 .annc-admin-form-field-group textarea {
   resize: vertical;
-  min-height: 100px;
-  line-height: 1.6;
+  min-height: 120px;
+  font-family: 'Courier New', monospace;
 }
 
-/* Checkbox Wrapper */
-.annc-admin-checkbox-wrapper label {
+/* ==================== FORM ROW ==================== */
+.annc-admin-form-row {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.annc-admin-flex-grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ==================== COLOR PICKER ==================== */
+.annc-admin-color-picker-group {
+  min-width: 140px;
+}
+
+.annc-admin-color-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.annc-admin-color-picker {
+  width: 50px;
+  height: 40px;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.annc-admin-color-text-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* ==================== CAPTION HEADER ==================== */
+.annc-admin-caption-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.annc-admin-format-switch {
+  display: flex;
+  gap: 15px;
+  font-size: 13px;
+}
+
+.annc-admin-format-switch label {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 5px;
   cursor: pointer;
   font-weight: 500;
 }
 
-.annc-admin-checkbox-wrapper input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+.annc-admin-format-switch input[type="radio"] {
   cursor: pointer;
-  accent-color: var(--color-black);
 }
 
+/* ==================== MARKDOWN TOOLBAR ==================== */
+.annc-admin-markdown-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  background: #f8f9fa;
+  border: 1px solid #dfe6e9;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+
+.annc-admin-markdown-toolbar button {
+  background: white;
+  border: 1px solid #dfe6e9;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #2c3e50;
+  min-width: 36px;
+  height: 36px;
+}
+
+.annc-admin-markdown-toolbar button:hover {
+  background: #3498db;
+  color: white;
+  border-color: #3498db;
+  transform: translateY(-1px);
+}
+
+.annc-admin-markdown-toolbar .annc-admin-media-btn {
+  background: #e8f5e9;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.annc-admin-markdown-toolbar .annc-admin-media-btn:hover {
+  background: #4caf50;
+  color: white;
+}
+
+.annc-admin-markdown-toolbar .annc-admin-color-btn,
+.annc-admin-markdown-toolbar .annc-admin-highlight-btn {
+  gap: 4px;
+  min-width: auto;
+  padding: 6px 12px;
+}
+
+.annc-admin-markdown-toolbar .annc-admin-help-btn {
+  background: #fff3cd;
+  border-color: #ffc107;
+  color: #856404;
+  font-weight: 700;
+}
+
+.annc-admin-markdown-toolbar .annc-admin-help-btn:hover {
+  background: #ffc107;
+  color: white;
+}
+
+/* ==================== MARKDOWN HELPER ==================== */
+.annc-admin-markdown-helper {
+  background: #f8f9fa;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.annc-admin-markdown-helper h4 {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.annc-admin-markdown-helper ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.annc-admin-markdown-helper li {
+  padding: 4px 0;
+  color: #555;
+}
+
+.annc-admin-markdown-helper strong {
+  color: #2c3e50;
+}
+
+/* ==================== CAPTION IMAGES/VIDEOS LIST ==================== */
+.annc-admin-content-images-list,
+.annc-admin-content-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.annc-admin-content-image-item,
+.annc-admin-content-video-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #f8f9fa;
+  border: 1px solid #dfe6e9;
+  border-radius: 8px;
+}
+
+.annc-admin-content-image-thumb,
+.annc-admin-content-video-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: #ecf0f1;
+}
+
+.annc-admin-content-video-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.annc-admin-content-video-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.annc-admin-video-placeholder {
+  font-size: 11px;
+  color: #7f8c8d;
+  text-align: center;
+}
+
+.annc-admin-content-image-info,
+.annc-admin-content-video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.annc-admin-image-id,
+.annc-admin-video-id {
+  font-family: 'Courier New', monospace;
+  background: #e8f5e9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: inline-block;
+  width: fit-content;
+}
+
+.annc-admin-image-position,
+.annc-admin-video-position {
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+.annc-admin-image-caption,
+.annc-admin-video-caption,
+.annc-admin-video-title {
+  color: #2c3e50;
+}
+
+.annc-admin-video-options {
+  font-size: 11px;
+  color: #7f8c8d;
+}
+
+.annc-admin-helper-text {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+/* ==================== IMAGE/VIDEO PREVIEW ==================== */
+.annc-admin-image-preview,
+.annc-admin-video-preview {
+  margin-top: 15px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.annc-admin-image-preview p,
+.annc-admin-video-preview p {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #7f8c8d;
+  font-weight: 600;
+}
+
+.annc-admin-image-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.annc-admin-video-preview-wrapper {
+  max-width: 100%;
+}
+
+.annc-admin-video-preview-wrapper img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== CHECKBOX WRAPPER ==================== */
+.annc-admin-checkbox-wrapper label,
 .annc-admin-checkbox-label-inline {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  font-size: 0.875rem;
-  color: var(--color-gray-700);
+  gap: 8px;
   cursor: pointer;
   font-weight: 500;
 }
 
+.annc-admin-checkbox-wrapper input[type="checkbox"],
 .annc-admin-checkbox-label-inline input[type="checkbox"] {
+  cursor: pointer;
   width: 18px;
   height: 18px;
-  cursor: pointer;
-  accent-color: var(--color-black);
 }
 
-/* File Upload */
+/* ==================== FILE UPLOAD ==================== */
 .annc-admin-file-upload-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 2px dashed var(--color-gray-300);
-  border-radius: 0.75rem;
-  background: var(--color-gray-50);
-  transition: var(--transition);
-  cursor: pointer;
-}
-
-.annc-admin-file-upload-wrapper:hover {
-  border-color: var(--color-gray-500);
-  background: var(--color-gray-100);
+  display: inline-block;
 }
 
 .annc-admin-file-upload-wrapper input[type="file"] {
-  width: 100%;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--color-gray-700);
+  padding-right: 40px;
 }
 
-.annc-admin-file-upload-wrapper input[type="file"]::file-selector-button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: var(--color-black);
-  color: var(--color-white);
-  font-weight: 600;
-  cursor: pointer;
-  margin-right: 1rem;
-  transition: var(--transition);
+.annc-admin-file-upload-wrapper svg {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #7f8c8d;
 }
 
-.annc-admin-file-upload-wrapper input[type="file"]::file-selector-button:hover {
-  background: var(--color-gray-900);
-}
-
-/* Form Actions */
+/* ==================== FORM ACTIONS BAR ==================== */
 .annc-admin-form-actions-bar {
   display: flex;
-  gap: 1rem;
   justify-content: flex-end;
-  padding-top: 1.5rem;
-  border-top: 2px solid var(--color-gray-200);
-  margin-top: 1rem;
+  gap: 12px;
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid #ecf0f1;
+  flex-shrink: 0;
 }
 
-/* Responsive Design */
+/* ==================== RESPONSIVE DESIGN ==================== */
+
+/* Tablets */
 @media (max-width: 1024px) {
   .annc-admin-cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  
+  .annc-admin-modal-dialog {
+    max-width: 90%;
   }
 }
 
+/* Mobile Landscape */
 @media (max-width: 768px) {
   .annc-admin-main-wrapper {
-    padding: 1.5rem 1rem;
+    padding: 15px;
   }
-
+  
   .annc-admin-top-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
   }
-
+  
   .annc-admin-top-header h1 {
-    font-size: 1.75rem;
+    font-size: 24px;
   }
-
+  
   .annc-admin-header-actions {
     width: 100%;
-    flex-direction: column;
   }
-
-  .annc-admin-header-actions .annc-admin-btn {
-    width: 100%;
+  
+  .annc-admin-header-actions button {
+    flex: 1;
     justify-content: center;
   }
-
+  
   .annc-admin-cards-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 15px;
   }
-
-  .annc-admin-single-card {
-    padding: 1.25rem;
+  
+  .annc-admin-form-row {
+    flex-direction: column;
   }
-
-  .annc-admin-card-top-section {
+  
+  .annc-admin-flex-grow {
+    min-width: 100%;
+  }
+  
+  .annc-admin-color-picker-group {
+    min-width: 100%;
+  }
+  
+  .annc-admin-caption-header {
     flex-direction: column;
     align-items: flex-start;
   }
-
-  .annc-admin-status-badges-group {
-    flex-direction: row;
-    align-items: flex-start;
+  
+  .annc-admin-markdown-toolbar {
+    gap: 4px;
+    padding: 8px;
   }
-
-  .annc-admin-card-action-buttons {
-    flex-wrap: wrap;
+  
+  .annc-admin-markdown-toolbar button {
+    min-width: 32px;
+    height: 32px;
+    padding: 4px 8px;
   }
-
-  .annc-admin-modal-dialog {
-    max-width: 100%;
-    margin: 0;
-    border-radius: 0;
-    max-height: 100vh;
-  }
-
-  .annc-admin-modal-top-bar {
-    padding: 1.25rem;
-  }
-
-  .annc-admin-modal-top-bar h2 {
-    font-size: 1.25rem;
-  }
-
-  .annc-admin-form-container {
-    padding: 1.25rem;
-  }
-
+  
   .annc-admin-form-actions-bar {
     flex-direction: column-reverse;
   }
-
-  .annc-admin-form-actions-bar .annc-admin-btn {
+  
+  .annc-admin-form-actions-bar button {
     width: 100%;
     justify-content: center;
   }
-}
-
-@media (max-width: 480px) {
-  .annc-admin-main-wrapper {
-    padding: 1rem 0.75rem;
+  
+  .annc-admin-modal-dialog {
+    max-width: 95%;
+    max-height: 85vh;
   }
-
-  .annc-admin-top-header h1 {
-    font-size: 1.5rem;
+  
+  .annc-admin-modal-backdrop {
+    padding: 10px;
   }
-
-  .annc-admin-btn {
-    padding: 0.625rem 1.25rem;
-    font-size: 0.875rem;
-  }
-
-  .annc-admin-single-card {
-    padding: 1rem;
-  }
-
-  .annc-admin-card-top-section h3 {
-    font-size: 1.125rem;
-  }
-
-  .annc-admin-status-badge {
-    padding: 0.25rem 0.625rem;
-    font-size: 0.6875rem;
-  }
-
-  .annc-admin-btn-icon {
-    width: 36px;
-    height: 36px;
-  }
-
-  .annc-admin-meta-single-item {
-    font-size: 0.8125rem;
-  }
-
-  .annc-admin-card-caption {
-    font-size: 0.875rem;
-  }
-
-  .annc-admin-modal-top-bar {
-    padding: 1rem;
-  }
-
-  .annc-admin-modal-top-bar h2 {
-    font-size: 1.125rem;
-  }
-
+  
   .annc-admin-form-container {
-    padding: 1rem;
+    padding: 16px;
   }
-
-  .annc-admin-form-field-group {
-    margin-bottom: 1.25rem;
+  
+  .annc-admin-modal-top-bar {
+    padding: 15px 16px;
   }
-
-  .annc-admin-form-field-group input[type="text"],
-  .annc-admin-form-field-group input[type="url"],
-  .annc-admin-form-field-group input[type="number"],
-  .annc-admin-form-field-group input[type="datetime-local"],
-  .annc-admin-form-field-group textarea,
-  .annc-admin-form-field-group select {
-    padding: 0.75rem;
-    font-size: 0.875rem;
-  }
-
-  .annc-admin-btn-close-modal {
-    width: 36px;
-    height: 36px;
-  }
-
-  .annc-admin-file-upload-wrapper {
-    padding: 0.875rem;
-  }
-
-  .annc-admin-file-upload-wrapper input[type="file"]::file-selector-button {
-    padding: 0.375rem 0.875rem;
-    font-size: 0.8125rem;
+  
+  .annc-admin-content-image-item,
+  .annc-admin-content-video-item {
+    flex-wrap: wrap;
   }
 }
 
-/* Smooth Scrolling */
-.annc-admin-modal-dialog {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-gray-400) transparent;
+/* Mobile Portrait */
+@media (max-width: 480px) {
+  .annc-admin-top-header h1 {
+    font-size: 20px;
+  }
+  
+  .annc-admin-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .annc-admin-single-card {
+    padding: 15px;
+  }
+  
+  .annc-admin-card-top-section h3 {
+    font-size: 16px;
+  }
+  
+  .annc-admin-modal-top-bar h2,
+  .annc-admin-modal-top-bar h3 {
+    font-size: 18px;
+  }
+  
+  .annc-admin-markdown-toolbar {
+    gap: 3px;
+    padding: 6px;
+  }
+  
+  .annc-admin-markdown-toolbar button {
+    min-width: 30px;
+    height: 30px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+  
+  .annc-admin-content-image-thumb,
+  .annc-admin-content-video-thumb {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .annc-admin-form-field-group input,
+  .annc-admin-form-field-group select,
+  .annc-admin-form-field-group textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
 }
 
-.annc-admin-modal-dialog::-webkit-scrollbar {
-  width: 6px;
+/* Full-screen modal specific adjustments */
+@media (max-width: 768px) {
+  .annc-admin-modal-dialog.annc-admin-modal-large {
+    padding: 0;
+  }
+  
+  .annc-admin-modal-dialog.annc-admin-modal-large .annc-admin-form-container {
+    padding: 15px;
+  }
 }
 
-.annc-admin-modal-dialog::-webkit-scrollbar-track {
-  background: transparent;
+/* Ensure small modals stay centered and compact */
+@media (min-width: 769px) {
+  .annc-admin-modal-backdrop {
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Small modals (image/video) stay compact and centered */
+  .annc-admin-modal-dialog:not(.annc-admin-modal-large) {
+    margin: auto;
+  }
 }
 
-.annc-admin-modal-dialog::-webkit-scrollbar-thumb {
-  background: var(--color-gray-400);
-  border-radius: 3px;
+/* Z-index layering for modals */
+.annc-admin-modal-backdrop {
+  z-index: 1000;
 }
 
-.annc-admin-modal-dialog::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray-500);
+
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
 }
 
-/* Focus Visible */
+/* ==================== PRINT STYLES ==================== */
+@media print {
+  .annc-admin-header-actions,
+  .annc-admin-card-action-buttons,
+  .annc-admin-btn,
+  .annc-admin-modal-backdrop {
+    display: none !important;
+  }
+  
+  .annc-admin-single-card {
+    page-break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+}
+
+/* ==================== ACCESSIBILITY ==================== */
 .annc-admin-btn:focus-visible,
 .annc-admin-btn-icon:focus-visible,
-.annc-admin-btn-close-modal:focus-visible {
-  outline: 3px solid var(--color-gray-400);
+.annc-admin-form-field-group input:focus-visible,
+.annc-admin-form-field-group textarea:focus-visible,
+.annc-admin-form-field-group select:focus-visible {
+  outline: 2px solid #3498db;
   outline-offset: 2px;
 }
 
-/* Print Styles */
-@media print {
-  .annc-admin-modal-backdrop,
-  .annc-admin-header-actions,
-  .annc-admin-card-action-buttons {
-    display: none;
+/* ==================== ANIMATIONS ==================== */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
   }
-
-  .annc-admin-main-wrapper {
-    padding: 0;
-  }
-
-  .annc-admin-single-card {
-    break-inside: avoid;
-    page-break-inside: avoid;
+  50% {
+    opacity: 0.5;
   }
 }
+
+.annc-admin-loading-state {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ==================== DARK MODE SUPPORT (Optional) ==================== */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #1a1a1a;
+    color: #e0e0e0;
+  }
+  
+  .annc-admin-single-card {
+    background: #2c2c2c;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  
+  .annc-admin-modal-dialog {
+    background: #2c2c2c;
+  }
+  
+  .annc-admin-form-field-group input,
+  .annc-admin-form-field-group textarea,
+  .annc-admin-form-field-group select {
+    background: #1a1a1a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  
+  .annc-admin-markdown-toolbar {
+    background: #1a1a1a;
+    border-color: #444;
+  }
+  
+  .annc-admin-markdown-toolbar button {
+    background: #2c2c2c;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  
+  .annc-admin-content-image-item,
+  .annc-admin-content-video-item {
+    background: #1a1a1a;
+    border-color: #444;
+  }
+  
+  .annc-admin-markdown-helper {
+    background: #1a1a1a;
+    border-color: #444;
+  }
+  
+  .annc-admin-modal-top-bar {
+    border-bottom-color: #444;
+  }
+  
+  .annc-admin-card-bottom-footer {
+    border-top-color: #444;
+  }
+}
+
+/* ==================== HIGH CONTRAST MODE ==================== */
+@media (prefers-contrast: high) {
+  .annc-admin-btn-primary {
+    background: #0066cc;
+    border: 2px solid #003366;
+  }
+  
+  .annc-admin-btn-danger {
+    background: #cc0000;
+    border: 2px solid #660000;
+  }
+  
+  .annc-admin-single-card {
+    border: 2px solid #000;
+  }
+  
+  .annc-admin-form-field-group input,
+  .annc-admin-form-field-group textarea,
+  .annc-admin-form-field-group select {
+    border: 2px solid #000;
+  }
+}
+
+/* ==================== REDUCED MOTION ==================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .annc-admin-single-card:hover {
+    transform: none;
+  }
+  
+  .annc-admin-btn-primary:hover {
+    transform: none;
+  }
+}
+
+/* ==================== UTILITY CLASSES ==================== */
+.annc-admin-text-center {
+  text-align: center;
+}
+
+.annc-admin-mt-10 {
+  margin-top: 10px;
+}
+
+.annc-admin-mt-20 {
+  margin-top: 20px;
+}
+
+.annc-admin-mb-10 {
+  margin-bottom: 10px;
+}
+
+.annc-admin-mb-20 {
+  margin-bottom: 20px;
+}
+
+.annc-admin-hidden {
+  display: none;
+}
+
+.annc-admin-visible {
+  display: block;
+}
+
+/* ==================== SPECIAL FOCUS STATES ==================== */
+.annc-admin-modal-dialog:not(.annc-admin-modal-large) {
+  position: relative;
+}
+
+
+
+/* ==================== IMPROVED TOUCH TARGETS (Mobile) ==================== */
+@media (max-width: 768px) {
+  .annc-admin-btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .annc-admin-checkbox-wrapper input[type="checkbox"],
+  .annc-admin-checkbox-label-inline input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .annc-admin-format-switch input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ==================== OVERFLOW HANDLING ==================== */
+.annc-admin-modal-dialog {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.annc-admin-modal-dialog.annc-admin-modal-large {
+  overflow: hidden;
+}
+
+.annc-admin-modal-dialog.annc-admin-modal-large .annc-admin-form-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Small modals should scroll internally */
+.annc-admin-modal-dialog:not(.annc-admin-modal-large) .annc-admin-form-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ==================== BACKDROP CLICK PREVENTION ==================== */
+.annc-admin-modal-dialog {
+  pointer-events: auto;
+}
+
+/* ==================== FINE-TUNING FOR SMALL SCREENS ==================== */
+@media (max-width: 480px) {
+  .annc-admin-modal-backdrop {
+    padding: 5px;
+  }
+  
+  .annc-admin-modal-dialog:not(.annc-admin-modal-large) {
+    max-height: 95vh;
+    max-width: 98%;
+  }
+  
+  .annc-admin-modal-top-bar {
+    padding: 12px 15px;
+  }
+  
+  .annc-admin-form-container {
+    padding: 12px;
+  }
+  
+  .annc-admin-btn {
+    padding: 10px 14px;
+  }
+}
+
+/* ==================== LANDSCAPE ORIENTATION ==================== */
+@media (max-height: 600px) and (orientation: landscape) {
+  .annc-admin-modal-dialog:not(.annc-admin-modal-large) {
+    max-height: 95vh;
+  }
+  
+  .annc-admin-modal-top-bar {
+    padding: 10px 15px;
+  }
+  
+  .annc-admin-form-container {
+    padding: 15px;
+  }
+  
+  .annc-admin-form-field-group {
+    margin-bottom: 15px;
+  }
+}
+
+/* ==================== ENSURE CENTERED SMALL MODALS ==================== */
+.annc-admin-modal-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Override for large modal - full screen */
+.annc-admin-modal-backdrop:has(.annc-admin-modal-large) {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+/* ==================== SMOOTH SCROLLING ==================== */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+/* FIX: Ensure small modals (image/video) appear on top */
+.annc-admin-modal-backdrop {
+  z-index: 1000;
+}
+
+.annc-admin-modal-backdrop.annc-admin-modal-high-z {
+  z-index: 2000 !important;
+}
+
+.annc-admin-modal-backdrop.annc-admin-modal-high-z .annc-admin-modal-dialog {
+  z-index: 2001 !important;
+}
+
+/* Optional: Dim previous modal when small one is open */
+.annc-admin-modal-backdrop:not(.annc-admin-modal-high-z) {
+  pointer-events: none; /* Allows click-through to high-z modal */
+}
+
+.annc-admin-modal-backdrop.annc-admin-modal-high-z ~ .annc-admin-modal-backdrop {
+  pointer-events: none;
+}
+
+/* Better: darken background slightly when nested modal is open */
+.annc-admin-modal-backdrop.annc-admin-modal-high-z {
+  background: rgba(0, 0, 0, 0.8);
+}
+/* ==================== END OF STYLES ==================== */

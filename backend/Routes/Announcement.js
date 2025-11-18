@@ -1,9 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware"); 
-const upload = require("../middlewares/upload");                    
+const upload = require("../middlewares/upload");
 const Announcement = require("../models/announcementSchema");
 const calculateExpiryDate = require("../utils/calculateExpiryDate");
+const cleanupUnusedImages = require("../utils/cleanupUnusedImages");
+const cleanupUnusedVideos = require("../utils/cleanupUnusedVideos");
+const extractVideoInfo = require("../utils/extractVideoInfo");
+const processContent = require("../utils/processContent");
+
+// ==================== CREATE ANNOUNCEMENT ====================
 router.post('/api/admin/announcement', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
@@ -14,24 +20,39 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       titleColor,
       caption, 
       captionFormat,
-      link, 
+      captionImages,
+      captionVideos,
+      linkUrl,
+      linkName,
+      linkOpenInNewTab,
       priority, 
       expiryType, 
       expiryValue, 
       expiresAt 
     } = req.body;
 
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
+    if (!title || !caption) {
+      return res.status(400).json({ error: 'Title and caption are required' });
     }
+
+    // Clean up unused images and videos from caption
+    const cleanedImages = cleanupUnusedImages(caption, captionImages ? JSON.parse(captionImages) : []);
+    const cleanedVideos = cleanupUnusedVideos(caption, captionVideos ? JSON.parse(captionVideos) : []);
 
     const announcementData = {
       title,
       titleColor: titleColor || '#000000',
       caption: caption || '',
       captionFormat: captionFormat || 'markdown',
-      link: link || '',
-      priority: priority || 0
+      captionImages: cleanedImages,
+      captionVideos: cleanedVideos,
+      link: {
+        url: linkUrl || '',
+        name: linkName || 'Learn More',
+        openInNewTab: linkOpenInNewTab !== 'false' && linkOpenInNewTab !== false
+      },
+      priority: priority || 0,
+      createdBy: req.user.admin_id
     };
 
     // Handle expiry
@@ -42,6 +63,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       }
     }
 
+    // Handle featured image
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcementData.image = {
@@ -51,6 +73,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       };
     }
 
+    // Handle document
     if (req.files && req.files.document) {
       const docFile = req.files.document[0];
       announcementData.document = {
@@ -63,6 +86,13 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
     const announcement = new Announcement(announcementData);
     await announcement.save();
 
+    // Process caption content
+    const processedCaption = processContent(
+      announcement.caption, 
+      announcement.captionImages, 
+      announcement.captionVideos
+    );
+
     res.status(201).json({ 
       message: 'Announcement created successfully', 
       announcement: {
@@ -71,58 +101,340 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
         titleColor: announcement.titleColor,
         caption: announcement.caption,
         captionFormat: announcement.captionFormat,
+        processedCaption: processedCaption,
         renderedCaption: announcement.getRenderedCaption(),
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-        hasImage: !!announcement.image,
-        hasDocument: !!announcement.document,
+       hasImage: !!(announcement.image && announcement.image.data),
+hasDocument: !!(announcement.document && announcement.document.data),
+        captionImagesCount: announcement.captionImages.length,
+        captionVideosCount: announcement.captionVideos.length,
         createdAt: announcement.createdAt
       }
     });
   } catch (error) {
+    console.error('Error creating announcement:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
+// ==================== CAPTION IMAGE ROUTES ====================
 
-router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
+// Add image to announcement caption
+router.post('/api/admin/announcement/:id/caption-images', authenticateToken, async (req, res) => {
   try {
-    await Announcement.expireOldAnnouncements();
-
-    const announcements = await Announcement.find()
-      .select('-image.data -document.data')
-      .sort({ priority: -1, createdAt: -1 });
-
-    const announcementsWithInfo = announcements.map(ann => ({
-      _id: ann._id,
-      title: ann.title,
-      titleColor: ann.titleColor,
-      caption: ann.caption,
-      captionFormat: ann.captionFormat,
-      renderedCaption: ann.getRenderedCaption(),
-      link: ann.link,
-      priority: ann.priority,
-      isActive: ann.isActive,
-      expiresAt: ann.expiresAt,
-      isExpired: ann.isExpired,
-      hasImage: !!ann.image?.data,
-      hasDocument: !!ann.document?.data,
-      imageFilename: ann.image?.filename,
-      documentFilename: ann.document?.filename,
-      createdAt: ann.createdAt,
-      updatedAt: ann.updatedAt
-    }));
-
-    res.json({ announcements: announcementsWithInfo });
+    const { id } = req.params;
+    const { url, alt, caption, position } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ message: 'Image URL is required' });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    // Check authorization
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    // Generate unique image ID
+    const imageId = 'ann_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const newImage = {
+      url,
+      alt: alt || '',
+      caption: caption || '',
+      position: position || 'center',
+      imageId
+    };
+    
+    announcement.captionImages.push(newImage);
+    await announcement.save();
+    
+    res.status(201).json({
+      message: 'Caption image added successfully',
+      image: newImage,
+      imageId: imageId,
+      embedCode: `[IMAGE:${imageId}]`
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error adding caption image:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 
+// Update caption image
+router.put('/api/admin/announcement/:id/caption-images/:imageId', authenticateToken, async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+    const { url, alt, caption, position } = req.body;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    const imageIndex = announcement.captionImages.findIndex(img => img.imageId === imageId);
+    
+    if (imageIndex === -1) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+    
+    if (url) announcement.captionImages[imageIndex].url = url;
+    if (alt !== undefined) announcement.captionImages[imageIndex].alt = alt;
+    if (caption !== undefined) announcement.captionImages[imageIndex].caption = caption;
+    if (position) announcement.captionImages[imageIndex].position = position;
+    
+    await announcement.save();
+    
+    res.json({
+      message: 'Caption image updated successfully',
+      image: announcement.captionImages[imageIndex]
+    });
+  } catch (error) {
+    console.error('Error updating caption image:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
+// Delete caption image
+router.delete('/api/admin/announcement/:id/caption-images/:imageId', authenticateToken, async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    const imageIndex = announcement.captionImages.findIndex(img => img.imageId === imageId);
+    
+    if (imageIndex === -1) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+    
+    announcement.captionImages.splice(imageIndex, 1);
+    await announcement.save();
+    
+    res.json({ message: 'Caption image deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting caption image:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all caption images for an announcement
+router.get('/api/admin/announcement/:id/caption-images', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to view this announcement' });
+    }
+    
+    res.json({
+      images: announcement.captionImages,
+      totalImages: announcement.captionImages.length
+    });
+  } catch (error) {
+    console.error('Error fetching caption images:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== CAPTION VIDEO ROUTES ====================
+
+// Add video to announcement caption
+router.post('/api/admin/announcement/:id/caption-videos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { url, title, caption, position, autoplay, muted } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ message: 'Video URL is required' });
+    }
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    // Extract video info from URL
+    const videoInfo = extractVideoInfo(url);
+    
+    if (!videoInfo) {
+      return res.status(400).json({ 
+        message: 'Invalid video URL. Supported: YouTube, Vimeo, Dailymotion' 
+      });
+    }
+    
+    // Generate unique embed ID
+    const embedId = 'ann_vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const newVideo = {
+      url: videoInfo.url,
+      videoId: videoInfo.videoId,
+      platform: videoInfo.platform,
+      title: title || '',
+      caption: caption || '',
+      position: position || 'center',
+      autoplay: autoplay || false,
+      muted: muted || false,
+      embedId
+    };
+    
+    announcement.captionVideos.push(newVideo);
+    await announcement.save();
+    
+    res.status(201).json({
+      message: 'Caption video added successfully',
+      video: newVideo,
+      embedId: embedId,
+      embedCode: `[VIDEO:${embedId}]`
+    });
+  } catch (error) {
+    console.error('Error adding caption video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update caption video
+router.put('/api/admin/announcement/:id/caption-videos/:embedId', authenticateToken, async (req, res) => {
+  try {
+    const { id, embedId } = req.params;
+    const { url, title, caption, position, autoplay, muted } = req.body;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    const videoIndex = announcement.captionVideos.findIndex(vid => vid.embedId === embedId);
+    
+    if (videoIndex === -1) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    
+    if (url) {
+      const videoInfo = extractVideoInfo(url);
+      if (!videoInfo) {
+        return res.status(400).json({ message: 'Invalid video URL' });
+      }
+      announcement.captionVideos[videoIndex].url = videoInfo.url;
+      announcement.captionVideos[videoIndex].videoId = videoInfo.videoId;
+      announcement.captionVideos[videoIndex].platform = videoInfo.platform;
+    }
+    
+    if (title !== undefined) announcement.captionVideos[videoIndex].title = title;
+    if (caption !== undefined) announcement.captionVideos[videoIndex].caption = caption;
+    if (position) announcement.captionVideos[videoIndex].position = position;
+    if (autoplay !== undefined) announcement.captionVideos[videoIndex].autoplay = autoplay;
+    if (muted !== undefined) announcement.captionVideos[videoIndex].muted = muted;
+    
+    await announcement.save();
+    
+    res.json({
+      message: 'Caption video updated successfully',
+      video: announcement.captionVideos[videoIndex]
+    });
+  } catch (error) {
+    console.error('Error updating caption video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete caption video
+router.delete('/api/admin/announcement/:id/caption-videos/:embedId', authenticateToken, async (req, res) => {
+  try {
+    const { id, embedId } = req.params;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this announcement' });
+    }
+    
+    const videoIndex = announcement.captionVideos.findIndex(vid => vid.embedId === embedId);
+    
+    if (videoIndex === -1) {
+      return res.status(404).json({ message: 'Video not found' });
+    }
+    
+    announcement.captionVideos.splice(videoIndex, 1);
+    await announcement.save();
+    
+    res.json({ message: 'Caption video deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting caption video:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all caption videos for an announcement
+router.get('/api/admin/announcement/:id/caption-videos', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const announcement = await Announcement.findById(id);
+    
+    if (!announcement) {
+      return res.status(404).json({ message: 'Announcement not found' });
+    }
+    
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to view this announcement' });
+    }
+    
+    res.json({
+      videos: announcement.captionVideos,
+      totalVideos: announcement.captionVideos.length
+    });
+  } catch (error) {
+    console.error('Error fetching caption videos:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ==================== MAIN ANNOUNCEMENT ROUTES ====================
+
+// GET ACTIVE ANNOUNCEMENTS (Public)
 router.get('/api/announcement/active', async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
@@ -131,34 +443,101 @@ router.get('/api/announcement/active', async (req, res) => {
       isActive: true,
       isExpired: false
     })
+    .select('-image.data -document.data')
     .sort({ priority: -1, createdAt: -1 });
 
-    const announcementsWithInfo = announcements.map(ann => ({
-      _id: ann._id,
-      title: ann.title,
-      titleColor: ann.titleColor,
-      caption: ann.caption,
-      captionFormat: ann.captionFormat,
-      renderedCaption: ann.getRenderedCaption(),
-      link: ann.link,
-      priority: ann.priority,
-      expiresAt: ann.expiresAt,
-      hasImage: !!(ann.image && ann.image.data),
-      hasDocument: !!(ann.document && ann.document.data),
-      createdAt: ann.createdAt
-    }));
+    const announcementsWithInfo = announcements.map(ann => {
+      const processedCaption = processContent(
+        ann.caption, 
+        ann.captionImages, 
+        ann.captionVideos
+      );
+
+      return {
+        _id: ann._id,
+        title: ann.title,
+        titleColor: ann.titleColor,
+        caption: ann.caption,
+        captionFormat: ann.captionFormat,
+        processedCaption: processedCaption,
+        renderedCaption: ann.getRenderedCaption(),
+        captionImages: ann.captionImages || [], // ← ADD THIS
+        captionVideos: ann.captionVideos || [], // ← ADD THIS
+        link: ann.link,
+        priority: ann.priority,
+        expiresAt: ann.expiresAt,
+  hasImage: !!(ann.image && ann.image.filename),
+hasDocument: !!(ann.document && ann.document.filename),
+        captionImagesCount: ann.captionImages.length,
+        captionVideosCount: ann.captionVideos.length,
+        createdAt: ann.createdAt
+      };
+    });
 
     res.json({ announcements: announcementsWithInfo });
   } catch (error) {
+    console.error('Error fetching active announcements:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET SINGLE ANNOUNCEMENT BY ID
+// GET ALL ANNOUNCEMENTS (Admin)
+router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
+  try {
+    await Announcement.expireOldAnnouncements();
+
+    const announcements = await Announcement.find()
+      .select('-image.data -document.data')
+      .populate('createdBy', 'name email')
+      .sort({ priority: -1, createdAt: -1 });
+
+    const announcementsWithInfo = announcements.map(ann => {
+      const processedCaption = processContent(
+        ann.caption, 
+        ann.captionImages, 
+        ann.captionVideos
+      );
+
+      return {
+        _id: ann._id,
+        title: ann.title,
+        titleColor: ann.titleColor,
+        caption: ann.caption,
+        captionFormat: ann.captionFormat,
+        processedCaption: processedCaption,
+        renderedCaption: ann.getRenderedCaption(),
+        captionImages: ann.captionImages || [], // ← ADD THIS
+        captionVideos: ann.captionVideos || [], // ← ADD THIS
+        link: ann.link,
+        priority: ann.priority,
+        isActive: ann.isActive,
+        expiresAt: ann.expiresAt,
+        isExpired: ann.isExpired,
+      hasImage: !!(ann.image && ann.image.filename),
+hasDocument: !!(ann.document && ann.document.filename),
+        imageFilename: ann.image?.filename,
+        documentFilename: ann.document?.filename,
+        captionImagesCount: ann.captionImages.length,
+        captionVideosCount: ann.captionVideos.length,
+        createdBy: ann.createdBy,
+        createdAt: ann.createdAt,
+        updatedAt: ann.updatedAt
+      };
+    });
+
+    res.json({ announcements: announcementsWithInfo });
+  } catch (error) {
+    console.error('Error fetching announcements:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET SINGLE ANNOUNCEMENT BY ID (Admin)
 router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
-      .select('-image.data -document.data');
+      .select('-image.data -document.data')
+      .populate('createdBy', 'name email');
 
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
@@ -169,6 +548,12 @@ router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) =>
       await announcement.save();
     }
 
+    const processedCaption = processContent(
+      announcement.caption, 
+      announcement.captionImages, 
+      announcement.captionVideos
+    );
+
     res.json({ 
       announcement: {
         _id: announcement._id,
@@ -176,26 +561,32 @@ router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) =>
         titleColor: announcement.titleColor,
         caption: announcement.caption,
         captionFormat: announcement.captionFormat,
+        processedCaption: processedCaption,
         renderedCaption: announcement.getRenderedCaption(),
+        captionImages: announcement.captionImages || [], // ← ADD THIS
+        captionVideos: announcement.captionVideos || [], // ← ADD THIS
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-        hasImage: !!announcement.image?.data,
-        hasDocument: !!announcement.document?.data,
+      hasImage: !!(announcement.image && announcement.image.filename),
+hasDocument: !!(announcement.document && announcement.document.filename),
         imageFilename: announcement.image?.filename,
         documentFilename: announcement.document?.filename,
+        createdBy: announcement.createdBy,
         createdAt: announcement.createdAt,
         updatedAt: announcement.updatedAt
       }
     });
   } catch (error) {
+    console.error('Error fetching announcement:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET ANNOUNCEMENT IMAGE
+
+// GET ANNOUNCEMENT FEATURED IMAGE
 router.get('/api/announcement/:id/image', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -207,6 +598,7 @@ router.get('/api/announcement/:id/image', async (req, res) => {
     res.set('Content-Type', announcement.image.contentType);
     res.send(announcement.image.data);
   } catch (error) {
+    console.error('Error fetching announcement image:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -224,6 +616,7 @@ router.get('/api/announcement/:id/document', async (req, res) => {
     res.set('Content-Disposition', `attachment; filename="${announcement.document.filename}"`);
     res.send(announcement.document.data);
   } catch (error) {
+    console.error('Error fetching announcement document:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -239,7 +632,11 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       titleColor,
       caption,
       captionFormat,
-      link, 
+      captionImages,
+      captionVideos,
+      linkUrl,
+      linkName,
+      linkOpenInNewTab,
       priority, 
       isActive, 
       removeImage, 
@@ -255,12 +652,43 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
+// In UPDATE ANNOUNCEMENT route (around line 651)
+if (!req.user || !req.user.admin_id) {
+  return res.status(401).json({ error: 'Unauthorized - Invalid user session' });
+}
+
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ error: 'Not authorized to update this announcement' });
+    }
 
     if (title) announcement.title = title;
     if (titleColor !== undefined) announcement.titleColor = titleColor;
-    if (caption !== undefined) announcement.caption = caption;
+    if (caption !== undefined) {
+      announcement.caption = caption;
+      
+      // Clean up unused media if caption was updated
+      if (captionImages) {
+        announcement.captionImages = cleanupUnusedImages(
+          caption, 
+          JSON.parse(captionImages)
+        );
+      }
+      if (captionVideos) {
+        announcement.captionVideos = cleanupUnusedVideos(
+          caption, 
+          JSON.parse(captionVideos)
+        );
+      }
+    }
     if (captionFormat !== undefined) announcement.captionFormat = captionFormat;
-    if (link !== undefined) announcement.link = link;
+    
+    // Update link
+    if (linkUrl !== undefined) announcement.link.url = linkUrl;
+    if (linkName !== undefined) announcement.link.name = linkName;
+    if (linkOpenInNewTab !== undefined) {
+      announcement.link.openInNewTab = linkOpenInNewTab === 'true' || linkOpenInNewTab === true;
+    }
+    
     if (priority !== undefined) announcement.priority = priority;
     if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
 
@@ -276,14 +704,10 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       }
     }
 
+    // Handle featured image removal/update
     if (removeImage === 'true' || removeImage === true) {
       announcement.image = undefined;
     }
-
-    if (removeDocument === 'true' || removeDocument === true) {
-      announcement.document = undefined;
-    }
-
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcement.image = {
@@ -293,6 +717,10 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       };
     }
 
+    // Handle document removal/update
+    if (removeDocument === 'true' || removeDocument === true) {
+      announcement.document = undefined;
+    }
     if (req.files && req.files.document) {
       const docFile = req.files.document[0];
       announcement.document = {
@@ -304,6 +732,12 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
 
     await announcement.save();
 
+    const processedCaption = processContent(
+      announcement.caption, 
+      announcement.captionImages, 
+      announcement.captionVideos
+    );
+
     res.json({ 
       message: 'Announcement updated successfully',
       announcement: {
@@ -312,18 +746,22 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
         titleColor: announcement.titleColor,
         caption: announcement.caption,
         captionFormat: announcement.captionFormat,
+        processedCaption: processedCaption,
         renderedCaption: announcement.getRenderedCaption(),
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-        hasImage: !!announcement.image,
-        hasDocument: !!announcement.document,
+       hasImage: !!(announcement.image && announcement.image.data),
+hasDocument: !!(announcement.document && announcement.document.data),
+        captionImagesCount: announcement.captionImages.length,
+        captionVideosCount: announcement.captionVideos.length,
         updatedAt: announcement.updatedAt
       }
     });
   } catch (error) {
+    console.error('Error updating announcement:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -335,6 +773,10 @@ router.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req
 
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ error: 'Not authorized to modify this announcement' });
     }
 
     if (announcement.isExpired) {
@@ -354,6 +796,7 @@ router.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req
       }
     });
   } catch (error) {
+    console.error('Error toggling announcement:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -361,14 +804,21 @@ router.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req
 // DELETE SINGLE ANNOUNCEMENT
 router.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
-    const announcement = await Announcement.findByIdAndDelete(req.params.id);
+    const announcement = await Announcement.findById(req.params.id);
 
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
+    if (announcement.createdBy.toString() !== req.user.admin_id) {
+      return res.status(403).json({ error: 'Not authorized to delete this announcement' });
+    }
+
+    await Announcement.findByIdAndDelete(req.params.id);
+
     res.json({ message: 'Announcement deleted successfully' });
   } catch (error) {
+    console.error('Error deleting announcement:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -382,7 +832,9 @@ router.delete('/api/admin/announcement', authenticateToken, async (req, res) => 
       deletedCount: result.deletedCount
     });
   } catch (error) {
+    console.error('Error deleting all announcements:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
 module.exports = router;
