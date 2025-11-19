@@ -560,7 +560,7 @@ router.post('/api/image-posts/:id/comments',
 );
 
 // Get comments for an image post (public - active comments only)
-router.get('/api/image-posts/:id/comments', cacheMiddleware, async (req, res) => {
+router.get('/api/image-posts/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -603,7 +603,7 @@ router.get('/api/image-posts/:id/comments', cacheMiddleware, async (req, res) =>
 });
 
 // Get replies for a comment (public)
-router.get('/api/image-posts/comments/:commentId/replies', cacheMiddleware,  async (req, res) => {
+router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -759,7 +759,7 @@ router.post('/api/image-posts/comments/:commentId/dislike',
 
 // Check user's reaction on a comment (public)
 router.get('/api/image-posts/comments/:commentId/user-reaction',
-  extractDeviceId, cacheMiddleware, 
+  extractDeviceId,
   async (req, res) => {
     try {
       const { commentId } = req.params;
@@ -867,8 +867,7 @@ router.delete('/api/image-posts/comments/:commentId',
 // Add author comment or reply (admin only)
 router.post('/api/image-posts/:id/author-comment',
   authenticateToken,
-  [
-    body('content').trim().notEmpty().withMessage('Comment content is required')
+  [body('content').trim().notEmpty().withMessage('Comment content is required')
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters'),
     body('parentCommentId').optional().isMongoId().withMessage('Invalid parent comment ID')
   ],
