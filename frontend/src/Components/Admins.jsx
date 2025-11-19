@@ -10,6 +10,7 @@ const SuperAdminPanel = () => {
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false); // FIX: Track if image should be removed
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -114,33 +115,9 @@ const SuperAdminPanel = () => {
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Image size should be less than 5MB');
-        return;
-      }
-      if (!file.type.startsWith('image/')) {
-        setError('Only image files are allowed');
-        return;
-      }
-      setImageFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+ 
 
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
+ 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -176,6 +153,7 @@ const SuperAdminPanel = () => {
     });
     setImageFile(null);
     setImagePreview(null);
+    setRemoveImage(false); // FIX: Reset remove flag
     setEditingAdmin(null);
     setShowCreateForm(false);
   };
@@ -235,60 +213,7 @@ const SuperAdminPanel = () => {
     setLoading(false);
   };
 
-  const handleUpdateAdmin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    const formDataToSend = new FormData();
-    
-    // Append all form fields
-    formDataToSend.append('name', formData.name);
-    formDataToSend.append('email', formData.email);
-    if (formData.password) formDataToSend.append('password', formData.password);
-    formDataToSend.append('role', formData.role);
-    formDataToSend.append('isSuperAdmin', formData.isSuperAdmin);
-    formDataToSend.append('status', formData.status);
-    formDataToSend.append('bio', formData.bio || '');
-    formDataToSend.append('designation', formData.designation || '');
-    formDataToSend.append('location', formData.location || '');
-    
-    // Append arrays as JSON strings
-    const expertise = formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s) : [];
-    const interests = formData.interests ? formData.interests.split(',').map(s => s.trim()).filter(s => s) : [];
-    formDataToSend.append('expertise', JSON.stringify(expertise));
-    formDataToSend.append('interests', JSON.stringify(interests));
-    formDataToSend.append('socialLinks', JSON.stringify(formData.socialLinks));
-    
-    // Append image if new one is selected
-    if (imageFile) {
-      formDataToSend.append('profileImage', imageFile);
-    }
-
-    try {
-      const response = await fetch(`${API_URL}/admins/${editingAdmin._id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: formDataToSend
-      });
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSuccess('Admin updated successfully');
-        resetForm();
-        fetchAdmins();
-      } else {
-        setError(data.message || 'Failed to update admin');
-      }
-    } catch (err) {
-      setError('Failed to update admin');
-      console.error('Update error:', err);
-    }
-    setLoading(false);
-  };
+  
 
   const handleDeleteAdmin = async (id) => {
     if (!window.confirm('Are you sure you want to delete this admin?')) return;
@@ -317,40 +242,162 @@ const SuperAdminPanel = () => {
     setLoading(false);
   };
 
-  const handleEditClick = (admin) => {
-    setEditingAdmin(admin);
-    setFormData({
-      name: admin.name || '',
-      email: admin.email || '',
-      password: '',
-      role: admin.role || 'admin',
-      isSuperAdmin: admin.isSuperAdmin || false,
-      status: admin.status || 'active',
-      bio: admin.bio || '',
-      designation: admin.designation || '',
-      location: admin.location || '',
-      expertise: admin.expertise ? admin.expertise.join(', ') : '',
-      interests: admin.interests ? admin.interests.join(', ') : '',
-      socialLinks: {
-        twitter: admin.socialLinks?.twitter || '',
-        linkedin: admin.socialLinks?.linkedin || '',
-        github: admin.socialLinks?.github || '',
-        portfolio: admin.socialLinks?.portfolio || '',
-        instagram: admin.socialLinks?.instagram || '',
-        personalWebsite: admin.socialLinks?.personalWebsite || '',
-        youtube: admin.socialLinks?.youtube || '',
-        medium: admin.socialLinks?.medium || ''
-      }
+ 
+  const handleUpdateAdmin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setSuccess('');
+
+  const formDataToSend = new FormData();
+  
+  // Append all form fields
+  formDataToSend.append('name', formData.name);
+  formDataToSend.append('email', formData.email);
+  if (formData.password) formDataToSend.append('password', formData.password);
+  formDataToSend.append('role', formData.role);
+  formDataToSend.append('isSuperAdmin', formData.isSuperAdmin);
+  formDataToSend.append('status', formData.status);
+  formDataToSend.append('bio', formData.bio || '');
+  formDataToSend.append('designation', formData.designation || '');
+  formDataToSend.append('location', formData.location || '');
+  
+  // Append arrays as JSON strings
+  const expertise = formData.expertise ? formData.expertise.split(',').map(s => s.trim()).filter(s => s) : [];
+  const interests = formData.interests ? formData.interests.split(',').map(s => s.trim()).filter(s => s) : [];
+  formDataToSend.append('expertise', JSON.stringify(expertise));
+  formDataToSend.append('interests', JSON.stringify(interests));
+  formDataToSend.append('socialLinks', JSON.stringify(formData.socialLinks));
+  
+  // DEBUG: Log what we're sending for image
+  console.log('=== IMAGE UPDATE DEBUG ===');
+  console.log('imageFile:', imageFile);
+  console.log('removeImage:', removeImage);
+  console.log('imagePreview:', imagePreview);
+  
+  // Handle image upload/removal
+  if (imageFile) {
+    console.log('Appending new image file:', imageFile.name);
+    formDataToSend.append('profileImage', imageFile);
+  } else if (removeImage) {
+    console.log('Appending removeImage flag');
+    formDataToSend.append('removeImage', 'true');
+  } else {
+    console.log('No image changes - keeping existing');
+  }
+  
+  // DEBUG: Log all FormData entries
+  console.log('=== FormData Contents ===');
+  for (let [key, value] of formDataToSend.entries()) {
+    if (key === 'profileImage') {
+      console.log(key, ': File -', value.name);
+    } else {
+      console.log(key, ':', value);
+    }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/admins/${editingAdmin._id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`
+        // Don't set Content-Type - FormData handles it
+      },
+      body: formDataToSend
     });
     
-    // Set image preview if admin has image
-    if (admin.profileImage?.hasImage) {
-      setImagePreview(getImageUrl(admin._id));
-    }
+    console.log('Response status:', response.status);
+    const data = await response.json();
+    console.log('Response data:', data);
     
-    setShowCreateForm(true);
-  };
+    if (response.ok) {
+      setSuccess('Admin updated successfully');
+      resetForm();
+      fetchAdmins();
+    } else {
+      setError(data.message || 'Failed to update admin');
+    }
+  } catch (err) {
+    setError('Failed to update admin');
+    console.error('Update error:', err);
+  }
+  setLoading(false);
+};
 
+const handleRemoveImage = () => {
+  console.log('Remove image button clicked');
+  setImageFile(null);
+  setImagePreview(null);
+  setRemoveImage(true);
+};
+
+const handleImageChange = (e) => {
+  const file = e.target.files[0];
+  console.log('Image selected:', file);
+  
+  if (file) {
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed');
+      return;
+    }
+    setImageFile(file);
+    setRemoveImage(false);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+      console.log('Image preview created');
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+const handleEditClick = (admin) => {
+  console.log('Editing admin:', admin._id);
+  setEditingAdmin(admin);
+  setFormData({
+    name: admin.name || '',
+    email: admin.email || '',
+    password: '',
+    role: admin.role || 'admin',
+    isSuperAdmin: admin.isSuperAdmin || false,
+    status: admin.status || 'active',
+    bio: admin.bio || '',
+    designation: admin.designation || '',
+    location: admin.location || '',
+    expertise: admin.expertise ? admin.expertise.join(', ') : '',
+    interests: admin.interests ? admin.interests.join(', ') : '',
+    socialLinks: {
+      twitter: admin.socialLinks?.twitter || '',
+      linkedin: admin.socialLinks?.linkedin || '',
+      github: admin.socialLinks?.github || '',
+      portfolio: admin.socialLinks?.portfolio || '',
+      instagram: admin.socialLinks?.instagram || '',
+      personalWebsite: admin.socialLinks?.personalWebsite || '',
+      youtube: admin.socialLinks?.youtube || '',
+      medium: admin.socialLinks?.medium || ''
+    }
+  });
+  
+  // Set image preview
+  if (admin.profileImage?.hasImage) {
+    console.log('Admin has existing image');
+    setImagePreview(getImageUrl(admin._id));
+  } else {
+    console.log('Admin has no existing image');
+    setImagePreview(null);
+  }
+  
+  // Reset file and remove flags
+  setImageFile(null);
+  setRemoveImage(false);
+  setShowCreateForm(true);
+};
   const handleToggleStatus = async (admin) => {
     const newStatus = admin.status === 'active' ? 'inactive' : 'active';
     setLoading(true);
@@ -416,7 +463,7 @@ const SuperAdminPanel = () => {
                   {imagePreview ? (
                     <div className="image-preview">
                       <img src={imagePreview} alt="Preview" />
-                      <button type="button" onClick={removeImage} className="btn-remove-image">
+                      <button type="button" onClick={handleRemoveImage} className="btn-remove-image">
                         ×
                       </button>
                     </div>

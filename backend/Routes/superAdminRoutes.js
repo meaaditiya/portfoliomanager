@@ -167,6 +167,59 @@ router.get('/api/admins/:id/image', async (req, res) => {
   }
 });
 
+
+// Delete admin (Super Admin only)
+router.delete('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (id === req.user.admin_id) {
+      return res.status(400).json({ message: 'Cannot delete your own account' });
+    }
+    
+    const admin = await Admin.findById(id);
+    
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    await Admin.findByIdAndDelete(id);
+    
+    res.json({ message: 'Admin deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting admin:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ============================================
+// REGULAR ADMIN ROUTES - Self Profile Management
+// ============================================
+
+// Get own profile
+router.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.user.admin_id).select('-password');
+    
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    const adminObj = admin.toObject();
+    if (adminObj.profileImage && adminObj.profileImage.data) {
+      adminObj.profileImage = {
+        contentType: adminObj.profileImage.contentType,
+        hasImage: true
+      };
+    }
+    
+    res.json({ admin: adminObj });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Update admin (Super Admin only) - WITH IMAGE UPLOAD
 router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('profileImage'), async (req, res) => {
   try {
@@ -221,15 +274,20 @@ router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('pr
       admin.socialLinks = { ...admin.socialLinks, ...parsedLinks };
     }
     
-    // Handle profile image
+    // Handle profile image - FIX: Better logic for image handling
     if (removeImage === 'true' || removeImage === true) {
+      // User explicitly wants to remove the image
       admin.profileImage = null;
+      console.log('Image removed');
     } else if (req.file) {
+      // New file uploaded - save it
       admin.profileImage = {
         data: req.file.buffer,
         contentType: req.file.mimetype
       };
+      console.log('New image uploaded', req.file.filename);
     }
+    // If neither, keep existing image (don't modify admin.profileImage)
     
     // Update password if provided
     if (password) {
@@ -254,58 +312,6 @@ router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('pr
     });
   } catch (error) {
     console.error('Error updating admin:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Delete admin (Super Admin only)
-router.delete('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (id === req.user.admin_id) {
-      return res.status(400).json({ message: 'Cannot delete your own account' });
-    }
-    
-    const admin = await Admin.findById(id);
-    
-    if (!admin) {
-      return res.status(404).json({ message: 'Admin not found' });
-    }
-    
-    await Admin.findByIdAndDelete(id);
-    
-    res.json({ message: 'Admin deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting admin:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// ============================================
-// REGULAR ADMIN ROUTES - Self Profile Management
-// ============================================
-
-// Get own profile
-router.get('/api/profile', authenticateToken, async (req, res) => {
-  try {
-    const admin = await Admin.findById(req.user.admin_id).select('-password');
-    
-    if (!admin) {
-      return res.status(404).json({ message: 'Admin not found' });
-    }
-    
-    const adminObj = admin.toObject();
-    if (adminObj.profileImage && adminObj.profileImage.data) {
-      adminObj.profileImage = {
-        contentType: adminObj.profileImage.contentType,
-        hasImage: true
-      };
-    }
-    
-    res.json({ admin: adminObj });
-  } catch (error) {
-    console.error('Error fetching profile:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -346,14 +352,16 @@ router.put('/api/profile', authenticateToken, upload.single('profileImage'), asy
       admin.socialLinks = { ...admin.socialLinks, ...parsedLinks };
     }
     
-    // Handle profile image
+    // Handle profile image - FIX: Better logic
     if (removeImage === 'true' || removeImage === true) {
       admin.profileImage = null;
+      console.log('Profile image removed');
     } else if (req.file) {
       admin.profileImage = {
         data: req.file.buffer,
         contentType: req.file.mimetype
       };
+      console.log('Profile image uploaded');
     }
     
     await admin.save();
