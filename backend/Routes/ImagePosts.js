@@ -333,6 +333,7 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   }
 });
 // Get single image/video post (public)
+// Get single image/video post (public) - Post data only, cached
 router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -356,13 +357,6 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       }
     }
     
-    // Get active TOP-LEVEL comments only (no replies)
-    const comments = await ImageComment.find({ 
-      post: id,
-      status: 'active',
-      parentComment: null
-    }).sort({ createdAt: -1 });
-    
     res.json({
       post: {
         id: post._id,
@@ -375,8 +369,7 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         updatedAt: post.updatedAt,
         reactionCount: post.hideReactionCount ? null : post.reactionCount,
         commentCount: post.commentCount
-      },
-      comments
+      }
     });
   } catch (error) {
     console.error('Error fetching public post:', error);
