@@ -326,7 +326,9 @@ router.get('/api/blogs/:identifier', async (req, res) => {
     console.log('Generated fingerprint:', fingerprint); // DEBUG
     
     // Find blog
-    let blog = await Blog.findOne(query);
+    let blog = await Blog.findOne(query)
+     .populate('author', 'name email profileImage designation location bio socialLinks')
+      .exec();
     
     if (!blog) {
       return res.status(404).json({ message: 'Blog post not found' });
