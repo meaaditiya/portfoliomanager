@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-// Updated Blog Schema with Video Support, Reports, and Read Tracking
 const blogSchema = new mongoose.Schema({
     title: { 
       type: String, 
@@ -11,7 +10,6 @@ const blogSchema = new mongoose.Schema({
       type: String, 
       required: true 
     },
-    // Array to store inline images used in content
     contentImages: [{
       url: {
         type: String,
@@ -36,7 +34,6 @@ const blogSchema = new mongoose.Schema({
         unique: true
       }
     }],
-    // Array to store inline videos used in content
     contentVideos: [{
       url: {
         type: String,
@@ -132,12 +129,26 @@ const blogSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    // NEW: Read tracking
+    // UPDATED: Total reads (accurate count)
     totalReads: {
       type: Number,
       default: 0
     },
-    // NEW: Reports array
+    // NEW: Array of unique fingerprints that have read this blog
+    readFingerprints: [{
+      fingerprint: {
+        type: String,
+        required: true
+      },
+      readAt: {
+        type: Date,
+        default: Date.now
+      },
+      readCount: {
+        type: Number,
+        default: 1
+      }
+    }],
     reports: [{
       userEmail: {
         type: String,
@@ -155,14 +166,15 @@ const blogSchema = new mongoose.Schema({
         default: Date.now
       }
     }],
-    // NEW: Total reports count
     totalReports: {
       type: Number,
       default: 0
     }
 });
 
-// Updated pre-save middleware
+// Index for faster fingerprint lookups
+blogSchema.index({ 'readFingerprints.fingerprint': 1 });
+
 blogSchema.pre('save', function(next) {
   if (this.isModified('title')) {
     this.slug = this.title
@@ -171,7 +183,6 @@ blogSchema.pre('save', function(next) {
       .replace(/\s+/g, '-');
   }
   
-  // Generate unique IDs for new content images
   if (this.isModified('contentImages')) {
     this.contentImages.forEach(image => {
       if (!image.imageId) {
@@ -180,7 +191,6 @@ blogSchema.pre('save', function(next) {
     });
   }
   
-  // Generate unique IDs for new content videos
   if (this.isModified('contentVideos')) {
     this.contentVideos.forEach(video => {
       if (!video.embedId) {
@@ -193,7 +203,6 @@ blogSchema.pre('save', function(next) {
     this.publishedAt = new Date();
   }
   
-  // Update totalReports count when reports are modified
   if (this.isModified('reports')) {
     this.totalReports = this.reports.length;
   }

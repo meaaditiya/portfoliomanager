@@ -15,6 +15,7 @@ const  Comment = require('../models/comment');
 const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
@@ -99,7 +100,66 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   });
-  
+  router.get('/api/admin/blogs/:identifier/read-stats', authenticateToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+    
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+    
+    const blog = await Blog.findOne(query)
+      .select('title slug totalReads readFingerprints status createdAt publishedAt')
+      .exec();
+    
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    
+    // Calculate statistics
+    const uniqueReaders = blog.readFingerprints.length;
+    const totalReads = blog.totalReads;
+    const averageReadsPerReader = uniqueReaders > 0 ? (totalReads / uniqueReaders).toFixed(2) : 0;
+    
+    // Get top readers (most reads from same fingerprint)
+    const topReaders = blog.readFingerprints
+      .sort((a, b) => b.readCount - a.readCount)
+      .slice(0, 10)
+      .map((rf, index) => ({
+        rank: index + 1,
+        readCount: rf.readCount,
+        lastReadAt: rf.readAt
+      }));
+    
+    // Calculate read trend (reads per day for last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentReads = blog.readFingerprints.filter(rf => rf.readAt >= thirtyDaysAgo);
+    
+    res.json({
+      blog: {
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug,
+        status: blog.status,
+        createdAt: blog.createdAt,
+        publishedAt: blog.publishedAt
+      },
+      readStats: {
+        totalReads,
+        uniqueReaders,
+        averageReadsPerReader,
+        topReaders,
+        recentReadsLast30Days: recentReads.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching read stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
   // Update content image
   router.put('/api/blogs/:id/images/:imageId', authenticateToken, async (req, res) => {
     try {
@@ -250,7 +310,6 @@ router.get('/api/blogs', async (req, res) => {
 router.get('/api/blogs/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    
     const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
     
     const query = isObjectId 
@@ -262,24 +321,67 @@ router.get('/api/blogs/:identifier', async (req, res) => {
       query.status = 'published';
     }
     
-    // Increment totalReads and get the blog
-    const blog = await Blog.findOneAndUpdate(
-      query,
-      { $inc: { totalReads: 0.5 } },
-      { new: true }
-    )
-      .populate('author', 'name email')
-      .exec();
+    // Generate fingerprint from request
+    const fingerprint = getFingerprintFromRequest(req);
+    console.log('Generated fingerprint:', fingerprint); // DEBUG
+    
+    // Find blog
+    let blog = await Blog.findOne(query);
     
     if (!blog) {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
+    console.log('Blog found:', blog._id); // DEBUG
+    console.log('Current readFingerprints:', blog.readFingerprints); // DEBUG
+    
+    // Initialize readFingerprints if it doesn't exist
+    if (!blog.readFingerprints) {
+      blog.readFingerprints = [];
+    }
+    
+    // Check if this fingerprint already exists in readFingerprints
+    const existingFingerprintIndex = blog.readFingerprints.findIndex(
+      rf => rf.fingerprint === fingerprint
+    );
+    
+    if (existingFingerprintIndex !== -1) {
+      // Increment read count for existing fingerprint
+      blog.readFingerprints[existingFingerprintIndex].readCount += 1;
+      blog.readFingerprints[existingFingerprintIndex].readAt = new Date();
+      console.log('Incremented existing fingerprint'); // DEBUG
+    } else {
+      // Add new fingerprint
+      blog.readFingerprints.push({
+        fingerprint,
+        readAt: new Date(),
+        readCount: 1
+      });
+      console.log('Added new fingerprint'); // DEBUG
+    }
+    
+    // Update totalReads
+    blog.totalReads += 1;
+    
+    // IMPORTANT: Save the blog with updated fingerprints
+    await blog.save();
+    console.log('Blog saved with readFingerprints'); // DEBUG
+    
     const blogObj = blog.toObject();
+    
+    // ADD: Calculate unique readers count
+    const uniqueReaders = blog.readFingerprints ? blog.readFingerprints.length : 0;
+    blogObj.uniqueReaders = uniqueReaders; // Send to frontend
+    
     blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
     
     // Don't send full reports array to clients for privacy
     delete blogObj.reports;
+    
+    // Don't send readFingerprints to clients (privacy)
+    delete blogObj.readFingerprints;
+    
+    console.log('Response:', { totalReads: blogObj.totalReads, uniqueReaders }); // DEBUG
     
     res.json(blogObj);
   } catch (error) {
@@ -287,6 +389,7 @@ router.get('/api/blogs/:identifier', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // NEW: Report a blog post (Public route)
 router.post('/api/blogs/:identifier/report', async (req, res) => {
@@ -474,6 +577,9 @@ router.get('/api/blogs/reports/all', authenticateToken, async (req, res) => {
 });
 
 // NEW: Get blog statistics (Admin only)
+// ============================================
+// UPDATED ROUTE: Get blog statistics (Admin only)
+// ============================================
 router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -484,13 +590,15 @@ router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) =
       : { slug: identifier };
     
     const blog = await Blog.findOne(query)
-      .select('title slug totalReads totalReports reactionCounts commentsCount status publishedAt createdAt')
+      .select('title slug totalReads totalReports reactionCounts commentsCount status publishedAt createdAt readFingerprints')
       .populate('author', 'name email')
       .exec();
     
     if (!blog) {
       return res.status(404).json({ message: 'Blog post not found' });
     }
+    
+    const uniqueReaders = blog.readFingerprints.length;
     
     res.json({
       blogId: blog._id,
@@ -502,6 +610,7 @@ router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) =
       createdAt: blog.createdAt,
       stats: {
         totalReads: blog.totalReads,
+        uniqueReaders: uniqueReaders,
         totalReports: blog.totalReports,
         likes: blog.reactionCounts.likes,
         dislikes: blog.reactionCounts.dislikes,
@@ -513,7 +622,6 @@ router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) =
     res.status(500).json({ message: error.message });
   }
 });
-
 // NEW: Get overall blog statistics (Admin only)
 router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
   try {
@@ -522,8 +630,15 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
     const draftBlogs = await Blog.countDocuments({ status: 'draft' });
     const blogsWithReports = await Blog.countDocuments({ totalReports: { $gt: 0 } });
     
-    const totalReadsResult = await Blog.aggregate([
-      { $group: { _id: null, totalReads: { $sum: '$totalReads' } } }
+    // Calculate total reads and unique readers
+    const readStatsResult = await Blog.aggregate([
+      { 
+        $group: { 
+          _id: null, 
+          totalReads: { $sum: '$totalReads' },
+          totalUniqueReaders: { $sum: { $size: '$readFingerprints' } }
+        } 
+      }
     ]);
     
     const totalReportsResult = await Blog.aggregate([
@@ -541,10 +656,19 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
     ]);
     
     const mostReadBlogs = await Blog.find({ status: 'published' })
-      .select('title slug totalReads publishedAt')
+      .select('title slug totalReads publishedAt readFingerprints')
       .sort('-totalReads')
       .limit(5)
       .exec();
+    
+    // Add unique readers count to most read blogs
+    const mostReadBlogsWithUnique = mostReadBlogs.map(blog => ({
+      title: blog.title,
+      slug: blog.slug,
+      totalReads: blog.totalReads,
+      uniqueReaders: blog.readFingerprints.length,
+      publishedAt: blog.publishedAt
+    }));
     
     const mostReportedBlogs = await Blog.find({ totalReports: { $gt: 0 } })
       .select('title slug totalReports status')
@@ -558,12 +682,13 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
         publishedBlogs,
         draftBlogs,
         blogsWithReports,
-        totalReads: totalReadsResult[0]?.totalReads || 0,
+        totalReads: readStatsResult[0]?.totalReads || 0,
+        totalUniqueReaders: readStatsResult[0]?.totalUniqueReaders || 0,
         totalReports: totalReportsResult[0]?.totalReports || 0,
         totalLikes: totalReactionsResult[0]?.totalLikes || 0,
         totalDislikes: totalReactionsResult[0]?.totalDislikes || 0
       },
-      mostReadBlogs,
+      mostReadBlogs: mostReadBlogsWithUnique,
       mostReportedBlogs
     });
   } catch (error) {
@@ -1250,6 +1375,76 @@ router.get('/api/gemini/health', async (req, res) => {
   }
 });
  
+router.post(
+  '/api/blogs/:blogId/comments',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('content').trim().notEmpty().withMessage('Comment content is required')
+      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { blogId } = req.params;
+      const { name, email, content } = req.body;
+
+      const blog = await Blog.findById(blogId);
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog not found' });
+      }
+
+      // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+
+      console.log(`🔍 Moderating comment from ${name}...`);
+      const moderation = await moderateContent(content, name);
+      
+      if (!moderation.approved) {
+        console.log(`✅ Content moderation blocked comment from ${name} - Reason: ${moderation.reason}`);
+        
+        return res.status(422).json({
+          message: 'Your comment cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
+          code: 'CONTENT_POLICY_VIOLATION',
+          severity: moderation.severity,
+          moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          hint: moderation.systemError 
+            ? 'Your comment is under review. Please try again later.' 
+            : 'Please review our community guidelines and post respectful, constructive content.'
+        });
+      }
+
+      console.log(`✅ Content approved for ${name}`);
+
+      const newComment = new Comment({
+        blog: blogId,
+        user: { name, email },
+        content,
+        fingerprint
+      });
+
+      await newComment.save();
+      
+      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Comment added successfully',
+        comment: newComment
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      res.status(500).json({ 
+        message: 'Server error', 
+        error: error.message,
+        code: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
 // Public route: Delete user's own comment
 router.delete('/api/comments/:commentId/user', 
   [
@@ -1427,7 +1622,6 @@ router.post(
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
   ],
   async (req, res) => {
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -1437,21 +1631,20 @@ router.post(
       const { blogId } = req.params;
       const { name, email, content } = req.body;
 
-      // Check if blog exists
       const blog = await Blog.findById(blogId);
       if (!blog) {
         return res.status(404).json({ message: 'Blog not found' });
       }
 
-      // CONTENT MODERATION CHECK
+      // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+
       console.log(`🔍 Moderating comment from ${name}...`);
       const moderation = await moderateContent(content, name);
       
       if (!moderation.approved) {
-        // Log moderation rejection (green/info level, not error)
         console.log(`✅ Content moderation blocked comment from ${name} - Reason: ${moderation.reason}`);
         
-        // Return user-friendly error with unique code
         return res.status(422).json({
           message: 'Your comment cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
           code: 'CONTENT_POLICY_VIOLATION',
@@ -1465,16 +1658,15 @@ router.post(
 
       console.log(`✅ Content approved for ${name}`);
 
-      // Create new comment (only if moderation passed)
       const newComment = new Comment({
         blog: blogId,
         user: { name, email },
-        content
+        content,
+        fingerprint
       });
 
       await newComment.save();
       
-      // Update blog comments count
       await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
 
       res.status(201).json({ 
@@ -1492,7 +1684,6 @@ router.post(
   }
 );
 
-
 // POST reply route with content moderation
 router.post(
   '/api/comments/:commentId/replies',
@@ -1503,7 +1694,6 @@ router.post(
       .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
   ],
   async (req, res) => {
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -1513,13 +1703,11 @@ router.post(
       const { commentId } = req.params;
       const { name, email, content } = req.body;
 
-      // Check if parent comment exists
       const parentComment = await Comment.findById(commentId);
       if (!parentComment) {
         return res.status(404).json({ message: 'Parent comment not found' });
       }
 
-      // Check if parent comment is approved
       if (parentComment.status !== 'approved') {
         return res.status(400).json({ 
           message: 'Cannot reply to unapproved comment',
@@ -1527,15 +1715,15 @@ router.post(
         });
       }
 
-      // CONTENT MODERATION CHECK
+      // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+
       console.log(`🔍 Moderating reply from ${name}...`);
       const moderation = await moderateContent(content, name);
       
       if (!moderation.approved) {
-        // Log moderation rejection (green/info level, not error)
         console.log(`✅ Content moderation blocked reply from ${name} - Reason: ${moderation.reason}`);
         
-        // Return user-friendly error with unique code
         return res.status(422).json({
           message: 'Your reply cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
           code: 'CONTENT_POLICY_VIOLATION',
@@ -1549,17 +1737,16 @@ router.post(
 
       console.log(`✅ Content approved for ${name}`);
 
-      // Create new reply (only if moderation passed)
       const newReply = new Comment({
         blog: parentComment.blog,
         user: { name, email },
         content,
-        parentComment: commentId
+        parentComment: commentId,
+        fingerprint
       });
 
       await newReply.save();
       
-      // Update parent comment's replies count
       await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
 
       res.status(201).json({ 
@@ -1622,7 +1809,6 @@ router.post(
     body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
   ],
   async (req, res) => {
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -1632,25 +1818,23 @@ router.post(
       const { commentId } = req.params;
       const { name, email, type } = req.body;
 
-      // Check if comment exists and is approved
       const comment = await Comment.findOne({ _id: commentId, status: 'approved' });
       if (!comment) {
         return res.status(404).json({ message: 'Comment not found or not approved' });
       }
 
-      // Check if user already reacted to this comment
+      // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+
       const existingReaction = await CommentReaction.findOne({
         comment: commentId,
         'user.email': email
       });
 
-      // If reaction exists but is of different type, update it
       if (existingReaction) {
         if (existingReaction.type === type) {
-          // User is toggling off their reaction
           await CommentReaction.deleteOne({ _id: existingReaction._id });
           
-          // Update comment reaction counts
           if (type === 'like') {
             await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': -1 } });
           } else {
@@ -1662,11 +1846,10 @@ router.post(
             reactionRemoved: true
           });
         } else {
-          // User is changing reaction type
           existingReaction.type = type;
+          existingReaction.fingerprint = fingerprint;
           await existingReaction.save();
           
-          // Update comment reaction counts
           if (type === 'like') {
             await Comment.findByIdAndUpdate(commentId, { 
               $inc: { 
@@ -1690,16 +1873,15 @@ router.post(
         }
       }
 
-      // Create new reaction
       const newReaction = new CommentReaction({
         comment: commentId,
         type,
-        user: { name, email }
+        user: { name, email },
+        fingerprint
       });
 
       await newReaction.save();
       
-      // Update comment reaction counts
       if (type === 'like') {
         await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': 1 } });
       } else {
@@ -1712,7 +1894,6 @@ router.post(
       });
     } catch (error) {
       if (error.code === 11000) {
-        // Handle duplicate key error
         return res.status(400).json({ message: 'You have already reacted to this comment' });
       }
       console.error('Error adding comment reaction:', error);
@@ -1904,112 +2085,109 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-  router.post(
-    '/api/blogs/:blogId/reactions',
-    [
-      body('name').trim().notEmpty().withMessage('Name is required'),
-      body('email').isEmail().withMessage('Valid email is required'),
-      body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
-    ],
-    async (req, res) => {
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+  // ============================================
+// UPDATED ROUTE: Post blog reaction with fingerprint
+// ============================================
+router.post(
+  '/api/blogs/:blogId/reactions',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { blogId } = req.params;
+      const { name, email, type } = req.body;
+
+      const blog = await Blog.findById(blogId);
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog not found' });
       }
-  
-      try {
-        const { blogId } = req.params;
-        const { name, email, type } = req.body;
-  
-        // Check if blog exists
-        const blog = await Blog.findById(blogId);
-        if (!blog) {
-          return res.status(404).json({ message: 'Blog not found' });
-        }
-  
-        // Check if user already reacted to this blog
-        const existingReaction = await Reaction.findOne({
-          blog: blogId,
-          'user.email': email
-        });
-  
-        // If reaction exists but is of different type, update it
-        if (existingReaction) {
-          if (existingReaction.type === type) {
-            // User is toggling off their reaction
-            await Reaction.deleteOne({ _id: existingReaction._id });
-            
-            // Update blog reaction counts
-            if (type === 'like') {
-              await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': -1 } });
-            } else {
-              await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': -1 } });
-            }
-            
-            return res.status(200).json({ 
-              message: `${type} removed successfully`,
-              reactionRemoved: true
+
+      // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+
+      const existingReaction = await Reaction.findOne({
+        blog: blogId,
+        'user.email': email
+      });
+
+      if (existingReaction) {
+        if (existingReaction.type === type) {
+          await Reaction.deleteOne({ _id: existingReaction._id });
+          
+          if (type === 'like') {
+            await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': -1 } });
+          } else {
+            await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': -1 } });
+          }
+          
+          return res.status(200).json({ 
+            message: `${type} removed successfully`,
+            reactionRemoved: true
+          });
+        } else {
+          existingReaction.type = type;
+          existingReaction.fingerprint = fingerprint;
+          await existingReaction.save();
+          
+          if (type === 'like') {
+            await Blog.findByIdAndUpdate(blogId, { 
+              $inc: { 
+                'reactionCounts.likes': 1,
+                'reactionCounts.dislikes': -1
+              } 
             });
           } else {
-            // User is changing reaction type
-            existingReaction.type = type;
-            await existingReaction.save();
-            
-            // Update blog reaction counts
-            if (type === 'like') {
-              await Blog.findByIdAndUpdate(blogId, { 
-                $inc: { 
-                  'reactionCounts.likes': 1,
-                  'reactionCounts.dislikes': -1
-                } 
-              });
-            } else {
-              await Blog.findByIdAndUpdate(blogId, { 
-                $inc: { 
-                  'reactionCounts.likes': -1,
-                  'reactionCounts.dislikes': 1
-                } 
-              });
-            }
-            
-            return res.status(200).json({
-              message: `Reaction changed to ${type}`,
-              reaction: existingReaction
+            await Blog.findByIdAndUpdate(blogId, { 
+              $inc: { 
+                'reactionCounts.likes': -1,
+                'reactionCounts.dislikes': 1
+              } 
             });
           }
+          
+          return res.status(200).json({
+            message: `Reaction changed to ${type}`,
+            reaction: existingReaction
+          });
         }
-  
-        // Create new reaction
-        const newReaction = new Reaction({
-          blog: blogId,
-          type,
-          user: { name, email }
-        });
-  
-        await newReaction.save();
-        
-        // Update blog reaction counts
-        if (type === 'like') {
-          await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': 1 } });
-        } else {
-          await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': 1 } });
-        }
-  
-        res.status(201).json({ 
-          message: `${type} added successfully`,
-          reaction: newReaction
-        });
-      } catch (error) {
-        if (error.code === 11000) {
-          // Handle duplicate key error
-          return res.status(400).json({ message: 'You have already reacted to this blog post' });
-        }
-        console.error('Error adding reaction:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
       }
+
+      const newReaction = new Reaction({
+        blog: blogId,
+        type,
+        user: { name, email },
+        fingerprint
+      });
+
+      await newReaction.save();
+      
+      if (type === 'like') {
+        await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': 1 } });
+      } else {
+        await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': 1 } });
+      }
+
+      res.status(201).json({ 
+        message: `${type} added successfully`,
+        reaction: newReaction
+      });
+    } catch (error) {
+      if (error.code === 11000) {
+        return res.status(400).json({ message: 'You have already reacted to this blog post' });
+      }
+      console.error('Error adding reaction:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
     }
-  );
+  }
+);
   
   // Get user's reaction to a blog
   router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {

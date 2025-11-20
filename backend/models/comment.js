@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
- const CommentSchema = new mongoose.Schema({
+
+const CommentSchema = new mongoose.Schema({
   blog: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Blog',
@@ -15,6 +16,11 @@ const mongoose = require('mongoose');
       required: true
     }
   },
+  // NEW: Fingerprint for tracking unique users without login
+  fingerprint: {
+    type: String,
+    default: null
+  },
   content: {
     type: String,
     required: true,
@@ -26,22 +32,19 @@ const mongoose = require('mongoose');
     enum: ['pending', 'approved', 'rejected'],
     default: 'approved'
   },
-  // New field to identify author comments
   isAuthorComment: {
     type: Boolean,
     default: false
   },
-  // New fields for replies
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment',
-    default: null // null means it's a top-level comment
+    default: null
   },
   repliesCount: {
     type: Number,
     default: 0
   },
-  // New fields for comment reactions
   reactionCounts: {
     likes: {
       type: Number,

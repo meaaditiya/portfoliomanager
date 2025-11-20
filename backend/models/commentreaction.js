@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
- const CommentReactionSchema = new mongoose.Schema({
+
+const CommentReactionSchema = new mongoose.Schema({
   comment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment',
@@ -20,13 +21,17 @@ const mongoose = require('mongoose');
       required: true
     }
   },
+  // NEW: Fingerprint for tracking unique users
+  fingerprint: {
+    type: String,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Compound index to prevent multiple reactions from the same user on the same comment
 CommentReactionSchema.index({ comment: 1, 'user.email': 1 }, { unique: true });
 
 module.exports = mongoose.model('CommentReaction', CommentReactionSchema);
