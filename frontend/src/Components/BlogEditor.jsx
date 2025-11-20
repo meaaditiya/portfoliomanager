@@ -60,7 +60,16 @@ const BlogManagementPanel = () => {
     muted: false
   });
   const [uploadingVideo, setUploadingVideo] = useState(false);
-  
+  // Image editing state
+const [editImageModal, setEditImageModal] = useState({
+  isOpen: false,
+  imageId: null,
+  url: '',
+  alt: '',
+  caption: '',
+  position: 'center'
+});
+const [updatingImage, setUpdatingImage] = useState(false);
   // Fetch blogs from API
   const fetchBlogs = async () => {
     try {
@@ -418,30 +427,37 @@ const BlogManagementPanel = () => {
   };
   
   // Modify cancel function
-  const handleCancel = () => {
-    setViewMode('list');
-    setEditMode(false);
-    setSelectedBlog(null);
-    setAnalyticsId(null);
-    setSuccessMessage('');
-    setImageModal({
-      isOpen: false,
-      url: '',
-      alt: '',
-      caption: '',
-      position: 'center'
-    });
-    setVideoModal({
-      isOpen: false,
-      url: '',
-      title: '',
-      caption: '',
-      position: 'center',
-      autoplay: false,
-      muted: false
-    });
-  };
-  
+ const handleCancel = () => {
+  setViewMode('list');
+  setEditMode(false);
+  setSelectedBlog(null);
+  setAnalyticsId(null);
+  setSuccessMessage('');
+  setImageModal({
+    isOpen: false,
+    url: '',
+    alt: '',
+    caption: '',
+    position: 'center'
+  });
+  setEditImageModal({  // Add this
+    isOpen: false,
+    imageId: null,
+    url: '',
+    alt: '',
+    caption: '',
+    position: 'center'
+  });
+  setVideoModal({
+    isOpen: false,
+    url: '',
+    title: '',
+    caption: '',
+    position: 'center',
+    autoplay: false,
+    muted: false
+  });
+};
   const handleEdit = async (blog) => {
     setViewMode('edit');
     setEditMode(true);
@@ -616,35 +632,144 @@ const BlogManagementPanel = () => {
       setUploadingVideo(false);
     }
   };
-
-  // Content Images Section
-  const ContentImagesSection = ({ contentImages, content }) => {
-    const activeImages = generateImagePreview(contentImages, content);
+// Handle edit image modal input changes
+const handleEditImageModalChange = (e) => {
+  const { name, value } = e.target;
+  setEditImageModal(prev => ({
+    ...prev,
+    [name]: value
+  }));
+};
+// Open edit modal for specific image
+const handleEditImage = (image) => {
+  setEditImageModal({
+    isOpen: true,
+    imageId: image.imageId,
+    url: image.url,
+    alt: image.alt || '',
+    caption: image.caption || '',
+    position: image.position || 'center'
+  });
+};
+// Update existing image
+const handleUpdateImage = async () => {
+  if (!editImageModal.url.trim()) {
+    setError('Please enter an image URL');
+    return;
+  }
+  
+  // Basic URL validation
+  try {
+    new URL(editImageModal.url);
+  } catch {
+    setError('Please enter a valid URL');
+    return;
+  }
+  
+  try {
+    setUpdatingImage(true);
+    setError(null);
     
-    if (!activeImages || activeImages.length === 0) {
-      return null;
+    // If we're editing an existing blog, update image via API
+    if (selectedBlog) {
+      const response = await axios.put(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images/${editImageModal.imageId}`,
+        {
+          url: editImageModal.url,
+          alt: editImageModal.alt,
+          caption: editImageModal.caption,
+          position: editImageModal.position
+        },
+        { withCredentials: true }
+      );
+      
+      // Update contentImages in formData
+      setFormData(prev => ({
+        ...prev,
+        contentImages: prev.contentImages.map(img => 
+          img.imageId === editImageModal.imageId 
+            ? response.data.image 
+            : img
+        )
+      }));
+      
+      setSuccessMessage('Image updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      // For new blogs (not yet saved), update in local state
+      setFormData(prev => ({
+        ...prev,
+        contentImages: prev.contentImages.map(img => 
+          img.imageId === editImageModal.imageId 
+            ? {
+                ...img,
+                url: editImageModal.url,
+                alt: editImageModal.alt,
+                caption: editImageModal.caption,
+                position: editImageModal.position
+              }
+            : img
+        )
+      }));
+      
+      setSuccessMessage('Image updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
     }
     
-    return (
-      <div className="form-group">
-        <label>Content Images ({activeImages.length})</label>
-        <div className="content-images-list">
-          {activeImages.map((image, index) => (
-            <div key={image.imageId || index} className="content-image-item">
-              <img 
-                src={image.url} 
-                alt={image.alt} 
-                className="content-image-thumb"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/50x50?text=Error';
-                }}
-              />
-              <div className="content-image-info">
-                <span className="image-id">[IMAGE:{image.imageId}]</span>
-                <span className="image-position">{image.position}</span>
-                {image.caption && <span className="image-caption">{image.caption}</span>}
-              </div>
+    // Close modal and reset
+    setEditImageModal({
+      isOpen: false,
+      imageId: null,
+      url: '',
+      alt: '',
+      caption: '',
+      position: 'center'
+    });
+    
+  } catch (err) {
+    console.error('Error updating image:', err);
+    setError(err.response?.data?.message || 'Failed to update image. Please try again.');
+  } finally {
+    setUpdatingImage(false);
+  }
+};
+  // Content Images Section
+const ContentImagesSection = ({ contentImages, content }) => {
+  const activeImages = generateImagePreview(contentImages, content);
+  
+  if (!activeImages || activeImages.length === 0) {
+    return null;
+  }
+  
+  return (
+    <div className="form-group">
+      <label>Content Images ({activeImages.length})</label>
+      <div className="content-images-list">
+        {activeImages.map((image, index) => (
+          <div key={image.imageId || index} className="content-image-item">
+            <img 
+              src={image.url} 
+              alt={image.alt} 
+              className="content-image-thumb"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/50x50?text=Error';
+              }}
+            />
+            <div className="content-image-info">
+              <span className="image-id">[IMAGE:{image.imageId}]</span>
+              <span className="image-position">{image.position}</span>
+              {image.caption && <span className="image-caption">{image.caption}</span>}
+            </div>
+            <div className="content-image-actions">
+              <button
+                type="button"
+                className="btn btn-small btn-edit"
+                onClick={() => handleEditImage(image)}
+                title="Edit this image"
+              >
+                Edit
+              </button>
               <button
                 type="button"
                 className="btn btn-small btn-delete"
@@ -654,15 +779,16 @@ const BlogManagementPanel = () => {
                 Remove
               </button>
             </div>
-          ))}
-        </div>
-        <div className="helper-text">
-          Only images referenced in your content are shown above. 
-          Remove the [IMAGE:id] placeholder from your content to remove an image.
-        </div>
+          </div>
+        ))}
       </div>
-    );
-  };
+      <div className="helper-text">
+        Only images referenced in your content are shown above. 
+        Click "Edit" to modify image properties or "Remove" to delete from content.
+      </div>
+    </div>
+  );
+};
 
   // Content Videos Section
   const ContentVideosSection = ({ contentVideos, content }) => {
@@ -1004,7 +1130,104 @@ const BlogManagementPanel = () => {
             </div>
           </div>
         )}
-        
+        {/* Edit Image Modal */}
+{editImageModal.isOpen && (
+  <div className="modal-overlay">
+    <div className="modal-content">
+      <div className="modal-header">
+        <h3>Edit Image</h3>
+        <button 
+          className="modal-close"
+          onClick={() => setEditImageModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          ×
+        </button>
+      </div>
+      <div className="modal-body">
+        <div className="form-group">
+          <label htmlFor="editImageUrl">Image URL *</label>
+          <input
+            type="url"
+            id="editImageUrl"
+            name="url"
+            value={editImageModal.url}
+            onChange={handleEditImageModalChange}
+            placeholder="https://example.com/image.jpg"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editImageAlt">Alt Text</label>
+          <input
+            type="text"
+            id="editImageAlt"
+            name="alt"
+            value={editImageModal.alt}
+            onChange={handleEditImageModalChange}
+            placeholder="Description of the image"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editImageCaption">Caption</label>
+          <input
+            type="text"
+            id="editImageCaption"
+            name="caption"
+            value={editImageModal.caption}
+            onChange={handleEditImageModalChange}
+            placeholder="Image caption (optional)"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editImagePosition">Position</label>
+          <select
+            id="editImagePosition"
+            name="position"
+            value={editImageModal.position}
+            onChange={handleEditImageModalChange}
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="full-width">Full Width</option>
+          </select>
+        </div>
+        {editImageModal.url && (
+          <div className="image-preview">
+            <p>Preview:</p>
+            <img
+              src={editImageModal.url}
+              alt="Preview"
+              style={{ maxWidth: '100%', maxHeight: '200px' }}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/400x200?text=Invalid+Image+URL';
+              }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="modal-footer">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setEditImageModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleUpdateImage}
+          disabled={updatingImage || !editImageModal.url.trim()}
+        >
+          {updatingImage && <span className="spinner"></span>}
+          Update Image
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {/* Video Modal */}
         {videoModal.isOpen && (
           <div className="modal-overlay">

@@ -1,7 +1,7 @@
 // src/components/BlogAnalytics.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash, FaReply, FaHeart, FaHeartBroken, FaFlag, FaChartBar, FaEye, FaExclamationTriangle } from 'react-icons/fa';
+import { FaThumbsUp, FaThumbsDown, FaCommentAlt, FaCheck, FaTimes, FaClock, FaCrown, FaPlus, FaTrash, FaReply, FaHeart, FaHeartBroken, FaFlag, FaChartBar, FaEye, FaExclamationTriangle, FaUsers, FaBook, FaFireAlt, FaUserFriends, FaCalendarAlt, FaChartLine } from 'react-icons/fa';
 import './Analytics.css';
 
 const BlogAnalytics = ({ blogId }) => {
@@ -34,7 +34,7 @@ const BlogAnalytics = ({ blogId }) => {
   const [commentReactions, setCommentReactions] = useState({});
   const [userCommentReactions, setUserCommentReactions] = useState({});
   
-  // NEW: Reports state
+  // Reports state
   const [reports, setReports] = useState({
     list: [],
     total: 0,
@@ -42,9 +42,10 @@ const BlogAnalytics = ({ blogId }) => {
     blogSlug: ''
   });
   
-  // NEW: Statistics state
+  // Statistics state
   const [stats, setStats] = useState({
     totalReads: 0,
+    uniqueReaders: 0,
     totalReports: 0,
     likes: 0,
     dislikes: 0,
@@ -54,10 +55,34 @@ const BlogAnalytics = ({ blogId }) => {
     publishedAt: null,
     createdAt: null
   });
+
+  // NEW: Read Statistics state
+  const [readStats, setReadStats] = useState({
+    totalReads: 0,
+    uniqueReaders: 0,
+    averageReadsPerReader: 0,
+    topReaders: [],
+    recentReadsLast30Days: 0
+  });
+
+  // NEW: Summary Generation state
+  const [summaryGeneration, setSummaryGeneration] = useState({
+    currentSummary: '',
+    isGenerating: false,
+    generatedSummary: '',
+    wordCount: 0,
+    targetWordLimit: 300
+  });
+
+  // NEW: Content Images state
+  const [contentImages, setContentImages] = useState([]);
+  
+  // NEW: Content Videos state
+  const [contentVideos, setContentVideos] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('reactions');
+  const [activeTab, setActiveTab] = useState('stats');
   const [commentTab, setCommentTab] = useState('approved');
   
   // Comment pagination
@@ -107,10 +132,16 @@ const BlogAnalytics = ({ blogId }) => {
       await fetchCommentsByStatus('approved');
       // Fetch author comments
       await fetchAuthorComments();
-      // NEW: Fetch reports
+      // Fetch reports
       await fetchReports();
-      // NEW: Fetch statistics
+      // Fetch statistics
       await fetchStatistics();
+      // NEW: Fetch read statistics
+      await fetchReadStatistics();
+      // NEW: Fetch content images
+      await fetchContentImages();
+      // NEW: Fetch content videos
+      await fetchContentVideos();
       
     } catch (err) {
       console.error('Error fetching analytics:', err);
@@ -120,7 +151,7 @@ const BlogAnalytics = ({ blogId }) => {
     }
   };
   
-  // NEW: Fetch reports
+  // Fetch reports
   const fetchReports = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -146,7 +177,7 @@ const BlogAnalytics = ({ blogId }) => {
     }
   };
   
-  // NEW: Fetch statistics
+  // Fetch statistics
   const fetchStatistics = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -162,6 +193,7 @@ const BlogAnalytics = ({ blogId }) => {
       
       setStats({
         totalReads: response.data.stats.totalReads || 0,
+        uniqueReaders: response.data.stats.uniqueReaders || 0,
         totalReports: response.data.stats.totalReports || 0,
         likes: response.data.stats.likes || 0,
         dislikes: response.data.stats.dislikes || 0,
@@ -176,8 +208,170 @@ const BlogAnalytics = ({ blogId }) => {
       console.error('Error fetching statistics:', err);
     }
   };
+
+  // NEW: Fetch read statistics
+  const fetchReadStatistics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/admin/blogs/${blogId}/read-stats`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      setReadStats({
+        totalReads: response.data.readStats.totalReads || 0,
+        uniqueReaders: response.data.readStats.uniqueReaders || 0,
+        averageReadsPerReader: response.data.readStats.averageReadsPerReader || 0,
+        topReaders: response.data.readStats.topReaders || [],
+        recentReadsLast30Days: response.data.readStats.recentReadsLast30Days || 0
+      });
+      
+    } catch (err) {
+      console.error('Error fetching read statistics:', err);
+    }
+  };
+
+  // NEW: Fetch content images
+  const fetchContentImages = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/images`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      setContentImages(response.data.images || []);
+      
+    } catch (err) {
+      console.error('Error fetching content images:', err);
+    }
+  };
+
+  // NEW: Fetch content videos
+  const fetchContentVideos = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/videos`,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      
+      setContentVideos(response.data.videos || []);
+      
+    } catch (err) {
+      console.error('Error fetching content videos:', err);
+    }
+  };
+
+  // NEW: Generate Summary
+  const handleGenerateSummary = async () => {
+    setSummaryGeneration(prev => ({ ...prev, isGenerating: true }));
+    
+    try {
+      const response = await axios.post(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/generate-summary`,
+        {
+          wordLimit: summaryGeneration.targetWordLimit,
+          temperature: 0.7
+        }
+      );
+      
+      setSummaryGeneration(prev => ({
+        ...prev,
+        generatedSummary: response.data.summary,
+        wordCount: response.data.wordCount,
+        isGenerating: false
+      }));
+      
+      alert('Summary generated successfully!');
+      
+    } catch (err) {
+      console.error('Error generating summary:', err);
+      alert(err.response?.data?.message || 'Failed to generate summary');
+      setSummaryGeneration(prev => ({ ...prev, isGenerating: false }));
+    }
+  };
+
+  // NEW: Update Summary
+  const handleUpdateSummary = async () => {
+    if (!summaryGeneration.generatedSummary.trim()) {
+      alert('No summary to update');
+      return;
+    }
+    
+    try {
+      await axios.put(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/update-summary`,
+        {
+          summary: summaryGeneration.generatedSummary,
+          replaceExisting: true
+        }
+      );
+      
+      alert('Summary updated successfully!');
+      setSummaryGeneration(prev => ({
+        ...prev,
+        currentSummary: prev.generatedSummary,
+        generatedSummary: ''
+      }));
+      
+    } catch (err) {
+      console.error('Error updating summary:', err);
+      alert(err.response?.data?.message || 'Failed to update summary');
+    }
+  };
+
+  // NEW: Auto-generate and update summary
+  const handleAutoSummary = async () => {
+    if (!window.confirm('This will automatically generate and update the blog summary. Continue?')) {
+      return;
+    }
+    
+    setSummaryGeneration(prev => ({ ...prev, isGenerating: true }));
+    
+    try {
+      const response = await axios.post(
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}/auto-summary`,
+        {
+          wordLimit: summaryGeneration.targetWordLimit,
+          forceUpdate: true,
+          temperature: 0.7
+        }
+      );
+      
+      setSummaryGeneration(prev => ({
+        ...prev,
+        currentSummary: response.data.blog.summary,
+        generatedSummary: '',
+        wordCount: response.data.blog.summaryWordCount,
+        isGenerating: false
+      }));
+      
+      alert('Summary generated and updated successfully!');
+      
+    } catch (err) {
+      console.error('Error auto-generating summary:', err);
+      alert(err.response?.data?.message || 'Failed to auto-generate summary');
+      setSummaryGeneration(prev => ({ ...prev, isGenerating: false }));
+    }
+  };
   
-  // NEW: Delete a specific report
+  // Delete a specific report
   const deleteReport = async (reportId) => {
     if (!window.confirm('Are you sure you want to delete this report?')) {
       return;
@@ -205,7 +399,7 @@ const BlogAnalytics = ({ blogId }) => {
     }
   };
   
-  // NEW: Clear all reports
+  // Clear all reports
   const clearAllReports = async () => {
     if (!window.confirm('Are you sure you want to clear ALL reports for this blog? This action cannot be undone.')) {
       return;
@@ -308,7 +502,7 @@ const BlogAnalytics = ({ blogId }) => {
       const [countsResponse, userReactionResponse] = await Promise.all([
         axios.get(`https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/reactions/count`),
         axios.get(`https://connectwithaaditiyamg.onrender.com/api/comments/${commentId}/reactions/user`, {
-          params: { email: 'admin@example.com' } // Use admin email or get from token
+          params: { email: 'admin@example.com' }
         })
       ]);
       
@@ -723,22 +917,39 @@ const BlogAnalytics = ({ blogId }) => {
           <FaChartBar /> Statistics
         </button>
         <button 
+          className={`tab-btn ${activeTab === 'readstats' ? 'active' : ''}`}
+          onClick={() => setActiveTab('readstats')}
+        >
+          <FaEye /> Read Analytics
+        </button>
+        <button 
           className={`tab-btn ${activeTab === 'reactions' ? 'active' : ''}`}
           onClick={() => setActiveTab('reactions')}
         >
-          Reactions
+          <FaThumbsUp /> Reactions
         </button>
-        <button 
-          className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
+        <button className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`}
           onClick={() => setActiveTab('comments')}
         >
-          Comments
+          <FaCommentAlt /> Comments
         </button>
         <button 
           className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`}
           onClick={() => setActiveTab('reports')}
         >
           <FaFlag /> Reports {reports.total > 0 && <span className="badge-count">{reports.total}</span>}
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          <FaBook /> AI Summary
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'media' ? 'active' : ''}`}
+          onClick={() => setActiveTab('media')}
+        >
+          <FaFireAlt /> Media
         </button>
       </div>
       
@@ -751,7 +962,7 @@ const BlogAnalytics = ({ blogId }) => {
         <div className="error-message">{error}</div>
       ) : (
         <div className="analytics-content">
-          {/* NEW: Statistics Tab */}
+          {/* Statistics Tab */}
           {activeTab === 'stats' && (
             <div className="statistics-analytics">
               <h3>Blog Statistics Overview</h3>
@@ -764,6 +975,16 @@ const BlogAnalytics = ({ blogId }) => {
                   <div className="stat-info">
                     <div className="stat-value">{stats.totalReads}</div>
                     <div className="stat-label">Total Reads</div>
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-icon">
+                    <FaUsers />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{stats.uniqueReaders}</div>
+                    <div className="stat-label">Unique Readers</div>
                   </div>
                 </div>
                 
@@ -838,8 +1059,329 @@ const BlogAnalytics = ({ blogId }) => {
               )}
             </div>
           )}
+
+          {/* NEW: Read Statistics Tab */}
+          {activeTab === 'readstats' && (
+            <div className="read-statistics-analytics">
+              <h3>Detailed Read Analytics</h3>
+              
+              <div className="stats-grid">
+                <div className="stat-card stat-card-large">
+                  <div className="stat-icon">
+                    <FaEye />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{readStats.totalReads}</div>
+                    <div className="stat-label">Total Reads</div>
+                    <div className="stat-description">All-time page views</div>
+                  </div>
+                </div>
+
+                <div className="stat-card stat-card-large">
+                  <div className="stat-icon">
+                    <FaUserFriends />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{readStats.uniqueReaders}</div>
+                    <div className="stat-label">Unique Readers</div>
+                    <div className="stat-description">Distinct visitors</div>
+                  </div>
+                </div>
+
+                <div className="stat-card stat-card-large">
+                  <div className="stat-icon">
+                    <FaChartLine />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{readStats.averageReadsPerReader}</div>
+                    <div className="stat-label">Avg Reads/Reader</div>
+                    <div className="stat-description">Engagement metric</div>
+                  </div>
+                </div>
+
+                <div className="stat-card stat-card-large">
+                  <div className="stat-icon">
+                    <FaCalendarAlt />
+                  </div>
+                  <div className="stat-info">
+                    <div className="stat-value">{readStats.recentReadsLast30Days}</div>
+                    <div className="stat-label">Last 30 Days</div>
+                    <div className="stat-description">Recent activity</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Readers Section */}
+              {readStats.topReaders && readStats.topReaders.length > 0 && (
+                <div className="top-readers-section">
+                  <h4>Top 10 Most Engaged Readers</h4>
+                  <div className="top-readers-table-container">
+                    <table className="top-readers-table">
+                      <thead>
+                        <tr>
+                          <th>Rank</th>
+                          <th>Read Count</th>
+                          <th>Last Read</th>
+                          <th>Engagement</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {readStats.topReaders.map((reader, index) => (
+                          <tr key={index}>
+                            <td>
+                              <span className={`rank-badge rank-${reader.rank}`}>
+                                #{reader.rank}
+                              </span>
+                            </td>
+                            <td>
+                              <strong>{reader.readCount}</strong> reads
+                            </td>
+                            <td>{formatDate(reader.lastReadAt)}</td>
+                            <td>
+                              <div className="engagement-bar">
+                                <div 
+                                  className="engagement-fill"
+                                  style={{ 
+                                    width: `${(reader.readCount / readStats.topReaders[0].readCount) * 100}%` 
+                                  }}
+                                ></div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* NEW: AI Summary Tab */}
+          {activeTab === 'summary' && (
+            <div className="summary-analytics">
+              <h3>AI-Powered Summary Generation</h3>
+              
+              <div className="summary-controls">
+                <div className="form-group">
+                  <label htmlFor="wordLimit">Target Word Limit:</label>
+                  <input
+                    type="number"
+                    id="wordLimit"
+                    min="100"
+                    max="500"
+                    value={summaryGeneration.targetWordLimit}
+                    onChange={(e) => setSummaryGeneration(prev => ({
+                      ...prev,
+                      targetWordLimit: parseInt(e.target.value) || 300
+                    }))}
+                    className="word-limit-input"
+                  />
+                </div>
+
+                <div className="summary-actions">
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleGenerateSummary}
+                    disabled={summaryGeneration.isGenerating}
+                  >
+                    {summaryGeneration.isGenerating ? (
+                      <>
+                        <span className="spinner-small"></span> Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FaBook /> Generate Summary
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    className="btn btn-success"
+                    onClick={handleAutoSummary}
+                    disabled={summaryGeneration.isGenerating}
+                  >
+                    {summaryGeneration.isGenerating ? (
+                      <>
+                        <span className="spinner-small"></span> Processing...
+                      </>
+                    ) : (
+                      <>
+                        <FaCheck /> Auto Generate & Update
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {summaryGeneration.generatedSummary && (
+                <div className="generated-summary-section">
+                  <h4>Generated Summary ({summaryGeneration.wordCount} words)</h4>
+                  <div className="summary-preview">
+                    {summaryGeneration.generatedSummary}
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleUpdateSummary}
+                  >
+                    <FaCheck /> Update Blog Summary
+                  </button>
+                </div>
+              )}
+
+              <div className="summary-info">
+                <div className="info-card">
+                  <FaExclamationTriangle className="info-icon" />
+                  <div className="info-content">
+                    <h5>How It Works</h5>
+                    <ul>
+                      <li><strong>Generate Summary:</strong> Creates a new summary without saving</li>
+                      <li><strong>Auto Generate & Update:</strong> Generates and immediately updates the blog</li>
+                      <li><strong>Update Blog Summary:</strong> Saves the generated summary to your blog</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* NEW: Media Tab */}
+          {activeTab === 'media' && (
+            <div className="media-analytics">
+              <h3>Blog Media Content</h3>
+
+              {/* Content Images Section */}
+              <div className="media-section">
+                <div className="media-section-header">
+                  <h4>Content Images ({contentImages.length})</h4>
+                </div>
+                
+                {contentImages.length === 0 ? (
+                  renderEmptyState('content images')
+                ) : (
+                  <div className="media-grid">
+                    {contentImages.map((image, index) => (
+                      <div key={image.imageId || index} className="media-card">
+                        <div className="media-thumbnail">
+                          <img 
+                            src={image.url} 
+                            alt={image.alt || 'Content image'} 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/300x200?text=Image+Error';
+                            }}
+                          />
+                        </div>
+                        <div className="media-info">
+                          <div className="media-id">
+                            <code>[IMAGE:{image.imageId}]</code>
+                          </div>
+                          {image.alt && (
+                            <div className="media-detail">
+                              <strong>Alt:</strong> {image.alt}
+                            </div>
+                          )}
+                          {image.caption && (
+                            <div className="media-detail">
+                              <strong>Caption:</strong> {image.caption}
+                            </div>
+                          )}
+                          <div className="media-detail">
+                            <strong>Position:</strong> 
+                            <span className={`position-badge ${image.position}`}>
+                              {image.position}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Content Videos Section */}
+              <div className="media-section">
+                <div className="media-section-header">
+                  <h4>Content Videos ({contentVideos.length})</h4>
+                </div>
+                
+                {contentVideos.length === 0 ? (
+                  renderEmptyState('content videos')
+                ) : (
+                  <div className="media-grid">
+                    {contentVideos.map((video, index) => (
+                      <div key={video.embedId || index} className="media-card">
+                        <div className="media-thumbnail video-thumbnail">
+                          {video.platform === 'youtube' && (
+                            <img
+                              src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
+                              alt={video.title || 'Video thumbnail'}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://via.placeholder.com/300x200?text=Video';
+                              }}
+                            />
+                          )}
+                          {video.platform === 'vimeo' && (
+                            <div className="video-platform-badge">
+                              Vimeo Video
+                            </div>
+                          )}
+                          {video.platform === 'dailymotion' && (
+                            <img
+                              src={`https://www.dailymotion.com/thumbnail/video/${video.videoId}`}
+                              alt={video.title || 'Video thumbnail'}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://via.placeholder.com/300x200?text=Video';
+                              }}
+                            />
+                          )}
+                          <span className={`platform-badge ${video.platform}`}>
+                            {video.platform}
+                          </span>
+                        </div>
+                        <div className="media-info">
+                          <div className="media-id">
+                            <code>[VIDEO:{video.embedId}]</code>
+                          </div>
+                          {video.title && (
+                            <div className="media-detail">
+                              <strong>Title:</strong> {video.title}
+                            </div>
+                          )}
+                          {video.caption && (
+                            <div className="media-detail">
+                              <strong>Caption:</strong> {video.caption}
+                            </div>
+                          )}
+                          <div className="media-detail">
+                            <strong>Position:</strong> 
+                            <span className={`position-badge ${video.position}`}>
+                              {video.position}
+                            </span>
+                          </div>
+                          <div className="media-detail">
+                            <strong>Settings:</strong>
+                            <div className="video-settings">
+                              <span className={`setting-badge ${video.autoplay ? 'active' : ''}`}>
+                                Autoplay: {video.autoplay ? 'On' : 'Off'}
+                              </span>
+                              <span className={`setting-badge ${video.muted ? 'active' : ''}`}>
+                                Muted: {video.muted ? 'On' : 'Off'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
-          {/* NEW: Reports Tab */}
+          {/* Reports Tab */}
           {activeTab === 'reports' && (
             <div className="reports-analytics">
               <div className="reports-header">
@@ -862,7 +1404,7 @@ const BlogAnalytics = ({ blogId }) => {
                     <div key={report._id} className="report-card">
                       <div className="report-header">
                         <div className="report-user-info">
-                         
+                          <FaExclamationTriangle className="report-icon" />
                           <a href={`mailto:${report.userEmail}`}>{report.userEmail}</a>
                         </div>
                         <span className="report-date">{formatDate(report.timestamp)}</span>
@@ -870,15 +1412,8 @@ const BlogAnalytics = ({ blogId }) => {
                       
                       <div className="report-reason">
                         <strong>Reason:</strong> 
-                        <span className="reason-badge">{report.reason}</span>
+                        <p className="reason-text">{report.reason}</p>
                       </div>
-                      
-                      {report.description && (
-                        <div className="report-description">
-                          <strong>Description:</strong>
-                          <p>{report.description}</p>
-                        </div>
-                      )}
                       
                       <div className="report-actions">
                         <button 
@@ -896,6 +1431,7 @@ const BlogAnalytics = ({ blogId }) => {
             </div>
           )}
           
+          {/* Reactions Tab */}
           {activeTab === 'reactions' && (
             <div className="reactions-analytics">
               <div className="analytics-summary">
@@ -947,6 +1483,7 @@ const BlogAnalytics = ({ blogId }) => {
             </div>
           )}
           
+          {/* Comments Tab */}
           {activeTab === 'comments' && (
             <div className="comments-analytics">
               <div className="comments-tabs">
