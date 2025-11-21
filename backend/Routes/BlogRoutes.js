@@ -16,6 +16,7 @@ const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
+const cachemiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
@@ -234,77 +235,87 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
   });
   
   // Get all blog posts (with pagination and filtering)
-router.get('/api/blogs', async (req, res) => {
-  try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      status, 
-      tag,
-      search,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
-    
-    // Build filter object
-    const filter = {};
-    
-    if (status) {
-      filter.status = status;
-    } else {
+router.get(
+  '/api/blogs/:identifier',
+  cachemiddleware,   // <-- CACHE APPLIED SAFELY HERE
+  async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+      
+      const query = isObjectId 
+        ? { _id: identifier }
+        : { slug: identifier };
+      
       const isAuthenticated = req.user?.admin_id;
       if (!isAuthenticated) {
-        filter.status = 'published';
+        query.status = 'published';
       }
-    }
-    
-    if (tag) {
-      filter.tags = tag;
-    }
-    
-    if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { content: { $regex: search, $options: 'i' } },
-        { summary: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const blogs = await Blog.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .populate('author', 'name email')
-      .exec();
-    
-    // Process content to replace both image and video placeholders
-    const processedBlogs = blogs.map(blog => {
+      
+      // Generate fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
+      console.log('Generated fingerprint:', fingerprint);
+      
+      // Fetch blog (NO COMMENTS INCLUDED → SAFE TO CACHE)
+      let blog = await Blog.findOne(query)
+        .populate('author', 'name email profileImage designation location bio socialLinks')
+        .exec();
+      
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog post not found' });
+      }
+      
+      console.log('Blog found:', blog._id);
+      console.log('Current readFingerprints:', blog.readFingerprints);
+      
+      if (!blog.readFingerprints) {
+        blog.readFingerprints = [];
+      }
+      
+      const existingFingerprintIndex = blog.readFingerprints.findIndex(
+        rf => rf.fingerprint === fingerprint
+      );
+      
+      if (existingFingerprintIndex !== -1) {
+        blog.readFingerprints[existingFingerprintIndex].readCount += 1;
+        blog.readFingerprints[existingFingerprintIndex].readAt = new Date();
+        console.log('Incremented existing fingerprint');
+      } else {
+        blog.readFingerprints.push({
+          fingerprint,
+          readAt: new Date(),
+          readCount: 1
+        });
+        console.log('Added new fingerprint');
+      }
+      
+      blog.totalReads += 1;
+      await blog.save();
+      console.log('Blog saved with readFingerprints');
+      
       const blogObj = blog.toObject();
-      blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
-      return blogObj;
-    });
-    
-    const total = await Blog.countDocuments(filter);
-    
-    res.json({
-      blogs: processedBlogs,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching blogs:', error);
-    res.status(500).json({ message: error.message });
+      
+      const uniqueReaders = blog.readFingerprints.length;
+      blogObj.uniqueReaders = uniqueReaders;
+      
+      blogObj.processedContent = processContent(
+        blogObj.content,
+        blogObj.contentImages,
+        blogObj.contentVideos
+      );
+      
+      delete blogObj.reports;
+      delete blogObj.readFingerprints;
+      
+      console.log('Response:', { totalReads: blogObj.totalReads, uniqueReaders });
+      
+      res.json(blogObj);
+    } catch (error) {
+      console.error('Error fetching blog:', error);
+      res.status(500).json({ message: error.message });
+    }
   }
-});
+);
   
  // UPDATED: Get a single blog post (with read tracking)
 router.get('/api/blogs/:identifier', async (req, res) => {
