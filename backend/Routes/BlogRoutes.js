@@ -15,7 +15,7 @@ const  Comment = require('../models/comment');
 const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
+const { getFingerprintFromRequest } = require("../utils/newfingerprint");
 const attachFingerprint = require("../middlewares/fingerprintMiddleware");
 router.use(attachFingerprint);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);

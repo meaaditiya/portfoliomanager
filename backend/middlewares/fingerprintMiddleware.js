@@ -1,9 +1,10 @@
-const { generateRobustFingerprint, generateFallbackFingerprint } = require('../utils/GenerateFingerprint');
+const { generateRobustFingerprint, generateFallbackFingerprint } = require('../utils/newfingerprint');
 
 const attachFingerprint = (req, res, next) => {
   try {
     // Parse fingerprint data from header
     let fingerprintData = {};
+    //new fingerprint
     const fingerprintHeader = req.headers['x-fingerprint-data'];
     
     if (fingerprintHeader) {

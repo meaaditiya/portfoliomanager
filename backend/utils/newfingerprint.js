@@ -11,6 +11,7 @@ const crypto = require('crypto');
  */
 const generateRobustFingerprint = (clientData, req) => {
   // Server-side data
+  //new fingerprint
   const ip = getClientIp(req);
   const userAgent = getUserAgent(req);
   
