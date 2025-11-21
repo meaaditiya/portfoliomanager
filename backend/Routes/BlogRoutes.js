@@ -18,6 +18,12 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
 const cachemiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const { 
+  generateQueryEmbedding, 
+  cosineSimilarity,
+  doextractPlainText,
+  generateBlogEmbedding  // ADD THIS
+} = require('../services/embeddingService');
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;
@@ -45,9 +51,22 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     
     await newBlog.save();
     
+    // ✅ AUTO-GENERATE EMBEDDING IF PUBLISHED
+    if (newBlog.status === 'published') {
+      try {
+        await generateBlogEmbedding(newBlog);
+        await newBlog.save();
+        console.log(`✅ Embedding auto-generated for: "${newBlog.title}"`);
+      } catch (embeddingError) {
+        console.error('⚠️ Embedding generation failed (non-critical):', embeddingError.message);
+        // Don't fail the entire request - embedding can be generated later
+      }
+    }
+    
     res.status(201).json({
       message: 'Blog post created successfully',
-      blog: newBlog
+      blog: newBlog,
+      embeddingGenerated: newBlog.status === 'published' && !!newBlog.embedding
     });
   } catch (error) {
     console.error('Error creating blog post:', error);
@@ -702,6 +721,7 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
   }
 });
 // Update a blog post (updated to handle videos)
+// Update a blog post (updated to handle videos + auto-embedding)
 router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -716,6 +736,12 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
     if (blog.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to update this blog post' });
     }
+    
+    // ✅ TRACK CHANGES THAT AFFECT EMBEDDINGS
+    const wasPublished = blog.status === 'published';
+    const contentChanged = updates.content !== undefined || 
+                          updates.title !== undefined || 
+                          updates.summary !== undefined;
     
     const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages', 'contentVideos'];
     
@@ -733,12 +759,31 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
     
     await blog.save();
     
+    // ✅ AUTO-REGENERATE EMBEDDING IF NEEDED
+    const isNowPublished = blog.status === 'published';
+    const shouldRegenerateEmbedding = isNowPublished && (
+      contentChanged ||                    // Content/title/summary changed
+      (!wasPublished && isNowPublished)   // Draft → Published transition
+    );
+    
+    if (shouldRegenerateEmbedding) {
+      try {
+        await generateBlogEmbedding(blog);
+        await blog.save();
+        console.log(`✅ Embedding auto-regenerated for: "${blog.title}"`);
+      } catch (embeddingError) {
+        console.error('⚠️ Embedding regeneration failed (non-critical):', embeddingError.message);
+        // Don't fail the entire request
+      }
+    }
+    
     const blogObj = blog.toObject();
     blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
     
     res.json({
       message: 'Blog post updated successfully',
-      blog: blogObj
+      blog: blogObj,
+      embeddingRegenerated: shouldRegenerateEmbedding && !!blog.embedding
     });
   } catch (error) {
     console.error('Error updating blog:', error);
@@ -2324,5 +2369,320 @@ router.post(
       }
     }
   );
+  router.post('/api/search', async (req, res) => {
+  try {
+    const { 
+      query, 
+      limit = 10, 
+      minScore = 0.3,
+      includeUnpublished = false,
+      filters = {},
+      hybridSearch = true,
+      generateSuggestions = true
+    } = req.body;
+    
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ 
+        message: 'Search query is required' 
+      });
+    }
+    
+    console.log(`Processing semantic search for query: "${query}"`);
+    
+    // Step 1: Generate query embedding
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateQueryEmbedding(query);
+    } catch (embeddingError) {
+      console.error('Embedding generation failed, falling back to text search:', embeddingError);
+      return await performTextSearch(query, limit, includeUnpublished, filters, res);
+    }
+    
+    // Step 2: Build base query with filters
+    const baseQuery = {
+      embedding: { $exists: true, $ne: null }
+    };
+    
+    if (!includeUnpublished) {
+      baseQuery.status = 'published';
+    }
+    
+    // Apply additional filters
+    if (filters.tags && filters.tags.length > 0) {
+      baseQuery.tags = { $in: filters.tags };
+    }
+    
+    if (filters.author) {
+      baseQuery.author = filters.author;
+    }
+    
+    if (filters.dateFrom || filters.dateTo) {
+      baseQuery.publishedAt = {};
+      if (filters.dateFrom) baseQuery.publishedAt.$gte = new Date(filters.dateFrom);
+      if (filters.dateTo) baseQuery.publishedAt.$lte = new Date(filters.dateTo);
+    }
+    
+    // Step 3: Fetch blogs with embeddings
+    const blogs = await Blog.find(baseQuery)
+      .select('+embedding')
+      .populate('author', 'name email')
+      .lean()
+      .limit(limit * 3);  // Fetch more than needed for better scoring
+    
+    if (blogs.length === 0) {
+      return res.json({
+        message: 'No blogs found with embeddings',
+        results: [],
+        searchMetadata: {
+          query,
+          totalResults: 0,
+          processingTime: 0
+        }
+      });
+    }
+    
+    const startTime = Date.now();
+    
+   // Step 4: Perform vector search in MongoDB
+let vectorResults = await Blog.aggregate([
+  {
+    $vectorSearch: {
+      index: "blog_vector_search",
+      path: "embedding",
+      queryVector: queryEmbedding,
+      numCandidates: 50,
+      limit: limit
+    }
+  },
+  {
+    $match: includeUnpublished ? {} : { status: "published" }
+  },
+  {
+    $project: {
+      title: 1,
+      summary: 1,
+      content: 1,
+      slug: 1,
+      author: 1,
+      tags: 1,
+      featuredImage: 1,
+      publishedAt: 1,
+      reactionCounts: 1,
+      commentsCount: 1,
+      totalReads: 1,
+      similarityScore: { $meta: "vectorSearchScore" }
+    }
+  }
+]);
+
+// Remove blogs below minimum score threshold
+vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
+
+// Vector search results replace manual cosineSimilarity results
+let results = vectorResults;
+
+    
+    // Step 6: Hybrid search enhancement (combine with text search)
+    if (hybridSearch && results.length < limit) {
+      const textResults = await performTextSearchInternal(
+        query, 
+        limit - results.length, 
+        includeUnpublished, 
+        filters
+      );
+      
+      // Merge results, avoiding duplicates
+      const resultIds = new Set(results.map(r => r._id.toString()));
+      const uniqueTextResults = textResults.filter(
+        r => !resultIds.has(r._id.toString())
+      );
+      
+      results = [...results, ...uniqueTextResults];
+    }
+    
+    const processingTime = Date.now() - startTime;
+    
+    // Step 7: Generate related search suggestions
+    let suggestions = [];
+    if (generateSuggestions && results.length > 0) {
+      try {
+        suggestions = await generateSearchSuggestions(query, results.slice(0, 5));
+      } catch (suggestionError) {
+        console.error('Failed to generate suggestions:', suggestionError);
+      }
+    }
+    
+    // Step 8: Prepare response
+    res.json({
+      message: 'Search completed successfully',
+      results: results.map(blog => ({
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        content: blog.content.substring(0, 300) + '...',  // Preview only
+        slug: blog.slug,
+        author: blog.author,
+        tags: blog.tags,
+        featuredImage: blog.featuredImage,
+        publishedAt: blog.publishedAt,
+        reactionCounts: blog.reactionCounts,
+        commentsCount: blog.commentsCount,
+        totalReads: blog.totalReads,
+        similarityScore: blog.similarityScore,
+        relevanceLevel: getRelevanceLevel(blog.similarityScore)
+      })),
+      suggestions,
+      searchMetadata: {
+        query,
+        totalResults: results.length,
+        processingTime: `${processingTime}ms`,
+        searchType: 'semantic_vector',
+        hybridSearchUsed: hybridSearch,
+        averageSimilarity: results.length > 0 
+          ? (results.reduce((sum, r) => sum + r.similarityScore, 0) / results.length).toFixed(3)
+          : 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in semantic search:', error);
+    res.status(500).json({ 
+      message: 'Search failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * Generate related search suggestions using Gemini
+ */
+async function generateSearchSuggestions(originalQuery, topResults) {
+  try {
+    const resultTitles = topResults.map(r => r.title).join(', ');
+    const resultTags = [...new Set(topResults.flatMap(r => r.tags || []))].slice(0, 10).join(', ');
+    
+    const prompt = `Based on the search query "${originalQuery}" and these related blog titles: "${resultTitles}", and tags: "${resultTags}", suggest 5 related search queries that a user might be interested in.
+
+Requirements:
+- Each suggestion should be 2-5 words
+- Be specific and relevant to the original query
+- Vary in specificity (some broader, some more specific)
+- Return ONLY a JSON array of strings, no other text
+
+Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
+    
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let text = response.text().trim();
+    
+    // Clean up response
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    const suggestions = JSON.parse(text);
+    
+    if (Array.isArray(suggestions) && suggestions.length > 0) {
+      return suggestions.slice(0, 5);
+    }
+    
+    return [];
+    
+  } catch (error) {
+    console.error('Error generating search suggestions:', error);
+    return [];
+  }
+}
+
+/**
+ * Fallback text search
+ */
+async function performTextSearch(query, limit, includeUnpublished, filters, res) {
+  try {
+    const results = await performTextSearchInternal(query, limit, includeUnpublished, filters);
+    
+    res.json({
+      message: 'Text search completed (vector search unavailable)',
+      results,
+      searchMetadata: {
+        query,
+        totalResults: results.length,
+        searchType: 'text_fallback'
+      }
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Internal text search helper
+ */
+async function performTextSearchInternal(query, limit, includeUnpublished, filters) {
+  const searchQuery = {
+    $text: { $search: query }
+  };
+  
+  if (!includeUnpublished) {
+    searchQuery.status = 'published';
+  }
+  
+  if (filters.tags && filters.tags.length > 0) {
+    searchQuery.tags = { $in: filters.tags };
+  }
+  
+  if (filters.author) {
+    searchQuery.author = filters.author;
+  }
+  
+  const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
+    .sort({ score: { $meta: "textScore" } })
+    .limit(limit)
+    .populate('author', 'name email')
+    .lean();
+  
+  return results;
+}
+
+/**
+ * Get relevance level based on similarity score
+ */
+function getRelevanceLevel(score) {
+  if (score >= 0.8) return 'very_high';
+  if (score >= 0.6) return 'high';
+  if (score >= 0.4) return 'medium';
+  if (score >= 0.2) return 'low';
+  return 'very_low';
+}
+
+/**
+ * Get search analytics
+ * GET /api/search/analytics
+ */
+router.get('/api/search/analytics', async (req, res) => {
+  try {
+    const totalBlogs = await Blog.countDocuments({ status: 'published' });
+    const blogsWithEmbeddings = await Blog.countDocuments({ 
+      status: 'published',
+      embedding: { $exists: true, $ne: null }
+    });
+    
+    const embeddingCoverage = totalBlogs > 0 
+      ? ((blogsWithEmbeddings / totalBlogs) * 100).toFixed(2)
+      : 0;
+    
+    res.json({
+      totalBlogs,
+      blogsWithEmbeddings,
+      blogsWithoutEmbeddings: totalBlogs - blogsWithEmbeddings,
+      embeddingCoverage: `${embeddingCoverage}%`,
+      vectorSearchReady: blogsWithEmbeddings > 0
+    });
+    
+  } catch (error) {
+    console.error('Error fetching search analytics:', error);
+    res.status(500).json({ message: 'Failed to fetch analytics' });
+  }
+});
+
 
 module.exports = router;

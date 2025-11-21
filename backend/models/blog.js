@@ -129,12 +129,10 @@ const blogSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    // UPDATED: Total reads (accurate count)
     totalReads: {
       type: Number,
       default: 0
     },
-    // NEW: Array of unique fingerprints that have read this blog
     readFingerprints: [{
       fingerprint: {
         type: String,
@@ -169,11 +167,59 @@ const blogSchema = new mongoose.Schema({
     totalReports: {
       type: Number,
       default: 0
+    },
+    
+    // ============================================
+    // NEW: VECTOR SEARCH FIELDS
+    // ============================================
+    
+    // Embedding vector for semantic search (768 dimensions for Gemini embedding model)
+    embedding: {
+      type: [Number],
+      default: null,
+      select: false  // Don't return embeddings by default to save bandwidth
+    },
+    
+    // Metadata for embedding generation
+    embeddingMetadata: {
+      model: {
+        type: String,
+        default: 'text-embedding-004'  // Gemini embedding model
+      },
+      generatedAt: {
+        type: Date,
+        default: null
+      },
+      contentHash: {
+        type: String,
+        default: null  // Hash of title + content to detect changes
+      },
+      dimension: {
+        type: Number,
+        default: 768
+      }
+    },
+    
+    // Searchable text field (combination of title, summary, content, tags)
+    searchableText: {
+      type: String,
+      select: false
     }
 });
 
 // Index for faster fingerprint lookups
 blogSchema.index({ 'readFingerprints.fingerprint': 1 });
+
+// Text index for hybrid search fallback
+blogSchema.index({ 
+  title: 'text', 
+  content: 'text', 
+  summary: 'text', 
+  tags: 'text' 
+});
+
+// Index for published blogs
+blogSchema.index({ status: 1, publishedAt: -1 });
 
 blogSchema.pre('save', function(next) {
   if (this.isModified('title')) {
@@ -205,6 +251,12 @@ blogSchema.pre('save', function(next) {
   
   if (this.isModified('reports')) {
     this.totalReports = this.reports.length;
+  }
+  
+  // NEW: Update searchable text when title, content, summary, or tags change
+  if (this.isModified('title') || this.isModified('content') || 
+      this.isModified('summary') || this.isModified('tags')) {
+    this.searchableText = `${this.title} ${this.summary} ${this.content} ${this.tags.join(' ')}`;
   }
   
   this.updatedAt = new Date();

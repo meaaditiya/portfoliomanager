@@ -25,6 +25,7 @@ const CommunityPostRoutes = require("./Routes/Community.js");
 const AudioMessageRoutes = require("./Routes/AudioMessage.js");
 const StreamRoutes = require("./Routes/Streams.js");
 const visitorRoutes = require("./Routes/Visitor.js");
+const embeddingRoutes = require("./Routes/embeddingRoutes.js");
 
 const app = express();
 const server = http.createServer(app); 
@@ -43,7 +44,7 @@ app.use(cookieParser());
 app.use(corsMiddleware);
 const PORT = process.env.PORT || 5000;
 connectDB();
-
+app.use(embeddingRoutes);
 
 app.use("/api/admin", adminRoutes);
 app.use(BlogSubmission);
@@ -62,6 +63,7 @@ app.use(ImageRoutes);
 app.use(SocialMediaEmbed);
 app.use(CommunityPostRoutes)
 app.use('/api/visitors', visitorRoutes);
+
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 const visitorSocket = require('./socket/visitorSocket');
