@@ -15,9 +15,7 @@ const  Comment = require('../models/comment');
 const  CommentReaction = require('../models/commentreaction');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getFingerprintFromRequest } = require("../utils/newfingerprint");
-const attachFingerprint = require("../middlewares/fingerprintMiddleware");
-router.use(attachFingerprint);
+const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
@@ -311,7 +309,6 @@ router.get('/api/blogs', async (req, res) => {
  // UPDATED: Get a single blog post (with read tracking)
 router.get('/api/blogs/:identifier', async (req, res) => {
   try {
-    
     const { identifier } = req.params;
     const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
     
@@ -324,39 +321,28 @@ router.get('/api/blogs/:identifier', async (req, res) => {
       query.status = 'published';
     }
     
-    // Parse fingerprint data from header
-    let fingerprintData = {};
-    try {
-      const fingerprintHeader = req.headers['x-fingerprint-data'];
-      if (fingerprintHeader) {
-        fingerprintData = JSON.parse(fingerprintHeader);
-      }
-    } catch (parseError) {
-      console.error('Error parsing fingerprint data:', parseError);
-    }
-    
-     const fingerprint = req.deviceFingerprint;
-    
-    console.log('Generated fingerprint:', fingerprint);
+    // Generate fingerprint from request
+    const fingerprint = getFingerprintFromRequest(req);
+    console.log('Generated fingerprint:', fingerprint); // DEBUG
     
     // Find blog
     let blog = await Blog.findOne(query)
-      .populate('author', 'name email profileImage designation location bio socialLinks')
+     .populate('author', 'name email profileImage designation location bio socialLinks')
       .exec();
     
     if (!blog) {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    console.log('Blog found:', blog._id);
-    console.log('Current readFingerprints:', blog.readFingerprints);
+    console.log('Blog found:', blog._id); // DEBUG
+    console.log('Current readFingerprints:', blog.readFingerprints); // DEBUG
     
     // Initialize readFingerprints if it doesn't exist
     if (!blog.readFingerprints) {
       blog.readFingerprints = [];
     }
     
-    // Check if this fingerprint already exists
+    // Check if this fingerprint already exists in readFingerprints
     const existingFingerprintIndex = blog.readFingerprints.findIndex(
       rf => rf.fingerprint === fingerprint
     );
@@ -365,7 +351,7 @@ router.get('/api/blogs/:identifier', async (req, res) => {
       // Increment read count for existing fingerprint
       blog.readFingerprints[existingFingerprintIndex].readCount += 1;
       blog.readFingerprints[existingFingerprintIndex].readAt = new Date();
-      console.log('Incremented existing fingerprint');
+      console.log('Incremented existing fingerprint'); // DEBUG
     } else {
       // Add new fingerprint
       blog.readFingerprints.push({
@@ -373,29 +359,31 @@ router.get('/api/blogs/:identifier', async (req, res) => {
         readAt: new Date(),
         readCount: 1
       });
-      console.log('Added new fingerprint');
+      console.log('Added new fingerprint'); // DEBUG
     }
     
     // Update totalReads
     blog.totalReads += 1;
     
-    // Save the blog
+    // IMPORTANT: Save the blog with updated fingerprints
     await blog.save();
-    console.log('Blog saved with readFingerprints');
+    console.log('Blog saved with readFingerprints'); // DEBUG
     
     const blogObj = blog.toObject();
     
-    // Calculate unique readers count
+    // ADD: Calculate unique readers count
     const uniqueReaders = blog.readFingerprints ? blog.readFingerprints.length : 0;
-    blogObj.uniqueReaders = uniqueReaders;
+    blogObj.uniqueReaders = uniqueReaders; // Send to frontend
     
     blogObj.processedContent = processContent(blogObj.content, blogObj.contentImages, blogObj.contentVideos);
     
-    // Don't send sensitive data to clients
+    // Don't send full reports array to clients for privacy
     delete blogObj.reports;
+    
+    // Don't send readFingerprints to clients (privacy)
     delete blogObj.readFingerprints;
     
-    console.log('Response:', { totalReads: blogObj.totalReads, uniqueReaders });
+    console.log('Response:', { totalReads: blogObj.totalReads, uniqueReaders }); // DEBUG
     
     res.json(blogObj);
   } catch (error) {
@@ -1413,8 +1401,8 @@ router.post(
       }
 
       // Get fingerprint
+      const fingerprint = getFingerprintFromRequest(req);
 
-const fingerprint = req.deviceFingerprint;
       console.log(`🔍 Moderating comment from ${name}...`);
       const moderation = await moderateContent(content, name);
       
@@ -1730,7 +1718,7 @@ router.post(
       }
 
       // Get fingerprint
-        const fingerprint = req.deviceFingerprint;
+      const fingerprint = getFingerprintFromRequest(req);
 
       console.log(`🔍 Moderating reply from ${name}...`);
       const moderation = await moderateContent(content, name);
@@ -1838,7 +1826,7 @@ router.post(
       }
 
       // Get fingerprint
-    const fingerprint = req.deviceFingerprint;
+      const fingerprint = getFingerprintFromRequest(req);
 
       const existingReaction = await CommentReaction.findOne({
         comment: commentId,
@@ -2125,8 +2113,8 @@ router.post(
       }
 
       // Get fingerprint
-     
- const fingerprint = req.deviceFingerprint;
+      const fingerprint = getFingerprintFromRequest(req);
+
       const existingReaction = await Reaction.findOne({
         blog: blogId,
         'user.email': email
