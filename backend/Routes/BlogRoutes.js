@@ -2457,6 +2457,20 @@ let vectorResults = await Blog.aggregate([
   {
     $match: includeUnpublished ? {} : { status: "published" }
   },
+   {
+    $lookup: {
+      from: "admins",
+      localField: "author",
+      foreignField: "_id",
+      as: "author"
+    }
+  },
+  {
+    $unwind: {
+      path: "$author",
+      preserveNullAndEmptyArrays: true
+    }
+  },
   {
     $project: {
       title: 1,
