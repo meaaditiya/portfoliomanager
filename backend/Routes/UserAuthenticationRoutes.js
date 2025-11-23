@@ -216,17 +216,26 @@ router.get('/verify', async (req, res) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     
     if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
+      return res.status(401).json({ 
+        message: 'No token provided',
+        isValid: false 
+      });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    const user = await User.findById(decoded.userId).select('-password');
+    
+    // ✅ FIX: Use decoded.user_id instead of decoded.userId
+    const user = await User.findById(decoded.user_id).select('-password');
     
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ 
+        message: 'User not found',
+        isValid: false 
+      });
     }
 
     res.json({ 
+      isValid: true,
       user: {
         id: user._id,
         name: user.name,
@@ -236,7 +245,11 @@ router.get('/verify', async (req, res) => {
     });
 
   } catch (error) {
-    res.status(403).json({ message: 'Invalid token' });
+    console.error('Token verification error:', error.message);
+    res.status(403).json({ 
+      message: 'Invalid token',
+      isValid: false 
+    });
   }
 });
 module.exports = router;
