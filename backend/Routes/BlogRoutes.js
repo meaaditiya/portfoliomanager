@@ -2689,7 +2689,8 @@ let vectorResults = await Blog.aggregate([
       summary: 1,
       content: 1,
       slug: 1,
-      author: 1,
+       "author.name": 1,
+          "author._id": 1,
       tags: 1,
       featuredImage: 1,
       publishedAt: 1,
@@ -2747,7 +2748,10 @@ let results = vectorResults;
         summary: blog.summary,
         content: blog.content.substring(0, 300) + '...',  // Preview only
         slug: blog.slug,
-        author: blog.author,
+       author: {
+          _id: blog.author?._id,
+          name: blog.author?.name || 'Unknown Author'
+        },
         tags: blog.tags,
         featuredImage: blog.featuredImage,
         publishedAt: blog.publishedAt,
@@ -2802,7 +2806,6 @@ Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
     const response = await result.response;
     let text = response.text().trim();
     
-    // Clean up response
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const suggestions = JSON.parse(text);
@@ -2828,7 +2831,24 @@ async function performTextSearch(query, limit, includeUnpublished, filters, res)
     
     res.json({
       message: 'Text search completed (vector search unavailable)',
-      results,
+      results: results.map(blog => ({
+        _id: blog._id,
+        title: blog.title,
+        summary: blog.summary,
+        content: blog.content?.substring(0, 300) + '...',
+        slug: blog.slug,
+        // ✅ SECURE: Only return author name
+        author: {
+          _id: blog.author?._id,
+          name: blog.author?.name || 'Unknown Author'
+        },
+        tags: blog.tags,
+        featuredImage: blog.featuredImage,
+        publishedAt: blog.publishedAt,
+        reactionCounts: blog.reactionCounts,
+        commentsCount: blog.commentsCount,
+        totalReads: blog.totalReads
+      })),
       searchMetadata: {
         query,
         totalResults: results.length,
@@ -2860,10 +2880,11 @@ async function performTextSearchInternal(query, limit, includeUnpublished, filte
     searchQuery.author = filters.author;
   }
   
+  // ✅ SECURE: Only populate author name, nothing else
   const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
     .sort({ score: { $meta: "textScore" } })
     .limit(limit)
-    .populate('author', 'name email')
+    .populate('author', 'name') // ⚠️ CRITICAL FIX: Only select 'name'
     .lean();
   
   return results;
@@ -2909,6 +2930,12 @@ router.get('/api/search/analytics', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch analytics' });
   }
 });
+
+
+
+
+
+
 
 
 module.exports = router;
