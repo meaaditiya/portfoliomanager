@@ -1,15 +1,47 @@
 const express = require("express");
 const router = express.Router();
 const ImageComment = require('../models/imageCommentSchema');
-const ImagePost= require('../models/imagepost');
-const ImageReaction= require('../models/imageReactionSchema');
+const ImagePost = require('../models/imagepost');
+const ImageReaction = require('../models/imageReactionSchema');
 const authenticateToken = require("../middlewares/authMiddleware");
+const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const upload = require("../middlewares/upload");
 const extractDeviceId = require("../middlewares/extractDeviceId");
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
-const cacheMiddleware = require("../middlewares/cacheMiddleware");
 const apicache = require("apicache");
+
+// Helper function to clear all related caches
+const clearPostCaches = (postId = null) => {
+  // Clear all cache
+  apicache.clear();
+  
+  // Specifically clear post-related routes
+  if (postId) {
+    apicache.clear(`/api/image-posts/${postId}`);
+    apicache.clear(`/api/image-posts/${postId}/comments`);
+  }
+  apicache.clear('/api/image-posts');
+};
+// Simple cache middleware for GET requests only
+const cacheMiddleware = (req, res, next) => {
+  if (req.method === 'GET') {
+    // Check if there's a cache-bust query parameter
+    if (req.query.bustCache) {
+      // Skip cache for this request
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      return next();
+    }
+    return apicache.middleware('5 minutes')(req, res, next);
+  }
+  next();
+};
+
+// ==================== ADMIN ROUTES ====================
+
+// Create image/video post (admin only)
 router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
@@ -18,12 +50,10 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   try {
     const { caption, hideReactionCount, mediaType, videoDuration } = req.body;
     
-    // Validate media type
     if (!mediaType || !['image', 'video'].includes(mediaType)) {
       return res.status(400).json({ message: 'Valid mediaType (image or video) is required' });
     }
     
-    // Validate media is provided based on type
     if (mediaType === 'image' && !req.files?.image) {
       return res.status(400).json({ message: 'Image is required for image posts' });
     }
@@ -32,7 +62,6 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
       return res.status(400).json({ message: 'Video is required for video posts' });
     }
     
-    // Create new post object
     const postData = {
       caption,
       mediaType,
@@ -40,7 +69,6 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
       hideReactionCount: hideReactionCount === 'true' || hideReactionCount === true
     };
     
-    // Add image data if image type
     if (mediaType === 'image' && req.files.image) {
       postData.image = {
         data: req.files.image[0].buffer,
@@ -48,7 +76,6 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
       };
     }
     
-    // Add video data if video type
     if (mediaType === 'video' && req.files.video) {
       postData.video = {
         data: req.files.video[0].buffer,
@@ -56,7 +83,6 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
         duration: videoDuration ? parseFloat(videoDuration) : null
       };
       
-      // Add thumbnail if provided
       if (req.files.thumbnail) {
         postData.video.thumbnail = {
           data: req.files.thumbnail[0].buffer,
@@ -67,7 +93,9 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
     
     const newImagePost = new ImagePost(postData);
     await newImagePost.save();
-    apicache.clear('/api/image-posts');
+    
+    clearPostCaches();
+    
     res.status(201).json({
       message: `${mediaType === 'video' ? 'Video' : 'Image'} post created successfully`,
       post: {
@@ -84,7 +112,6 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   }
 });
 
-
 // Update an image/video post (admin only)
 router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
@@ -95,39 +122,32 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     const { id } = req.params;
     const { caption, hideReactionCount, mediaType, videoDuration } = req.body;
     
-    // Find post
     const post = await ImagePost.findById(id);
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Check if user is authorized
     if (post.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to update this post' });
     }
     
-    // Update basic fields
     if (caption) post.caption = caption;
     if (hideReactionCount !== undefined) {
       post.hideReactionCount = hideReactionCount === 'true' || hideReactionCount === true;
     }
     
-    // Update media type if provided
     if (mediaType && ['image', 'video'].includes(mediaType)) {
       post.mediaType = mediaType;
     }
     
-    // Update image if provided and type is image
     if (req.files?.image && post.mediaType === 'image') {
       post.image = {
         data: req.files.image[0].buffer,
         contentType: req.files.image[0].mimetype
       };
-      // Clear video data if switching from video to image
       post.video = undefined;
     }
     
-    // Update video if provided and type is video
     if (req.files?.video && post.mediaType === 'video') {
       post.video = {
         data: req.files.video[0].buffer,
@@ -135,7 +155,6 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
         duration: videoDuration ? parseFloat(videoDuration) : post.video?.duration
       };
       
-      // Update thumbnail if provided
       if (req.files.thumbnail) {
         post.video.thumbnail = {
           data: req.files.thumbnail[0].buffer,
@@ -143,11 +162,9 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
         };
       }
       
-      // Clear image data if switching from image to video
       post.image = undefined;
     }
     
-    // Update thumbnail separately if provided for existing video
     if (req.files?.thumbnail && post.mediaType === 'video' && !req.files.video) {
       if (!post.video) post.video = {};
       post.video.thumbnail = {
@@ -158,6 +175,8 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     
     post.updatedAt = new Date();
     await post.save();
+    
+    clearPostCaches(id);
     
     res.json({
       message: 'Post updated successfully',
@@ -174,28 +193,27 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     res.status(500).json({ message: error.message });
   }
 });
+
 // Delete an image post (admin only)
 router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Find post
     const post = await ImagePost.findById(id);
     if (!post) {
       return res.status(404).json({ message: 'Image post not found' });
     }
     
-    // Check if user is authorized (author or admin)
-    if (post.author.toString() !== req.user.admin_id ) {
+    if (post.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
     
-    // Delete post and associated reactions and comments
     await ImageReaction.deleteMany({ post: id });
     await ImageComment.deleteMany({ post: id });
     await ImagePost.findByIdAndDelete(id);
-     apicache.clear('/api/image-posts');
-    apicache.clear(`/api/image-posts/${id}`);
+    
+    clearPostCaches(id);
+    
     res.json({ message: 'Image post and associated data deleted successfully' });
   } catch (error) {
     console.error('Error deleting image post:', error);
@@ -208,21 +226,18 @@ router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, mediaType } = req.query;
     
-    // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Build filter
     const filter = {};
     if (mediaType && ['image', 'video'].includes(mediaType)) {
       filter.mediaType = mediaType;
     }
     
-    // Get posts with reaction and comment counts
     const posts = await ImagePost.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('-image.data -video.data -video.thumbnail.data') // Exclude binary data for listing
+      .select('-image.data -video.data -video.thumbnail.data')
       .populate('author', 'name email');
     
     const total = await ImagePost.countDocuments(filter);
@@ -241,6 +256,7 @@ router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 // Get single image/video post with admin details
 router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
@@ -253,7 +269,6 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Prepare response based on media type
     let mediaData = null;
     let thumbnailData = null;
     
@@ -267,7 +282,6 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
       }
     }
     
-    // Get reactions and comments
     const reactions = await ImageReaction.find({ post: id }).countDocuments();
     const comments = await ImageComment.find({ post: id }).sort({ createdAt: -1 });
     
@@ -288,62 +302,149 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
     res.status(500).json({ message: error.message });
   }
 });
-// PUBLIC ROUTES
-// Get all published image posts (public)
-// Get all published image/video posts (public)
+
+// ==================== PUBLIC ROUTES (VIEWING - NO AUTH) ====================
+
+// Get all published image/video posts (public) - WITH PROGRESSIVE LOADING & CACHING
 router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10, mediaType } = req.query;
     
-    // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
     
-    // Build filter
     const filter = {};
     if (mediaType && ['image', 'video'].includes(mediaType)) {
       filter.mediaType = mediaType;
     }
     
-    // Get posts for public view
-    const posts = await ImagePost.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .select('-image.data -video.data -video.thumbnail.data') // Exclude binary data for listing
-      .lean();
-    
     const total = await ImagePost.countDocuments(filter);
     
-    res.json({
-      posts: posts.map(post => ({
-        ...post,
-        // Only include reaction count if not hidden
-        reactionCount: post.hideReactionCount ? null : post.reactionCount
-      })),
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
+    // Check if client wants progressive loading
+    if (limitNum > 3 && req.headers['accept'] !== 'application/json-stream') {
+      // Standard response - all posts at once
+      const posts = await ImagePost.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .select('-image.data -video.data -video.thumbnail.data')
+        .lean();
+      
+      return res.json({
+        posts: posts.map(post => ({
+          ...post,
+          reactionCount: post.hideReactionCount ? null : post.reactionCount
+        })),
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum)
+        }
+      });
+    }
+    
+    // Progressive loading (only if more than 3 posts requested)
+    if (limitNum > 3) {
+      res.setHeader('Content-Type', 'application/json');
+      
+      // Fetch first 3 posts
+      const firstBatch = await ImagePost.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(3)
+        .select('-image.data -video.data -video.thumbnail.data')
+        .lean();
+      
+      // Send first batch
+      res.write(JSON.stringify({
+        streaming: true,
+        batch: 1,
+        posts: firstBatch.map(post => ({
+          ...post,
+          reactionCount: post.hideReactionCount ? null : post.reactionCount
+        })),
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum)
+        }
+      }));
+      
+      // Delay and fetch remaining posts
+      setTimeout(async () => {
+        try {
+          const remainingPosts = await ImagePost.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip + 3)
+            .limit(limitNum - 3)
+            .select('-image.data -video.data -video.thumbnail.data')
+            .lean();
+          
+          res.write('\n' + JSON.stringify({
+            streaming: true,
+            batch: 2,
+            posts: remainingPosts.map(post => ({
+              ...post,
+              reactionCount: post.hideReactionCount ? null : post.reactionCount
+            }))
+          }));
+          
+          res.end();
+        } catch (error) {
+          console.error('Error fetching remaining posts:', error);
+          res.end();
+        }
+      }, 150);
+    } else {
+      // Less than 3 posts, send all at once
+      const posts = await ImagePost.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .select('-image.data -video.data -video.thumbnail.data')
+        .lean();
+      
+      res.json({
+        posts: posts.map(post => ({
+          ...post,
+          reactionCount: post.hideReactionCount ? null : post.reactionCount
+        })),
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: limitNum,
+          pages: Math.ceil(total / limitNum)
+        }
+      });
+    }
+    
   } catch (error) {
     console.error('Error fetching public posts:', error);
-    res.status(500).json({ message: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: error.message });
+    }
   }
 });
-// Get single image/video post (public)
-// Get single image/video post (public)
+
+// Get single image/video post (public) - CACHED POST, FRESH COMMENTS
 router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Add no-cache headers if bustCache is present
+    if (req.query.bustCache) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
     
     const post = await ImagePost.findById(id);
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    // Prepare response based on media type
     let mediaData = null;
     let thumbnailData = null;
     
@@ -357,17 +458,15 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       }
     }
     
-    // Get active TOP-LEVEL comments only (no replies) - NOT CACHED
+    // Get active TOP-LEVEL comments (NOT CACHED)
     const comments = await ImageComment.find({ 
       post: id,
       status: 'active',
       parentComment: null
-    }).sort({ createdAt: -1 });
-    
-    // Set response headers to prevent caching of the entire response since it includes comments
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+    })
+    .sort({ isAuthorComment: -1, createdAt: -1 })
+    .select('-user.deviceId')
+    .lean();
     
     res.json({
       post: {
@@ -382,190 +481,18 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         reactionCount: post.hideReactionCount ? null : post.reactionCount,
         commentCount: post.commentCount
       },
-      comments
+      comments,
+      // Add timestamp to help client know this is fresh data
+      timestamp: Date.now()
     });
   } catch (error) {
     console.error('Error fetching public post:', error);
     res.status(500).json({ message: error.message });
   }
 });
-// Like an image post (public)
-router.post('/api/image-posts/:id/react', extractDeviceId, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email } = req.body;
-    const deviceId = req.deviceId;
-    
-    // Validate inputs
-    if (!name || !email) {
-      return res.status(400).json({ message: 'Name and email are required' });
-    }
-    
-    // Check if post exists
-    const post = await ImagePost.findById(id);
-    if (!post) {
-      return res.status(404).json({ message: 'Image post not found' });
-    }
-    
-    // Check if user already reacted
-    const existingReaction = await ImageReaction.findOne({
-      post: id,
-      $or: [
-        { 'user.email': email },
-        { 'user.deviceId': deviceId }
-      ]
-    });
-    
-    if (existingReaction) {
-      // Remove reaction (toggle off)
-      await ImageReaction.findByIdAndDelete(existingReaction._id);
-      await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: -1 } });
-      
-      return res.json({
-        message: 'Reaction removed successfully',
-        hasReacted: false
-      });
-    }
-    
-    // Create new reaction
-    const newReaction = new ImageReaction({
-      post: id,
-      user: {
-        name,
-        email,
-        deviceId
-      }
-    });
-    
-    await newReaction.save();
-    await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: 1 } });
-    
-    res.status(201).json({
-      message: 'Reaction added successfully',
-      hasReacted: true
-    });
-  } catch (error) {
-    console.error('Error adding reaction:', error);
-    
-    // Handle duplicate key error specifically
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'You have already reacted to this post' });
-    }
-    
-    res.status(500).json({ message: error.message });
-  }
-});
 
-// Check if user has reacted to a post
-router.get('/api/image-posts/:id/has-reacted', extractDeviceId, cacheMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { email } = req.query;
-    const deviceId = req.deviceId;
-    
-    // Need email or deviceId
-    if (!email && !deviceId) {
-      return res.status(400).json({ message: 'Email or device identification required' });
-    }
-    
-    // Build query
-    const query = { post: id };
-    
-    if (email) {
-      query['user.email'] = email;
-    } else {
-      query['user.deviceId'] = deviceId;
-    }
-    
-    // Check if reaction exists
-    const reaction = await ImageReaction.findOne(query);
-    
-    res.json({
-      hasReacted: !!reaction
-    });
-  } catch (error) {
-    console.error('Error checking reaction status:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
 
-// ==================== PUBLIC ROUTES ====================
-
-// Add a regular comment (public users)
-router.post('/api/image-posts/:id/comments', 
-  extractDeviceId,
-  [
-    body('name').trim().notEmpty().withMessage('Name is required')
-      .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
-    body('email').trim().isEmail().withMessage('Valid email is required')
-      .normalizeEmail(),
-    body('content').trim().notEmpty().withMessage('Comment content is required')
-      .isLength({ max: 500 }).withMessage('Comment cannot exceed 500 characters'),
-    body('parentCommentId').optional().isMongoId().withMessage('Invalid parent comment ID')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    try {
-      const { id } = req.params;
-      const { name, email, content, parentCommentId } = req.body;
-      const deviceId = req.deviceId;
-      
-      // Check if post exists
-      const post = await ImagePost.findById(id);
-      if (!post) {
-        return res.status(404).json({ message: 'Image post not found' });
-      }
-
-      // If it's a reply, check if parent comment exists
-      if (parentCommentId) {
-        const parentComment = await ImageComment.findById(parentCommentId);
-        if (!parentComment) {
-          return res.status(404).json({ message: 'Parent comment not found' });
-        }
-        if (parentComment.post.toString() !== id) {
-          return res.status(400).json({ message: 'Parent comment does not belong to this post' });
-        }
-      }
-      
-      // Create new comment
-      const newComment = new ImageComment({
-        post: id,
-        user: {
-          name,
-          email,
-          deviceId
-        },
-        content,
-        isAuthorComment: false,
-        parentComment: parentCommentId || null
-      });
-      
-      await newComment.save();
-      
-      // Update post comment count (only for top-level comments)
-      if (!parentCommentId) {
-        await ImagePost.findByIdAndUpdate(id, { $inc: { commentCount: 1 } });
-      } else {
-        // Update parent comment reply count
-        await ImageComment.findByIdAndUpdate(parentCommentId, { $inc: { replyCount: 1 } });
-      }
-      
-      res.status(201).json({
-        message: parentCommentId ? 'Reply added successfully' : 'Comment added successfully',
-        comment: newComment
-      });
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  }
-);
-
-// Get comments for an image post (public - active comments only)
+// Get comments for an image post (public - NO AUTH)
 router.get('/api/image-posts/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
@@ -575,7 +502,6 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    // Get only top-level active comments (no parent)
     const comments = await ImageComment.find({
       post: id,
       status: 'active',
@@ -584,7 +510,7 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
     .sort({ isAuthorComment: -1, createdAt: -1 })
     .skip(skip)
     .limit(limitNum)
-    .select('-user.deviceId -likes -dislikes')
+    .select('-user.deviceId')
     .lean();
     
     const total = await ImageComment.countDocuments({
@@ -608,7 +534,7 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
   }
 });
 
-// Get replies for a comment (public)
+// Get replies for a comment (public - NO AUTH)
 router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -618,15 +544,14 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    // Get active replies
     const replies = await ImageComment.find({
       parentComment: commentId,
       status: 'active'
     })
-    .sort({ isAuthorComment: -1, createdAt: 1 }) // Author replies first, then chronological
+    .sort({ isAuthorComment: -1, createdAt: 1 })
     .skip(skip)
     .limit(limitNum)
-    .select('-user.deviceId -likes -dislikes')
+    .select('-user.deviceId')
     .lean();
     
     const total = await ImageComment.countDocuments({
@@ -649,11 +574,94 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   }
 });
 
-// Like a comment (public)
-router.post('/api/image-posts/comments/:commentId/like',
-  extractDeviceId,
+// ==================== PUBLIC ROUTES (INTERACTIONS - REQUIRE AUTH) ====================
+
+// Like an image post (REQUIRES AUTH)
+router.post('/api/image-posts/:id/react', UserAuthMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.user_id;
+    const userEmail = req.user.email;
+    const userName = req.user.name;
+    
+    const post = await ImagePost.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: 'Image post not found' });
+    }
+    
+    const existingReaction = await ImageReaction.findOne({
+      post: id,
+      'user.email': userEmail
+    });
+    
+    if (existingReaction) {
+      await ImageReaction.findByIdAndDelete(existingReaction._id);
+      await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: -1 } });
+      
+      clearPostCaches(id);
+      
+      return res.json({
+        message: 'Reaction removed successfully',
+        hasReacted: false
+      });
+    }
+    
+    const newReaction = new ImageReaction({
+      post: id,
+      user: {
+        name: userName,
+        email: userEmail,
+        deviceId: userId
+      }
+    });
+    
+    await newReaction.save();
+    await ImagePost.findByIdAndUpdate(id, { $inc: { reactionCount: 1 } });
+    
+    clearPostCaches(id);
+    
+    res.status(201).json({
+      message: 'Reaction added successfully',
+      hasReacted: true
+    });
+  } catch (error) {
+    console.error('Error adding reaction:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'You have already reacted to this post' });
+    }
+    
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Check if user has reacted to a post (REQUIRES AUTH)
+router.get('/api/image-posts/:id/has-reacted', UserAuthMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userEmail = req.user.email;
+    
+    const reaction = await ImageReaction.findOne({
+      post: id,
+      'user.email': userEmail
+    });
+    
+    res.json({
+      hasReacted: !!reaction
+    });
+  } catch (error) {
+    console.error('Error checking reaction status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Add a regular comment (REQUIRES AUTH)
+router.post('/api/image-posts/:id/comments', 
+  UserAuthMiddleware,
   [
-    body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail()
+    body('content').trim().notEmpty().withMessage('Comment content is required')
+      .isLength({ max: 500 }).withMessage('Comment cannot exceed 500 characters'),
+    body('parentCommentId').optional().isMongoId().withMessage('Invalid parent comment ID')
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -662,33 +670,100 @@ router.post('/api/image-posts/comments/:commentId/like',
     }
 
     try {
+      const { id } = req.params;
+      const { content, parentCommentId } = req.body;
+      const userName = req.user.name;
+      const userEmail = req.user.email;
+      const userId = req.user.user_id;
+      
+      const post = await ImagePost.findById(id);
+      if (!post) {
+        return res.status(404).json({ message: 'Image post not found' });
+      }
+
+      if (parentCommentId) {
+        const parentComment = await ImageComment.findById(parentCommentId);
+        if (!parentComment) {
+          return res.status(404).json({ message: 'Parent comment not found' });
+        }
+        if (parentComment.post.toString() !== id) {
+          return res.status(400).json({ message: 'Parent comment does not belong to this post' });
+        }
+      }
+      
+      const newComment = new ImageComment({
+        post: id,
+        user: {
+          name: userName,
+          email: userEmail,
+          deviceId: userId
+        },
+        content,
+        isAuthorComment: false,
+        parentComment: parentCommentId || null
+      });
+      
+      await newComment.save();
+      
+      if (!parentCommentId) {
+        await ImagePost.findByIdAndUpdate(id, { $inc: { commentCount: 1 } });
+      } else {
+        await ImageComment.findByIdAndUpdate(parentCommentId, { $inc: { replyCount: 1 } });
+      }
+      
+      clearPostCaches(id);
+      
+      // Fetch updated comments to return
+      const updatedComments = await ImageComment.find({ 
+        post: id,
+        status: 'active',
+        parentComment: parentCommentId || null
+      })
+      .sort({ isAuthorComment: -1, createdAt: -1 })
+      .select('-user.deviceId')
+      .lean();
+      
+      res.status(201).json({
+        message: parentCommentId ? 'Reply added successfully' : 'Comment added successfully',
+        comment: newComment,
+        updatedComments: parentCommentId ? null : updatedComments, // Only return for top-level comments
+        timestamp: Date.now() // Help client identify fresh data
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+// Like a comment (REQUIRES AUTH)
+router.post('/api/image-posts/comments/:commentId/like',
+  UserAuthMiddleware,
+  async (req, res) => {
+    try {
       const { commentId } = req.params;
-      const { email } = req.body;
-      const deviceId = req.deviceId;
+      const userEmail = req.user.email;
+      const userId = req.user.user_id;
       
       const comment = await ImageComment.findById(commentId);
       if (!comment) {
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      // Check if already liked
       const alreadyLiked = comment.likes.some(
-        like => like.email === email || like.deviceId === deviceId
+        like => like.email === userEmail || like.deviceId === userId
       );
 
       if (alreadyLiked) {
-        // Remove like
         comment.likes = comment.likes.filter(
-          like => like.email !== email && like.deviceId !== deviceId
+          like => like.email !== userEmail && like.deviceId !== userId
         );
       } else {
-        // Remove dislike if exists
         comment.dislikes = comment.dislikes.filter(
-          dislike => dislike.email !== email && dislike.deviceId !== deviceId
+          dislike => dislike.email !== userEmail && dislike.deviceId !== userId
         );
         
-        // Add like
-        comment.likes.push({ email, deviceId });
+        comment.likes.push({ email: userEmail, deviceId: userId });
       }
 
       await comment.save();
@@ -706,46 +781,34 @@ router.post('/api/image-posts/comments/:commentId/like',
   }
 );
 
-// Dislike a comment (public)
+// Dislike a comment (REQUIRES AUTH)
 router.post('/api/image-posts/comments/:commentId/dislike',
-  extractDeviceId,
-  [
-    body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail()
-  ],
+  UserAuthMiddleware,
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
     try {
       const { commentId } = req.params;
-      const { email } = req.body;
-      const deviceId = req.deviceId;
+      const userEmail = req.user.email;
+      const userId = req.user.user_id;
       
       const comment = await ImageComment.findById(commentId);
       if (!comment) {
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      // Check if already disliked
       const alreadyDisliked = comment.dislikes.some(
-        dislike => dislike.email === email || dislike.deviceId === deviceId
+        dislike => dislike.email === userEmail || dislike.deviceId === userId
       );
 
       if (alreadyDisliked) {
-        // Remove dislike
         comment.dislikes = comment.dislikes.filter(
-          dislike => dislike.email !== email && dislike.deviceId !== deviceId
+          dislike => dislike.email !== userEmail && dislike.deviceId !== userId
         );
       } else {
-        // Remove like if exists
         comment.likes = comment.likes.filter(
-          like => like.email !== email && like.deviceId !== deviceId
+          like => like.email !== userEmail && like.deviceId !== userId
         );
         
-        // Add dislike
-        comment.dislikes.push({ email, deviceId });
+        comment.dislikes.push({ email: userEmail, deviceId: userId });
       }
 
       await comment.save();
@@ -763,18 +826,14 @@ router.post('/api/image-posts/comments/:commentId/dislike',
   }
 );
 
-// Check user's reaction on a comment (public)
+// Check user's reaction on a comment (REQUIRES AUTH)
 router.get('/api/image-posts/comments/:commentId/user-reaction',
-  extractDeviceId,
+  UserAuthMiddleware,
   async (req, res) => {
     try {
       const { commentId } = req.params;
-      const { email } = req.query;
-      const deviceId = req.deviceId;
-      
-      if (!email) {
-        return res.status(400).json({ message: 'Email is required' });
-      }
+      const userEmail = req.user.email;
+      const userId = req.user.user_id;
 
       const comment = await ImageComment.findById(commentId)
         .select('likes dislikes likeCount dislikeCount');
@@ -784,11 +843,11 @@ router.get('/api/image-posts/comments/:commentId/user-reaction',
       }
 
       const userLiked = comment.likes.some(
-        like => like.email === email || like.deviceId === deviceId
+        like => like.email === userEmail || like.deviceId === userId
       );
 
       const userDisliked = comment.dislikes.some(
-        dislike => dislike.email === email || dislike.deviceId === deviceId
+        dislike => dislike.email === userEmail || dislike.deviceId === userId
       );
 
       res.json({
@@ -804,22 +863,14 @@ router.get('/api/image-posts/comments/:commentId/user-reaction',
   }
 );
 
-// Delete own comment (public users only - not author comments)
+// Delete own comment (REQUIRES AUTH)
 router.delete('/api/image-posts/comments/:commentId', 
-  extractDeviceId,
-  [
-    body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail()
-  ],
+  UserAuthMiddleware,
   async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
     try {
       const { commentId } = req.params;
-      const { email } = req.body;
-      const deviceId = req.deviceId;
+      const userEmail = req.user.email;
+      const userId = req.user.user_id;
       
       const comment = await ImageComment.findById(commentId);
       if (!comment) {
@@ -830,25 +881,21 @@ router.delete('/api/image-posts/comments/:commentId',
         return res.status(403).json({ message: 'Cannot delete author comments through this route' });
       }
       
-      if (comment.user.email !== email && comment.user.deviceId !== deviceId) {
+      if (comment.user.email !== userEmail && comment.user.deviceId !== userId) {
         return res.status(403).json({ message: 'Not authorized to delete this comment' });
       }
 
-      // Delete all replies to this comment
       const replies = await ImageComment.find({ parentComment: commentId });
       const activeRepliesCount = replies.filter(r => r.status === 'active').length;
       
       await ImageComment.deleteMany({ parentComment: commentId });
       
-      // Update post's comment count if comment is active
       if (comment.status === 'active') {
         if (!comment.parentComment) {
-          // Top-level comment: decrement post comment count
           await ImagePost.findByIdAndUpdate(comment.post, { 
             $inc: { commentCount: -(1 + activeRepliesCount) }
           });
         } else {
-          // Reply: decrement parent's reply count
           await ImageComment.findByIdAndUpdate(comment.parentComment, { 
             $inc: { replyCount: -1 }
           });
@@ -857,9 +904,23 @@ router.delete('/api/image-posts/comments/:commentId',
       
       await ImageComment.findByIdAndDelete(commentId);
       
+      clearPostCaches(comment.post);
+      
+      // Fetch updated comments
+      const updatedComments = await ImageComment.find({ 
+        post: comment.post,
+        status: 'active',
+        parentComment: comment.parentComment || null
+      })
+      .sort({ isAuthorComment: -1, createdAt: -1 })
+      .select('-user.deviceId')
+      .lean();
+      
       res.json({ 
         message: 'Comment deleted successfully',
-        deletedReplies: replies.length
+        deletedReplies: replies.length,
+        updatedComments,
+        timestamp: Date.now()
       });
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -868,12 +929,13 @@ router.delete('/api/image-posts/comments/:commentId',
   }
 );
 
-// ==================== ADMIN ROUTES ====================
+// ==================== ADMIN COMMENT MANAGEMENT ROUTES ====================
 
 // Add author comment or reply (admin only)
 router.post('/api/image-posts/:id/author-comment',
   authenticateToken,
-  [body('content').trim().notEmpty().withMessage('Comment content is required')
+  [
+    body('content').trim().notEmpty().withMessage('Comment content is required')
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters'),
     body('parentCommentId').optional().isMongoId().withMessage('Invalid parent comment ID')
   ],
@@ -887,13 +949,11 @@ router.post('/api/image-posts/:id/author-comment',
       const { id } = req.params;
       const { content, parentCommentId } = req.body;
 
-      // Check if post exists
       const post = await ImagePost.findById(id);
       if (!post) {
         return res.status(404).json({ message: 'Image post not found' });
       }
 
-      // If it's a reply, check if parent comment exists
       if (parentCommentId) {
         const parentComment = await ImageComment.findById(parentCommentId);
         if (!parentComment) {
@@ -904,7 +964,6 @@ router.post('/api/image-posts/:id/author-comment',
         }
       }
 
-      // Create new author comment
       const newComment = new ImageComment({
         post: id,
         user: { 
@@ -919,12 +978,13 @@ router.post('/api/image-posts/:id/author-comment',
 
       await newComment.save();
       
-      // Update counts
       if (!parentCommentId) {
         await ImagePost.findByIdAndUpdate(id, { $inc: { commentCount: 1 } });
       } else {
         await ImageComment.findByIdAndUpdate(parentCommentId, { $inc: { replyCount: 1 } });
       }
+
+      clearPostCaches(id);
 
       res.status(201).json({ 
         message: parentCommentId ? 'Author reply added successfully' : 'Author comment added successfully',
@@ -949,7 +1009,6 @@ router.get('/api/admin/image-posts/:id/comments',
       const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
       const skip = (pageNum - 1) * limitNum;
       
-      // Build filter for top-level comments
       const filter = { post: id, parentComment: null };
       if (status && ['active', 'hidden'].includes(status)) {
         filter.status = status;
@@ -961,7 +1020,6 @@ router.get('/api/admin/image-posts/:id/comments',
         .limit(limitNum)
         .lean();
       
-      // If includeReplies, fetch replies for each comment
       if (includeReplies === 'true') {
         for (let comment of comments) {
           const replies = await ImageComment.find({ 
@@ -1026,6 +1084,8 @@ router.put('/api/admin/image-comments/:commentId',
       comment.updatedAt = Date.now();
       await comment.save();
       
+      clearPostCaches(comment.post);
+      
       res.json({
         message: 'Comment updated successfully',
         comment
@@ -1065,22 +1125,21 @@ router.patch('/api/admin/image-comments/:commentId',
         comment.updatedAt = Date.now();
         await comment.save();
         
-        // Update counts
         if (!comment.parentComment) {
-          // Top-level comment
           if (oldStatus === 'active' && status === 'hidden') {
             await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: -1 } });
           } else if (oldStatus === 'hidden' && status === 'active') {
             await ImagePost.findByIdAndUpdate(comment.post, { $inc: { commentCount: 1 } });
           }
         } else {
-          // Reply
           if (oldStatus === 'active' && status === 'hidden') {
             await ImageComment.findByIdAndUpdate(comment.parentComment, { $inc: { replyCount: -1 } });
           } else if (oldStatus === 'hidden' && status === 'active') {
             await ImageComment.findByIdAndUpdate(comment.parentComment, { $inc: { replyCount: 1 } });
           }
         }
+        
+        clearPostCaches(comment.post);
       }
       
       res.json({
@@ -1106,21 +1165,17 @@ router.delete('/api/admin/image-comments/:commentId',
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      // Delete all replies to this comment
       const replies = await ImageComment.find({ parentComment: commentId });
       const activeRepliesCount = replies.filter(r => r.status === 'active').length;
       
       await ImageComment.deleteMany({ parentComment: commentId });
       
-      // Update counts if comment is active
       if (comment.status === 'active') {
         if (!comment.parentComment) {
-          // Top-level comment
           await ImagePost.findByIdAndUpdate(comment.post, { 
             $inc: { commentCount: -(1 + activeRepliesCount) }
           });
         } else {
-          // Reply
           await ImageComment.findByIdAndUpdate(comment.parentComment, { 
             $inc: { replyCount: -1 }
           });
@@ -1128,6 +1183,8 @@ router.delete('/api/admin/image-comments/:commentId',
       }
       
       await ImageComment.findByIdAndDelete(commentId);
+      
+      clearPostCaches(comment.post);
       
       res.json({ 
         message: 'Comment deleted successfully',
@@ -1261,11 +1318,13 @@ router.post('/api/admin/image-comments/bulk-delete',
         return res.status(404).json({ message: 'No comments found' });
       }
       
-      // Calculate counts to update
       const postUpdates = {};
       const parentUpdates = {};
+      const affectedPosts = new Set();
       
       for (let comment of comments) {
+        affectedPosts.add(comment.post.toString());
+        
         if (comment.status === 'active') {
           if (!comment.parentComment) {
             const postId = comment.post.toString();
@@ -1276,25 +1335,24 @@ router.post('/api/admin/image-comments/bulk-delete',
           }
         }
         
-        // Delete replies
         const replies = await ImageComment.find({ parentComment: comment._id });
         await ImageComment.deleteMany({ parentComment: comment._id });
       }
       
-      // Delete comments
       await ImageComment.deleteMany({ _id: { $in: commentIds } });
       
-      // Update post counts
       const postUpdatePromises = Object.entries(postUpdates).map(([postId, count]) =>
         ImagePost.findByIdAndUpdate(postId, { $inc: { commentCount: -count } })
       );
       
-      // Update parent comment counts
       const parentUpdatePromises = Object.entries(parentUpdates).map(([parentId, count]) =>
         ImageComment.findByIdAndUpdate(parentId, { $inc: { replyCount: -count } })
       );
       
       await Promise.all([...postUpdatePromises, ...parentUpdatePromises]);
+      
+      affectedPosts.forEach(postId => clearPostCaches(postId));
+      
       res.json({
         message: `${comments.length} comment(s) deleted successfully`,
         deletedCount: comments.length
@@ -1329,11 +1387,13 @@ router.patch('/api/admin/image-comments/bulk-status',
         return res.status(404).json({ message: 'No comments found' });
       }
       
-      // Calculate count changes
       const postUpdates = {};
       const parentUpdates = {};
+      const affectedPosts = new Set();
       
       comments.forEach(comment => {
+        affectedPosts.add(comment.post.toString());
+        
         if (comment.status !== status) {
           const change = status === 'active' ? 1 : -1;
           
@@ -1347,7 +1407,6 @@ router.patch('/api/admin/image-comments/bulk-status',
         }
       });
       
-      // Update comments
       await ImageComment.updateMany(
         { _id: { $in: commentIds } },
         { 
@@ -1358,14 +1417,12 @@ router.patch('/api/admin/image-comments/bulk-status',
         }
       );
       
-      // Update post counts
       const postUpdatePromises = Object.entries(postUpdates)
         .filter(([_, count]) => count !== 0)
         .map(([postId, count]) =>
           ImagePost.findByIdAndUpdate(postId, { $inc: { commentCount: count } })
         );
       
-      // Update parent comment counts
       const parentUpdatePromises = Object.entries(parentUpdates)
         .filter(([_, count]) => count !== 0)
         .map(([parentId, count]) =>
@@ -1373,6 +1430,8 @@ router.patch('/api/admin/image-comments/bulk-status',
         );
       
       await Promise.all([...postUpdatePromises, ...parentUpdatePromises]);
+      
+      affectedPosts.forEach(postId => clearPostCaches(postId));
       
       res.json({
         message: `${comments.length} comment(s) updated successfully`,
@@ -1385,4 +1444,5 @@ router.patch('/api/admin/image-comments/bulk-status',
     }
   }
 );
+
 module.exports = router;
