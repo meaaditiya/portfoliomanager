@@ -1864,90 +1864,137 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Start a session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       const { commentId } = req.params;
       const { name, email, type } = req.body;
 
-      const comment = await Comment.findOne({ _id: commentId, status: 'approved' });
+      // Find comment with session lock
+      const comment = await Comment.findOne({ 
+        _id: commentId, 
+        status: 'approved' 
+      }).session(session);
+      
       if (!comment) {
-        return res.status(404).json({ message: 'Comment not found or not approved' });
+        await session.abortTransaction();
+        return res.status(404).json({ 
+          message: 'Comment not found or not approved' 
+        });
       }
 
       // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
+      // Find existing reaction with session lock
       const existingReaction = await CommentReaction.findOne({
         comment: commentId,
         'user.email': email
-      });
+      }).session(session);
+
+      let reactionRemoved = false;
+      let oldType = null;
 
       if (existingReaction) {
+        oldType = existingReaction.type;
+        
         if (existingReaction.type === type) {
-          await CommentReaction.deleteOne({ _id: existingReaction._id });
+          // Remove reaction - DELETE operation
+          await CommentReaction.deleteOne({ 
+            _id: existingReaction._id 
+          }).session(session);
           
-          if (type === 'like') {
-            await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': -1 } });
-          } else {
-            await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.dislikes': -1 } });
-          }
+          // Decrement count atomically
+          await Comment.findByIdAndUpdate(
+            commentId,
+            { 
+              $inc: { 
+                [`reactionCounts.${type}s`]: -1 
+              } 
+            },
+            { session }
+          );
           
-          return res.status(200).json({ 
-            message: `${type} removed successfully`,
-            reactionRemoved: true
-          });
+          reactionRemoved = true;
+          
         } else {
+          // Change reaction type - UPDATE operation
           existingReaction.type = type;
           existingReaction.fingerprint = fingerprint;
-          await existingReaction.save();
+          await existingReaction.save({ session });
           
-          if (type === 'like') {
-            await Comment.findByIdAndUpdate(commentId, { 
+          // Update counts atomically: -1 old type, +1 new type
+          await Comment.findByIdAndUpdate(
+            commentId,
+            { 
               $inc: { 
-                'reactionCounts.likes': 1,
-                'reactionCounts.dislikes': -1
+                [`reactionCounts.${oldType}s`]: -1,
+                [`reactionCounts.${type}s`]: 1
               } 
-            });
-          } else {
-            await Comment.findByIdAndUpdate(commentId, { 
-              $inc: { 
-                'reactionCounts.likes': -1,
-                'reactionCounts.dislikes': 1
-              } 
-            });
-          }
-          
-          return res.status(200).json({
-            message: `Reaction changed to ${type}`,
-            reaction: existingReaction
-          });
+            },
+            { session }
+          );
         }
-      }
-
-      const newReaction = new CommentReaction({
-        comment: commentId,
-        type,
-        user: { name, email },
-        fingerprint
-      });
-
-      await newReaction.save();
-      
-      if (type === 'like') {
-        await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.likes': 1 } });
+        
       } else {
-        await Comment.findByIdAndUpdate(commentId, { $inc: { 'reactionCounts.dislikes': 1 } });
+        // Create new reaction
+        const newReaction = new CommentReaction({
+          comment: commentId,
+          type,
+          user: { name, email },
+          fingerprint
+        });
+        
+        await newReaction.save({ session });
+        
+        // Increment count atomically
+        await Comment.findByIdAndUpdate(
+          commentId,
+          { 
+            $inc: { 
+              [`reactionCounts.${type}s`]: 1 
+            } 
+          },
+          { session }
+        );
       }
 
-      res.status(201).json({ 
-        message: `${type} added successfully`,
-        reaction: newReaction
+      // Commit the transaction
+      await session.commitTransaction();
+      
+      // Fetch updated counts after successful transaction
+      const updatedComment = await Comment.findById(commentId)
+        .select('reactionCounts');
+
+      res.status(200).json({
+        message: reactionRemoved ? `${type} removed successfully` : 
+                 oldType ? `Reaction changed to ${type}` : 
+                 `${type} added successfully`,
+        reactionRemoved,
+        reaction: existingReaction || null,
+        counts: updatedComment.reactionCounts
       });
+
     } catch (error) {
+      // Abort transaction on error
+      await session.abortTransaction();
+      
+      console.error('Error processing comment reaction:', error);
+      
       if (error.code === 11000) {
-        return res.status(400).json({ message: 'You have already reacted to this comment' });
+        return res.status(409).json({ 
+          message: 'Reaction conflict detected. Please try again.' 
+        });
       }
-      console.error('Error adding comment reaction:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      
+      res.status(500).json({ 
+        message: 'Server error processing reaction',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } finally {
+      session.endSession();
     }
   }
 );
@@ -2151,94 +2198,131 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Start a session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       const { blogId } = req.params;
       const { name, email, type } = req.body;
 
-      const blog = await Blog.findById(blogId);
+      // Find blog with session lock
+      const blog = await Blog.findById(blogId).session(session);
       if (!blog) {
+        await session.abortTransaction();
         return res.status(404).json({ message: 'Blog not found' });
       }
 
       // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
+      // Find existing reaction with session lock
       const existingReaction = await Reaction.findOne({
         blog: blogId,
         'user.email': email
-      });
+      }).session(session);
+
+      let reactionRemoved = false;
+      let oldType = null;
 
       if (existingReaction) {
+        oldType = existingReaction.type;
+        
         if (existingReaction.type === type) {
-          await Reaction.deleteOne({ _id: existingReaction._id });
+          // Remove reaction - DELETE operation
+          await Reaction.deleteOne({ _id: existingReaction._id }).session(session);
           
-          if (type === 'like') {
-            await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': -1 } });
-          } else {
-            await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': -1 } });
-          }
+          // Decrement count atomically
+          await Blog.findByIdAndUpdate(
+            blogId,
+            { 
+              $inc: { 
+                [`reactionCounts.${type}s`]: -1 
+              } 
+            },
+            { session }
+          );
           
-          return res.status(200).json({ 
-            message: `${type} removed successfully`,
-            reactionRemoved: true
-          });
+          reactionRemoved = true;
+          
         } else {
+          // Change reaction type - UPDATE operation
           existingReaction.type = type;
           existingReaction.fingerprint = fingerprint;
-          await existingReaction.save();
+          await existingReaction.save({ session });
           
-          if (type === 'like') {
-            await Blog.findByIdAndUpdate(blogId, { 
+          // Update counts atomically: -1 old type, +1 new type
+          await Blog.findByIdAndUpdate(
+            blogId,
+            { 
               $inc: { 
-                'reactionCounts.likes': 1,
-                'reactionCounts.dislikes': -1
+                [`reactionCounts.${oldType}s`]: -1,
+                [`reactionCounts.${type}s`]: 1
               } 
-            });
-          } else {
-            await Blog.findByIdAndUpdate(blogId, { 
-              $inc: { 
-                'reactionCounts.likes': -1,
-                'reactionCounts.dislikes': 1
-              } 
-            });
-          }
-          
-          return res.status(200).json({
-            message: `Reaction changed to ${type}`,
-            reaction: existingReaction
-          });
+            },
+            { session }
+          );
         }
-      }
-
-      const newReaction = new Reaction({
-        blog: blogId,
-        type,
-        user: { name, email },
-        fingerprint
-      });
-
-      await newReaction.save();
-      
-      if (type === 'like') {
-        await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.likes': 1 } });
+        
       } else {
-        await Blog.findByIdAndUpdate(blogId, { $inc: { 'reactionCounts.dislikes': 1 } });
+        // Create new reaction
+        const newReaction = new Reaction({
+          blog: blogId,
+          type,
+          user: { name, email },
+          fingerprint
+        });
+        
+        await newReaction.save({ session });
+        
+        // Increment count atomically
+        await Blog.findByIdAndUpdate(
+          blogId,
+          { 
+            $inc: { 
+              [`reactionCounts.${type}s`]: 1 
+            } 
+          },
+          { session }
+        );
       }
 
-      res.status(201).json({ 
-        message: `${type} added successfully`,
-        reaction: newReaction
+      // Commit the transaction
+      await session.commitTransaction();
+      
+      // Fetch updated counts after successful transaction
+      const updatedBlog = await Blog.findById(blogId).select('reactionCounts');
+
+      res.status(200).json({ 
+        message: reactionRemoved ? `${type} removed successfully` : 
+                 oldType ? `Reaction changed to ${type}` : 
+                 `${type} added successfully`,
+        reactionRemoved,
+        reaction: existingReaction || null,
+        counts: updatedBlog.reactionCounts
       });
+
     } catch (error) {
+      // Abort transaction on error
+      await session.abortTransaction();
+      
+      console.error('Error processing blog reaction:', error);
+      
       if (error.code === 11000) {
-        return res.status(400).json({ message: 'You have already reacted to this blog post' });
+        return res.status(409).json({ 
+          message: 'Reaction conflict detected. Please try again.' 
+        });
       }
-      console.error('Error adding reaction:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      
+      res.status(500).json({ 
+        message: 'Server error processing reaction',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } finally {
+      session.endSession();
     }
   }
 );
-  
   // Get user's reaction to a blog
   router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {
     try {
