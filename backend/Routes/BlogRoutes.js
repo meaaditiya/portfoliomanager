@@ -18,6 +18,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
 const cachemiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const jwt = require('jsonwebtoken');
+const User = require("../models/userSchema");
 const { 
   generateQueryEmbedding, 
   cosineSimilarity,
@@ -1441,14 +1443,29 @@ router.post(
 
     try {
       const { blogId } = req.params;
-      const { name, email, content } = req.body;
+      let { name, email, content } = req.body;
+
+      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          const user = await User.findById(decoded.userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
 
       const blog = await Blog.findById(blogId);
       if (!blog) {
         return res.status(404).json({ message: 'Blog not found' });
       }
 
-      // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
       console.log(`🔍 Moderating comment from ${name}...`);
@@ -1751,7 +1768,23 @@ router.post(
 
     try {
       const { commentId } = req.params;
-      const { name, email, content } = req.body;
+      let { name, email, content } = req.body;
+
+      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          const user = await User.findById(decoded.userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
 
       const parentComment = await Comment.findById(commentId);
       if (!parentComment) {
@@ -1765,7 +1798,6 @@ router.post(
         });
       }
 
-      // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
       console.log(`🔍 Moderating reply from ${name}...`);
@@ -1864,15 +1896,29 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Start a session for transaction
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       const { commentId } = req.params;
-      const { name, email, type } = req.body;
+      let { name, email, type } = req.body;
 
-      // Find comment with session lock
+      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          const user = await User.findById(decoded.userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
+
       const comment = await Comment.findOne({ 
         _id: commentId, 
         status: 'approved' 
@@ -1885,10 +1931,8 @@ router.post(
         });
       }
 
-      // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
-      // Find existing reaction with session lock
       const existingReaction = await CommentReaction.findOne({
         comment: commentId,
         'user.email': email
@@ -1901,12 +1945,10 @@ router.post(
         oldType = existingReaction.type;
         
         if (existingReaction.type === type) {
-          // Remove reaction - DELETE operation
           await CommentReaction.deleteOne({ 
             _id: existingReaction._id 
           }).session(session);
           
-          // Decrement count atomically
           await Comment.findByIdAndUpdate(
             commentId,
             { 
@@ -1920,12 +1962,10 @@ router.post(
           reactionRemoved = true;
           
         } else {
-          // Change reaction type - UPDATE operation
           existingReaction.type = type;
           existingReaction.fingerprint = fingerprint;
           await existingReaction.save({ session });
           
-          // Update counts atomically: -1 old type, +1 new type
           await Comment.findByIdAndUpdate(
             commentId,
             { 
@@ -1939,7 +1979,6 @@ router.post(
         }
         
       } else {
-        // Create new reaction
         const newReaction = new CommentReaction({
           comment: commentId,
           type,
@@ -1949,7 +1988,6 @@ router.post(
         
         await newReaction.save({ session });
         
-        // Increment count atomically
         await Comment.findByIdAndUpdate(
           commentId,
           { 
@@ -1961,10 +1999,8 @@ router.post(
         );
       }
 
-      // Commit the transaction
       await session.commitTransaction();
       
-      // Fetch updated counts after successful transaction
       const updatedComment = await Comment.findById(commentId)
         .select('reactionCounts');
 
@@ -1978,7 +2014,6 @@ router.post(
       });
 
     } catch (error) {
-      // Abort transaction on error
       await session.abortTransaction();
       
       console.error('Error processing comment reaction:', error);
@@ -1998,7 +2033,6 @@ router.post(
     }
   }
 );
-
 // Get user's reaction to a comment
 router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
   try {
@@ -2198,25 +2232,37 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Start a session for transaction
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       const { blogId } = req.params;
-      const { name, email, type } = req.body;
+      let { name, email, type } = req.body;
 
-      // Find blog with session lock
+      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          const user = await User.findById(decoded.userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
+
       const blog = await Blog.findById(blogId).session(session);
       if (!blog) {
         await session.abortTransaction();
         return res.status(404).json({ message: 'Blog not found' });
       }
 
-      // Get fingerprint
       const fingerprint = getFingerprintFromRequest(req);
 
-      // Find existing reaction with session lock
       const existingReaction = await Reaction.findOne({
         blog: blogId,
         'user.email': email
@@ -2229,10 +2275,8 @@ router.post(
         oldType = existingReaction.type;
         
         if (existingReaction.type === type) {
-          // Remove reaction - DELETE operation
           await Reaction.deleteOne({ _id: existingReaction._id }).session(session);
           
-          // Decrement count atomically
           await Blog.findByIdAndUpdate(
             blogId,
             { 
@@ -2246,12 +2290,10 @@ router.post(
           reactionRemoved = true;
           
         } else {
-          // Change reaction type - UPDATE operation
           existingReaction.type = type;
           existingReaction.fingerprint = fingerprint;
           await existingReaction.save({ session });
           
-          // Update counts atomically: -1 old type, +1 new type
           await Blog.findByIdAndUpdate(
             blogId,
             { 
@@ -2265,7 +2307,6 @@ router.post(
         }
         
       } else {
-        // Create new reaction
         const newReaction = new Reaction({
           blog: blogId,
           type,
@@ -2275,7 +2316,6 @@ router.post(
         
         await newReaction.save({ session });
         
-        // Increment count atomically
         await Blog.findByIdAndUpdate(
           blogId,
           { 
@@ -2287,10 +2327,8 @@ router.post(
         );
       }
 
-      // Commit the transaction
       await session.commitTransaction();
       
-      // Fetch updated counts after successful transaction
       const updatedBlog = await Blog.findById(blogId).select('reactionCounts');
 
       res.status(200).json({ 
@@ -2303,7 +2341,6 @@ router.post(
       });
 
     } catch (error) {
-      // Abort transaction on error
       await session.abortTransaction();
       
       console.error('Error processing blog reaction:', error);
