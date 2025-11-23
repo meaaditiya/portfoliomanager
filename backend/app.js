@@ -26,7 +26,7 @@ const AudioMessageRoutes = require("./Routes/AudioMessage.js");
 const StreamRoutes = require("./Routes/Streams.js");
 const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
-
+const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const app = express();
 const server = http.createServer(app); 
 const io = new Server(server, {
@@ -47,6 +47,7 @@ connectDB();
 app.use(embeddingRoutes);
 
 app.use("/api/admin", adminRoutes);
+app.use("/api", userAuth);
 app.use(BlogSubmission);
 app.use(BlogRoutes);
 app.use(queryRoutes);
