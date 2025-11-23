@@ -1512,13 +1512,71 @@ router.post(
     }
   }
 );
-// Public route: Delete user's own comment
+
+
+router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { email } = req.body;
+    
+    // Get token if user is logged in
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ canDelete: false, message: 'Comment not found' });
+    }
+    
+    // Prevent deletion of author comments through this route
+    if (comment.isAuthorComment) {
+      return res.status(200).json({ canDelete: false, reason: 'author_comment' });
+    }
+    
+    let canDelete = false;
+    let verificationMethod = 'none';
+    
+    // Priority 1: Check JWT token (most secure)
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        const user = await User.findById(decoded.userId);
+        
+        if (user && user.email === comment.user.email) {
+          canDelete = true;
+          verificationMethod = 'jwt_authenticated';
+        }
+      } catch (err) {
+        console.log('Token verification failed');
+      }
+    }
+    
+    // Priority 2: Check fingerprint match (if not authenticated)
+    if (!canDelete && email) {
+      const requestFingerprint = getFingerprintFromRequest(req);
+      
+      // Must match BOTH email AND fingerprint
+      if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
+        canDelete = true;
+        verificationMethod = 'fingerprint_match';
+      }
+    }
+    
+    res.status(200).json({ 
+      canDelete,
+      verificationMethod,
+      commentId: comment._id
+    });
+    
+  } catch (error) {
+    console.error('Error verifying comment ownership:', error);
+    res.status(500).json({ canDelete: false, message: 'Server error' });
+  }
+});
 router.delete('/api/comments/:commentId/user', 
   [
     body('email').isEmail().withMessage('Valid email is required')
   ],
   async (req, res) => {
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -1528,45 +1586,78 @@ router.delete('/api/comments/:commentId/user',
       const { commentId } = req.params;
       const { email } = req.body;
       
-      // Find the comment
       const comment = await Comment.findById(commentId);
       if (!comment) {
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      // Check if the email matches the comment owner
-      if (comment.user.email !== email) {
-        return res.status(403).json({ message: 'You can only delete your own comments' });
-      }
-
-      // Prevent deletion of author comments through this route
+      // Prevent deletion of author comments
       if (comment.isAuthorComment) {
         return res.status(403).json({ message: 'Author comments cannot be deleted through this route' });
       }
 
-      // If it's a reply, update parent comment's replies count
+      // Get token if user is logged in
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      
+      let isAuthorized = false;
+      
+      // Priority 1: Verify JWT token (most secure)
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          const user = await User.findById(decoded.userId);
+          
+          if (user && user.email === comment.user.email) {
+            isAuthorized = true;
+            console.log('✅ Deletion authorized via JWT authentication');
+          }
+        } catch (err) {
+          console.log('Token verification failed, checking fingerprint...');
+        }
+      }
+      
+      // Priority 2: Verify fingerprint + email match (for guests)
+      if (!isAuthorized) {
+        const requestFingerprint = getFingerprintFromRequest(req);
+        
+        // Must match BOTH email AND fingerprint
+        if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
+          isAuthorized = true;
+          console.log('✅ Deletion authorized via fingerprint match');
+        } else {
+          console.log('❌ Authorization failed - Email or fingerprint mismatch');
+          console.log('Comment email:', comment.user.email);
+          console.log('Request email:', email);
+          console.log('Comment fingerprint:', comment.fingerprint);
+          console.log('Request fingerprint:', requestFingerprint);
+        }
+      }
+      
+      if (!isAuthorized) {
+        return res.status(403).json({ 
+          message: 'You can only delete your own comments. Verification failed.',
+          hint: 'This comment was created from a different device or browser session.'
+        });
+      }
+
+      // Proceed with deletion (rest of the code remains the same)
       if (comment.parentComment) {
         await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
       }
       
-      // If comment was approved and is a top-level comment, update the blog comments count
       if (comment.status === 'approved' && !comment.parentComment) {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       }
 
-      // Delete all replies to this comment if it's a top-level comment
       if (!comment.parentComment) {
         const repliesToDelete = await Comment.find({ parentComment: commentId });
         for (const reply of repliesToDelete) {
-          // Delete reactions for each reply
           await CommentReaction.deleteMany({ comment: reply._id });
         }
         await Comment.deleteMany({ parentComment: commentId });
       }
 
-      // Delete reactions for this comment
       await CommentReaction.deleteMany({ comment: commentId });
-      
       await Comment.deleteOne({ _id: commentId });
       
       res.status(200).json({ message: 'Comment deleted successfully' });
