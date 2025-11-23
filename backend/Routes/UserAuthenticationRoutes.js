@@ -252,4 +252,34 @@ router.get('/verify', async (req, res) => {
     });
   }
 });
+router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ message: 'Name is required' });
+    }
+
+    const user = await User.findById(req.user.user_id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.name = name.trim();
+    await user.save();
+
+    res.json({ 
+      message: 'Name updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;
