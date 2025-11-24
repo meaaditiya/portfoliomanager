@@ -7,7 +7,7 @@ const http = require('http');
 const { Server } = require('socket.io');    
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
 const connectDB = require("./Config/db");
-
+const session = require('express-session');
 const adminRoutes = require("./Routes/AdminRoutes.js");
 const queryRoutes = require("./Routes/QueryRoutes.js");
 const superAdminRoutes = require("./Routes/superAdminRoutes.js");
@@ -27,6 +27,7 @@ const StreamRoutes = require("./Routes/Streams.js");
 const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
+const passport = require('./Config/passport');
 const app = express();
 const server = http.createServer(app); 
 const io = new Server(server, {
@@ -42,6 +43,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(corsMiddleware);
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'your_session_secret_here',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 
+    }
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 const PORT = process.env.PORT || 5000;
 connectDB();
 app.use(embeddingRoutes);

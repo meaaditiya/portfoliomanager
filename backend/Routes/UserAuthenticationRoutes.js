@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
+const passport = require('passport');
 const User = require("../models/userSchema");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
@@ -282,4 +282,47 @@ router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+router.get('/google',
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'] 
+  })
+);
+
+// Google OAuth callback route
+router.get('/google/callback',
+  passport.authenticate('google', { 
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=google_auth_failed`,
+    session: false 
+  }),
+  async (req, res) => {
+    try {
+      // Generate JWT token for the authenticated user
+      const token = jwt.sign(
+        {
+          user_id: req.user._id,
+          email: req.user.email,
+          name: req.user.name
+        },
+        process.env.JWT_SECRET || 'your_jwt_secret',
+        { expiresIn: '24h' }
+      );
+
+      // Set cookie
+      const isProduction = process.env.NODE_ENV === 'production';
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'None' : 'Lax',
+        maxAge: 24 * 60 * 60 * 1000,
+        path: '/'
+      });
+
+      // Redirect to frontend with token
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&google_login=success`);
+    } catch (error) {
+      console.error('Google callback error:', error);
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=auth_failed`);
+    }
+  }
+);
 module.exports = router;
