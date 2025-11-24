@@ -25,16 +25,17 @@ const BlogManagementPanel = () => {
   // Editor state
   const [editMode, setEditMode] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    summary: '',
-    tags: '',
-    status: 'draft',
-    featuredImage: '',
-    contentImages: [],
-    contentVideos: []
-  });
+ const [formData, setFormData] = useState({
+  title: '',
+  content: '',
+  summary: '',
+  tags: '',
+  status: 'draft',
+  featuredImage: '',
+  contentImages: [],
+  contentVideos: [],
+  isSubscriberOnly: false  // ADD THIS LINE
+});
   const [successMessage, setSuccessMessage] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
   const [analyticsId, setAnalyticsId] = useState(null);
@@ -80,7 +81,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
         ...filters
       });
 
-      const response = await axios.get(`http://localhost:5000/api/blogs?${params.toString()}`, {
+      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/blogs?${params.toString()}`, {
         withCredentials: true
       });
 
@@ -150,25 +151,24 @@ const [updatingImage, setUpdatingImage] = useState(false);
   
   // Handle form input changes
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'content') {
-      // Clean up contentImages and contentVideos when content changes
-      const updatedImages = cleanupContentImages(value, formData.contentImages);
-      const updatedVideos = cleanupContentVideos(value, formData.contentVideos);
-      setFormData(prev => ({
-        ...prev,
-        [name]: value,
-        contentImages: updatedImages,
-        contentVideos: updatedVideos
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-  };
+  const { name, value, type, checked } = e.target;
+  
+  if (name === 'content') {
+    const updatedImages = cleanupContentImages(value, formData.contentImages);
+    const updatedVideos = cleanupContentVideos(value, formData.contentVideos);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      contentImages: updatedImages,
+      contentVideos: updatedVideos
+    }));
+  } else {
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }
+};
 
   const cleanupContentImages = (content, contentImages) => {
     if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
@@ -273,64 +273,61 @@ const [updatingImage, setUpdatingImage] = useState(false);
   
   // Create or update blog post
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
+  
+  try {
+    setLoading(true);
+    setError(null);
+    setSuccessMessage('');
     
-    try {
-      setLoading(true);
-      setError(null);
-      setSuccessMessage('');
-      
-      // Format tags
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag !== '');
-      
-      // Clean up contentImages and contentVideos to only include those referenced in content
-      const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
-      const cleanedVideos = cleanupContentVideos(formData.content, formData.contentVideos);
-      
-      const blogData = {
-        ...formData,
-        tags: tagsArray,
-        contentImages: cleanedImages,
-        contentVideos: cleanedVideos
-      };
-      
-      let response;
-      
-      if (selectedBlog) {
-        // Update existing blog
-        response = await axios.put(`http://localhost:5000/api/blogs/${selectedBlog._id}`, blogData, {
-          withCredentials: true
-        });
-        setSuccessMessage('Blog post updated successfully!');
-      } else {
-        // Create new blog
-        response = await axios.post('http://localhost:5000/api/blogs', blogData, {
-          withCredentials: true
-        });
-        setSuccessMessage('Blog post created successfully!');
-      }
-      
-      // Refresh blog list and reset form
-      fetchBlogs();
-      
-      // Show success message and automatically return to blog list
-      setTimeout(() => {
-        setSuccessMessage('');
-        setEditMode(false);
-        setSelectedBlog(null);
-        setViewMode('list');
-      }, 3000);
-      
-    } catch (err) {
-      console.error('Error saving blog:', err);
-      setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
-    } finally {
-      setLoading(false);
+    // Format tags
+    const tagsArray = formData.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag !== '');
+    
+    // Clean up contentImages and contentVideos
+    const cleanedImages = cleanupContentImages(formData.content, formData.contentImages);
+    const cleanedVideos = cleanupContentVideos(formData.content, formData.contentVideos);
+    
+    const blogData = {
+      ...formData,
+      tags: tagsArray,
+      contentImages: cleanedImages,
+      contentVideos: cleanedVideos,
+      isSubscriberOnly: formData.isSubscriberOnly  // ADD THIS LINE
+    };
+    
+    let response;
+    
+    if (selectedBlog) {
+      response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
+        withCredentials: true
+      });
+      setSuccessMessage('Blog post updated successfully!');
+    } else {
+      response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
+        withCredentials: true
+      });
+      setSuccessMessage('Blog post created successfully!');
     }
-  };
+    
+    fetchBlogs();
+    
+    setTimeout(() => {
+      setSuccessMessage('');
+      setEditMode(false);
+      setSelectedBlog(null);
+      setViewMode('list');
+    }, 3000);
+    
+  } catch (err) {
+    console.error('Error saving blog:', err);
+    setError(err.response?.data?.message || 'Failed to save blog post. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
   
   // Delete blog post
   const handleDelete = async (blogId) => {
@@ -340,7 +337,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
     
     try {
       setLoading(true);
-      await axios.delete(`http://localhost:5000/api/blogs/${blogId}`, {
+      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}`, {
         withCredentials: true
       });
       
@@ -458,44 +455,43 @@ const [updatingImage, setUpdatingImage] = useState(false);
     muted: false
   });
 };
-  const handleEdit = async (blog) => {
-    setViewMode('edit');
-    setEditMode(true);
-    setSelectedBlog(blog);
-    setFormData({
-      title: blog.title,
-      content: blog.content,
-      summary: blog.summary,
-      tags: blog.tags.join(', '),
-      status: blog.status,
-      featuredImage: blog.featuredImage || '',
-      contentImages: blog.contentImages || [],
-      contentVideos: blog.contentVideos || []
-    });
-    
-    // Scroll to top for better UX
-    window.scrollTo(0, 0);
-  };
+ const handleEdit = async (blog) => {
+  setViewMode('edit');
+  setEditMode(true);
+  setSelectedBlog(blog);
+  setFormData({
+    title: blog.title,
+    content: blog.content,
+    summary: blog.summary,
+    tags: blog.tags.join(', '),
+    status: blog.status,
+    featuredImage: blog.featuredImage || '',
+    contentImages: blog.contentImages || [],
+    contentVideos: blog.contentVideos || [],
+    isSubscriberOnly: blog.isSubscriberOnly || false  // ADD THIS LINE
+  });
   
-  const handleNew = () => {
-    setViewMode('edit');
-    setEditMode(true);
-    setSelectedBlog(null);
-    setFormData({
-      title: '',
-      content: '',
-      summary: '',
-      tags: '',
-      status: 'draft',
-      featuredImage: '',
-      contentImages: [],
-      contentVideos: []
-    });
-    
-    // Scroll to top for better UX
-    window.scrollTo(0, 0);
-  };
-
+  window.scrollTo(0, 0);
+};
+  
+ const handleNew = () => {
+  setViewMode('edit');
+  setEditMode(true);
+  setSelectedBlog(null);
+  setFormData({
+    title: '',
+    content: '',
+    summary: '',
+    tags: '',
+    status: 'draft',
+    featuredImage: '',
+    contentImages: [],
+    contentVideos: [],
+    isSubscriberOnly: false  // ADD THIS LINE
+  });
+  
+  window.scrollTo(0, 0);
+};
   // Extract video information from URL
   const extractVideoInfo = (url) => {
     // YouTube URL patterns
@@ -564,7 +560,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
       // If we're editing an existing blog, add video via API
       if (selectedBlog) {
         const response = await axios.post(
-          `http://localhost:5000/api/blogs/${selectedBlog._id}/videos`,
+          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/videos`,
           {
             url: videoModal.url,
             title: videoModal.title,
@@ -673,7 +669,7 @@ const handleUpdateImage = async () => {
     // If we're editing an existing blog, update image via API
     if (selectedBlog) {
       const response = await axios.put(
-        `http://localhost:5000/api/blogs/${selectedBlog._id}/images/${editImageModal.imageId}`,
+        `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images/${editImageModal.imageId}`,
         {
           url: editImageModal.url,
           alt: editImageModal.alt,
@@ -924,7 +920,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
       // If we're editing an existing blog, add image via API
       if (selectedBlog) {
         const response = await axios.post(
-          `http://localhost:5000/api/blogs/${selectedBlog._id}/images`,
+          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
           {
             url: imageModal.url,
             alt: imageModal.alt,
@@ -1538,7 +1534,38 @@ const ContentImagesSection = ({ contentImages, content }) => {
                   </select>
                 </div>
               </div>
-              
+              <div className="form-group subscriber-only-section">
+  <div className="subscriber-only-container">
+    <div className="subscriber-only-checkbox">
+      <label htmlFor="isSubscriberOnly" className="checkbox-label">
+        <input
+          type="checkbox"
+          id="isSubscriberOnly"
+          name="isSubscriberOnly"
+          checked={formData.isSubscriberOnly}
+          onChange={handleInputChange}
+        />
+        <span className="checkbox-text">Subscriber Only Content</span>
+      </label>
+      <span className="helper-text">
+        If enabled, this blog will only be visible to logged-in subscribers. 
+        Public users will see only the title, summary, featured image, and publish date.
+      </span>
+    </div>
+    
+    {formData.isSubscriberOnly && formData.status === 'published' && (
+      <div className="subscriber-only-info">
+        <div className="info-badge">
+          <span className="info-icon">🔒</span>
+          <span className="info-text">This is subscriber-only content</span>
+        </div>
+        <p className="info-description">
+          Only authenticated users will be able to see the full article content.
+        </p>
+      </div>
+    )}
+  </div>
+</div>
               {/* Content Images Summary */}
               {formData.contentImages && formData.contentImages.length > 0 && (
                 <ContentImagesSection 
@@ -1670,6 +1697,12 @@ const ContentImagesSection = ({ contentImages, content }) => {
                 <div className="blog-cards">
                   {blogs.map(blog => (
                     <div key={blog._id} className="blog-card">
+                       {blog.isSubscriberOnly && (
+      <div className="subscriber-badge">
+        <span>🔒</span>
+        <span>Subscriber Only</span>
+      </div>
+    )}
                       {blog.featuredImage && (
                         <div className="card-image">
                           <img 
@@ -1687,6 +1720,9 @@ const ContentImagesSection = ({ contentImages, content }) => {
                           <span className={`status-badge ${blog.status}`}>
                             {blog.status === 'published' ? 'Published' : 'Draft'}
                           </span>
+                           {blog.isSubscriberOnly && (
+          <span className="subscription-badge">Subscriber Only</span>
+        )}
                           {blog.publishedAt && (
                             <span className="publish-date">
                               {formatDate(blog.publishedAt)}

@@ -258,7 +258,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
   // Get all blog posts (with pagination and filtering)
 router.get(
   "/api/blogs",
-  cachemiddleware,   // <-- Caching applied ONLY here
+  cachemiddleware,
   async (req, res) => {
     try {
       const { 
@@ -278,7 +278,9 @@ router.get(
       } else {
         const isAuthenticated = req.user?.admin_id;
         if (!isAuthenticated) {
+          // Public user - exclude subscriber-only blogs, only show public blogs
           filter.status = "published";
+          filter.isSubscriberOnly = false;
         }
       }
 
@@ -304,8 +306,25 @@ router.get(
         .populate("author", "name email")
         .exec();
 
+      // Transform blogs based on subscriber-only status
       const processedBlogs = blogs.map(blog => {
         const blogObj = blog.toObject();
+        
+        // If subscriber-only and user is not authenticated, return only preview
+        if (blog.isSubscriberOnly && !req.user?.admin_id) {
+          return {
+            _id: blog._id,
+            title: blog.title,
+            summary: blog.summary,
+            featuredImage: blog.featuredImage,
+            author: blog.author,
+            publishedAt: blog.publishedAt,
+            isSubscriberOnly: true,
+            preview: true
+          };
+        }
+        
+        // Full content for public blogs or authenticated users
         blogObj.processedContent = processContent(
           blogObj.content,
           blogObj.contentImages,
@@ -335,7 +354,7 @@ router.get(
 // UPDATED: Get a single blog post (with read tracking)
 router.get(
   '/api/blogs/:identifier',
-  cachemiddleware,   // <-- CACHE APPLIED SAFELY HERE
+  cachemiddleware,
   async (req, res) => {
     try {
       const { identifier } = req.params;
@@ -348,13 +367,10 @@ router.get(
       const isAuthenticated = req.user?.admin_id;
       if (!isAuthenticated) {
         query.status = 'published';
+        // Public users cannot access subscriber-only blogs
+        query.isSubscriberOnly = false;
       }
       
-      // Generate fingerprint
-      const fingerprint = getFingerprintFromRequest(req);
-      console.log('Generated fingerprint:', fingerprint);
-      
-      // Fetch blog (NO COMMENTS INCLUDED → SAFE TO CACHE)
       let blog = await Blog.findOne(query)
         .populate('author', 'name email profileImage designation location bio socialLinks')
         .exec();
@@ -363,8 +379,24 @@ router.get(
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      console.log('Blog found:', blog._id);
-      console.log('Current readFingerprints:', blog.readFingerprints);
+      // If subscriber-only blog and not authenticated, return preview only
+      if (blog.isSubscriberOnly && !isAuthenticated) {
+        return res.json({
+          _id: blog._id,
+          title: blog.title,
+          summary: blog.summary,
+          featuredImage: blog.featuredImage,
+          author: blog.author,
+          publishedAt: blog.publishedAt,
+          isSubscriberOnly: true,
+          preview: true,
+          message: 'This is subscriber-only content. Please login to access full article.'
+        });
+      }
+      
+      // Track reads for public blogs or authenticated users accessing subscriber content
+      const fingerprint = getFingerprintFromRequest(req);
+      console.log('Generated fingerprint:', fingerprint);
       
       if (!blog.readFingerprints) {
         blog.readFingerprints = [];
@@ -416,21 +448,18 @@ router.get(
 );
 
 
-
 // NEW: Report a blog post (Public route)
 router.post('/api/blogs/:identifier/report', async (req, res) => {
   try {
     const { identifier } = req.params;
     const { userEmail, reason } = req.body;
     
-    // Validation
     if (!userEmail || !reason) {
       return res.status(400).json({ 
         message: 'User email and reason are required' 
       });
     }
     
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userEmail)) {
       return res.status(400).json({ 
@@ -438,7 +467,6 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
       });
     }
     
-    // Reason length validation
     if (reason.trim().length < 10 || reason.trim().length > 500) {
       return res.status(400).json({ 
         message: 'Reason must be between 10 and 500 characters' 
@@ -450,7 +478,6 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
       ? { _id: identifier }
       : { slug: identifier };
     
-    // Only published blogs can be reported
     query.status = 'published';
     
     const blog = await Blog.findOne(query);
@@ -459,7 +486,6 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check if user has already reported this blog
     const existingReport = blog.reports.find(
       report => report.userEmail.toLowerCase() === userEmail.toLowerCase()
     );
@@ -470,7 +496,6 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
       });
     }
     
-    // Add the report
     blog.reports.push({
       userEmail: userEmail.toLowerCase().trim(),
       reason: reason.trim(),
@@ -2581,7 +2606,7 @@ router.post(
       }
     }
   );
-  router.post('/api/search', async (req, res) => {
+ router.post('/api/search', async (req, res) => {
   try {
     const { 
       query, 
@@ -2599,18 +2624,17 @@ router.post(
       });
     }
     
+    const isAuthenticated = req.user?.admin_id;
     console.log(`Processing semantic search for query: "${query}"`);
     
-    // Step 1: Generate query embedding
     let queryEmbedding;
     try {
       queryEmbedding = await generateQueryEmbedding(query);
     } catch (embeddingError) {
       console.error('Embedding generation failed, falling back to text search:', embeddingError);
-      return await performTextSearch(query, limit, includeUnpublished, filters, res);
+      return await performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res);
     }
     
-    // Step 2: Build base query with filters
     const baseQuery = {
       embedding: { $exists: true, $ne: null }
     };
@@ -2619,7 +2643,11 @@ router.post(
       baseQuery.status = 'published';
     }
     
-    // Apply additional filters
+    // Public users cannot see subscriber-only blogs in search
+    if (!isAuthenticated) {
+      baseQuery.isSubscriberOnly = false;
+    }
+    
     if (filters.tags && filters.tags.length > 0) {
       baseQuery.tags = { $in: filters.tags };
     }
@@ -2634,12 +2662,11 @@ router.post(
       if (filters.dateTo) baseQuery.publishedAt.$lte = new Date(filters.dateTo);
     }
     
-    // Step 3: Fetch blogs with embeddings
     const blogs = await Blog.find(baseQuery)
       .select('+embedding')
       .populate('author', 'name email')
       .lean()
-      .limit(limit * 3);  // Fetch more than needed for better scoring
+      .limit(limit * 3);
     
     if (blogs.length === 0) {
       return res.json({
@@ -2655,70 +2682,70 @@ router.post(
     
     const startTime = Date.now();
     
-   // Step 4: Perform vector search in MongoDB
-let vectorResults = await Blog.aggregate([
-  {
-    $vectorSearch: {
-      index: "blog_vector_search",
-      path: "embedding",
-      queryVector: queryEmbedding,
-      numCandidates: 50,
-      limit: limit
-    }
-  },
-  {
-    $match: includeUnpublished ? {} : { status: "published" }
-  },
-   {
-    $lookup: {
-      from: "admins",
-      localField: "author",
-      foreignField: "_id",
-      as: "author"
-    }
-  },
-  {
-    $unwind: {
-      path: "$author",
-      preserveNullAndEmptyArrays: true
-    }
-  },
-  {
-    $project: {
-      title: 1,
-      summary: 1,
-      content: 1,
-      slug: 1,
-       "author.name": 1,
+    let vectorResults = await Blog.aggregate([
+      {
+        $vectorSearch: {
+          index: "blog_vector_search",
+          path: "embedding",
+          queryVector: queryEmbedding,
+          numCandidates: 50,
+          limit: limit
+        }
+      },
+      {
+        $match: {
+          status: includeUnpublished ? {} : "published",
+          // Public users can't see subscriber-only blogs
+          ...(isAuthenticated ? {} : { isSubscriberOnly: false })
+        }
+      },
+      {
+        $lookup: {
+          from: "admins",
+          localField: "author",
+          foreignField: "_id",
+          as: "author"
+        }
+      },
+      {
+        $unwind: {
+          path: "$author",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          title: 1,
+          summary: 1,
+          content: 1,
+          slug: 1,
+          isSubscriberOnly: 1,
+          "author.name": 1,
           "author._id": 1,
-      tags: 1,
-      featuredImage: 1,
-      publishedAt: 1,
-      reactionCounts: 1,
-      commentsCount: 1,
-      totalReads: 1,
-      similarityScore: { $meta: "vectorSearchScore" }
-    }
-  }
-]);
+          tags: 1,
+          featuredImage: 1,
+          publishedAt: 1,
+          reactionCounts: 1,
+          commentsCount: 1,
+          totalReads: 1,
+          similarityScore: { $meta: "vectorSearchScore" }
+        }
+      }
+    ]);
 
-// Remove blogs below minimum score threshold
-vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
+    vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
 
-// Vector search results replace manual cosineSimilarity results
-let results = vectorResults;
+    let results = vectorResults;
 
-    
-    // Step 6: Hybrid search enhancement (combine with text search)
     if (hybridSearch && results.length < limit) {
       const textResults = await performTextSearchInternal(
         query, 
         limit - results.length, 
         includeUnpublished, 
-        filters
+        filters,
+        isAuthenticated
       );
       
-      // Merge results, avoiding duplicates
       const resultIds = new Set(results.map(r => r._id.toString()));
       const uniqueTextResults = textResults.filter(
         r => !resultIds.has(r._id.toString())
@@ -2729,7 +2756,6 @@ let results = vectorResults;
     
     const processingTime = Date.now() - startTime;
     
-    // Step 7: Generate related search suggestions
     let suggestions = [];
     if (generateSuggestions && results.length > 0) {
       try {
@@ -2739,28 +2765,51 @@ let results = vectorResults;
       }
     }
     
-    // Step 8: Prepare response
     res.json({
       message: 'Search completed successfully',
-      results: results.map(blog => ({
-        _id: blog._id,
-        title: blog.title,
-        summary: blog.summary,
-        content: blog.content.substring(0, 300) + '...',  // Preview only
-        slug: blog.slug,
-       author: {
-          _id: blog.author?._id,
-          name: blog.author?.name || 'Unknown Author'
-        },
-        tags: blog.tags,
-        featuredImage: blog.featuredImage,
-        publishedAt: blog.publishedAt,
-        reactionCounts: blog.reactionCounts,
-        commentsCount: blog.commentsCount,
-        totalReads: blog.totalReads,
-        similarityScore: blog.similarityScore,
-        relevanceLevel: getRelevanceLevel(blog.similarityScore)
-      })),
+      results: results.map(blog => {
+        // If subscriber-only and not authenticated, return preview
+        if (blog.isSubscriberOnly && !isAuthenticated) {
+          return {
+            _id: blog._id,
+            title: blog.title,
+            summary: blog.summary,
+            slug: blog.slug,
+            author: {
+              _id: blog.author?._id,
+              name: blog.author?.name || 'Unknown Author'
+            },
+            tags: blog.tags,
+            featuredImage: blog.featuredImage,
+            publishedAt: blog.publishedAt,
+            isSubscriberOnly: true,
+            preview: true,
+            similarityScore: blog.similarityScore
+          };
+        }
+        
+        // Full content for public blogs or authenticated users
+        return {
+          _id: blog._id,
+          title: blog.title,
+          summary: blog.summary,
+          content: blog.content.substring(0, 300) + '...',
+          slug: blog.slug,
+          author: {
+            _id: blog.author?._id,
+            name: blog.author?.name || 'Unknown Author'
+          },
+          tags: blog.tags,
+          featuredImage: blog.featuredImage,
+          publishedAt: blog.publishedAt,
+          reactionCounts: blog.reactionCounts,
+          commentsCount: blog.commentsCount,
+          totalReads: blog.totalReads,
+          isSubscriberOnly: blog.isSubscriberOnly,
+          similarityScore: blog.similarityScore,
+          relevanceLevel: getRelevanceLevel(blog.similarityScore)
+        };
+      }),
       suggestions,
       searchMetadata: {
         query,
@@ -2782,6 +2831,7 @@ let results = vectorResults;
     });
   }
 });
+
 
 /**
  * Generate related search suggestions using Gemini
@@ -2822,33 +2872,52 @@ Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
   }
 }
 
-/**
- * Fallback text search
- */
-async function performTextSearch(query, limit, includeUnpublished, filters, res) {
+async function performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res) {
   try {
-    const results = await performTextSearchInternal(query, limit, includeUnpublished, filters);
+    const results = await performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated);
     
     res.json({
       message: 'Text search completed (vector search unavailable)',
-      results: results.map(blog => ({
-        _id: blog._id,
-        title: blog.title,
-        summary: blog.summary,
-        content: blog.content?.substring(0, 300) + '...',
-        slug: blog.slug,
-        // ✅ SECURE: Only return author name
-        author: {
-          _id: blog.author?._id,
-          name: blog.author?.name || 'Unknown Author'
-        },
-        tags: blog.tags,
-        featuredImage: blog.featuredImage,
-        publishedAt: blog.publishedAt,
-        reactionCounts: blog.reactionCounts,
-        commentsCount: blog.commentsCount,
-        totalReads: blog.totalReads
-      })),
+      results: results.map(blog => {
+        // If subscriber-only and not authenticated, return preview
+        if (blog.isSubscriberOnly && !isAuthenticated) {
+          return {
+            _id: blog._id,
+            title: blog.title,
+            summary: blog.summary,
+            slug: blog.slug,
+            author: {
+              _id: blog.author?._id,
+              name: blog.author?.name || 'Unknown Author'
+            },
+            tags: blog.tags,
+            featuredImage: blog.featuredImage,
+            publishedAt: blog.publishedAt,
+            isSubscriberOnly: true,
+            preview: true
+          };
+        }
+        
+        // Full content
+        return {
+          _id: blog._id,
+          title: blog.title,
+          summary: blog.summary,
+          content: blog.content?.substring(0, 300) + '...',
+          slug: blog.slug,
+          author: {
+            _id: blog.author?._id,
+            name: blog.author?.name || 'Unknown Author'
+          },
+          tags: blog.tags,
+          featuredImage: blog.featuredImage,
+          publishedAt: blog.publishedAt,
+          reactionCounts: blog.reactionCounts,
+          commentsCount: blog.commentsCount,
+          totalReads: blog.totalReads,
+          isSubscriberOnly: blog.isSubscriberOnly
+        };
+      }),
       searchMetadata: {
         query,
         totalResults: results.length,
@@ -2861,15 +2930,20 @@ async function performTextSearch(query, limit, includeUnpublished, filters, res)
 }
 
 /**
- * Internal text search helper
+ * Internal text search helper with subscriber-only handling
  */
-async function performTextSearchInternal(query, limit, includeUnpublished, filters) {
+async function performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated) {
   const searchQuery = {
     $text: { $search: query }
   };
   
   if (!includeUnpublished) {
     searchQuery.status = 'published';
+  }
+  
+  // Public users cannot search subscriber-only blogs
+  if (!isAuthenticated) {
+    searchQuery.isSubscriberOnly = false;
   }
   
   if (filters.tags && filters.tags.length > 0) {
@@ -2880,11 +2954,10 @@ async function performTextSearchInternal(query, limit, includeUnpublished, filte
     searchQuery.author = filters.author;
   }
   
-  // ✅ SECURE: Only populate author name, nothing else
   const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
     .sort({ score: { $meta: "textScore" } })
     .limit(limit)
-    .populate('author', 'name') // ⚠️ CRITICAL FIX: Only select 'name'
+    .populate('author', 'name')
     .lean();
   
   return results;

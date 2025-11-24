@@ -1188,3 +1188,107 @@
     opacity: 1;
   }
 }
+.subscriber-only-section {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.subscriber-only-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subscriber-only-checkbox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #333;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #007bff;
+}
+
+.checkbox-text {
+  user-select: none;
+}
+
+.subscriber-only-info {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #856404;
+}
+
+.info-icon {
+  font-size: 18px;
+}
+
+.info-text {
+  font-size: 14px;
+}
+
+.info-description {
+  margin: 0;
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+/* Blog Card Subscriber Badge */
+.blog-card {
+  position: relative;
+}
+
+.subscriber-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #dc3545;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 10;
+}
+.subscription-badge {
+  background-color: #dc3545;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

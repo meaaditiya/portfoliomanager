@@ -173,18 +173,16 @@ const blogSchema = new mongoose.Schema({
     // NEW: VECTOR SEARCH FIELDS
     // ============================================
     
-    // Embedding vector for semantic search (768 dimensions for Gemini embedding model)
     embedding: {
       type: [Number],
       default: null,
-      select: false  // Don't return embeddings by default to save bandwidth
+      select: false
     },
     
-    // Metadata for embedding generation
     embeddingMetadata: {
       model: {
         type: String,
-        default: 'text-embedding-004'  // Gemini embedding model
+        default: 'text-embedding-004'
       },
       generatedAt: {
         type: Date,
@@ -192,7 +190,7 @@ const blogSchema = new mongoose.Schema({
       },
       contentHash: {
         type: String,
-        default: null  // Hash of title + content to detect changes
+        default: null
       },
       dimension: {
         type: Number,
@@ -200,10 +198,19 @@ const blogSchema = new mongoose.Schema({
       }
     },
     
-    // Searchable text field (combination of title, summary, content, tags)
     searchableText: {
       type: String,
       select: false
+    },
+    
+    // ============================================
+    // NEW: SUBSCRIBER ONLY FIELD
+    // ============================================
+    
+    isSubscriberOnly: {
+      type: Boolean,
+      default: false,
+      ref: 'User'
     }
 });
 
@@ -220,6 +227,9 @@ blogSchema.index({
 
 // Index for published blogs
 blogSchema.index({ status: 1, publishedAt: -1 });
+
+// Index for subscriber-only blogs query
+blogSchema.index({ isSubscriberOnly: 1 });
 
 blogSchema.pre('save', function(next) {
   if (this.isModified('title')) {
@@ -253,7 +263,6 @@ blogSchema.pre('save', function(next) {
     this.totalReports = this.reports.length;
   }
   
-  // NEW: Update searchable text when title, content, summary, or tags change
   if (this.isModified('title') || this.isModified('content') || 
       this.isModified('summary') || this.isModified('tags')) {
     this.searchableText = `${this.title} ${this.summary} ${this.content} ${this.tags.join(' ')}`;
