@@ -28,7 +28,8 @@ const {
 } = require('../services/embeddingService');
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
-    const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos } = req.body;
+    // ✅ ADD isSubscriberOnly here
+    const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos, isSubscriberOnly } = req.body;
     
     // Validate required fields
     if (!title || !content || !summary) {
@@ -48,7 +49,8 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       tags: tags || [],
       featuredImage,
       contentImages: cleanedImages,
-      contentVideos: cleanedVideos
+      contentVideos: cleanedVideos,
+      isSubscriberOnly: isSubscriberOnly || false  // ✅ ADD THIS
     });
     
     await newBlog.save();
@@ -61,7 +63,6 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         console.log(`✅ Embedding auto-generated for: "${newBlog.title}"`);
       } catch (embeddingError) {
         console.error('⚠️ Embedding generation failed (non-critical):', embeddingError.message);
-        // Don't fail the entire request - embedding can be generated later
       }
     }
     
@@ -1082,7 +1083,18 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
                           updates.title !== undefined || 
                           updates.summary !== undefined;
     
-    const allowedUpdates = ['title', 'content', 'summary', 'status', 'tags', 'featuredImage', 'contentImages', 'contentVideos'];
+    // ✅ ADD isSubscriberOnly to allowed updates
+    const allowedUpdates = [
+      'title', 
+      'content', 
+      'summary', 
+      'status', 
+      'tags', 
+      'featuredImage', 
+      'contentImages', 
+      'contentVideos',
+      'isSubscriberOnly'  // ← ADD THIS
+    ];
     
     allowedUpdates.forEach(field => {
       if (updates[field] !== undefined) {
@@ -1101,8 +1113,8 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
     // ✅ AUTO-REGENERATE EMBEDDING IF NEEDED
     const isNowPublished = blog.status === 'published';
     const shouldRegenerateEmbedding = isNowPublished && (
-      contentChanged ||                    // Content/title/summary changed
-      (!wasPublished && isNowPublished)   // Draft → Published transition
+      contentChanged ||                    
+      (!wasPublished && isNowPublished)   
     );
     
     if (shouldRegenerateEmbedding) {
@@ -1112,7 +1124,6 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
         console.log(`✅ Embedding auto-regenerated for: "${blog.title}"`);
       } catch (embeddingError) {
         console.error('⚠️ Embedding regeneration failed (non-critical):', embeddingError.message);
-        // Don't fail the entire request
       }
     }
     
