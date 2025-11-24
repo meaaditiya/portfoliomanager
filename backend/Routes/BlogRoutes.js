@@ -571,195 +571,7 @@ router.get(
 // ============================================
 // UPDATED: Search route with both auth types
 // ============================================
-router.post('/api/search', extractAuthFromToken, async (req, res) => {
-  try {
-    const { 
-      query, 
-      limit = 10, 
-      minScore = 0.3,
-      includeUnpublished = false,
-      filters = {},
-      hybridSearch = true,
-      generateSuggestions = true
-    } = req.body;
-    
-    if (!query || query.trim().length === 0) {
-      return res.status(400).json({ 
-        message: 'Search query is required' 
-      });
-    }
-    
-    // ✅ Check both admin and user authentication
-    const isAuthenticated = req.user?.isAuthenticated;
-    console.log(`Processing semantic search for query: "${query}", isAuthenticated: ${isAuthenticated}`);
-    
-    let queryEmbedding;
-    try {
-      queryEmbedding = await generateQueryEmbedding(query);
-    } catch (embeddingError) {
-      console.error('Embedding generation failed, falling back to text search:', embeddingError);
-      return await performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res);
-    }
-    
-    const baseQuery = {
-      embedding: { $exists: true, $ne: null },
-      status: includeUnpublished ? {} : 'published'
-    };
-    
-    // Public users cannot see subscriber-only blogs in search
-    if (!isAuthenticated) {
-      baseQuery.isSubscriberOnly = false;
-    }
-    
-    if (filters.tags && filters.tags.length > 0) {
-      baseQuery.tags = { $in: filters.tags };
-    }
-    
-    if (filters.author) {
-      baseQuery.author = filters.author;
-    }
-    
-    if (filters.dateFrom || filters.dateTo) {
-      baseQuery.publishedAt = {};
-      if (filters.dateFrom) baseQuery.publishedAt.$gte = new Date(filters.dateFrom);
-      if (filters.dateTo) baseQuery.publishedAt.$lte = new Date(filters.dateTo);
-    }
-    
-    const startTime = Date.now();
-    
-    // Build vector search match query
-    const vectorMatchQuery = {
-      status: includeUnpublished ? { $exists: true } : 'published'
-    };
-    
-    if (!isAuthenticated) {
-      vectorMatchQuery.isSubscriberOnly = false;
-    }
-    
-    let vectorResults = await Blog.aggregate([
-      {
-        $vectorSearch: {
-          index: "blog_vector_search",
-          path: "embedding",
-          queryVector: queryEmbedding,
-          numCandidates: 50,
-          limit: limit
-        }
-      },
-      {
-        $match: vectorMatchQuery
-      },
-      {
-        $lookup: {
-          from: "admins",
-          localField: "author",
-          foreignField: "_id",
-          as: "author"
-        }
-      },
-      {
-        $unwind: {
-          path: "$author",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $project: {
-          title: 1,
-          summary: 1,
-          content: 1,
-          slug: 1,
-          isSubscriberOnly: 1,
-          "author.name": 1,
-          "author._id": 1,
-          tags: 1,
-          featuredImage: 1,
-          publishedAt: 1,
-          reactionCounts: 1,
-          commentsCount: 1,
-          totalReads: 1,
-          similarityScore: { $meta: "vectorSearchScore" }
-        }
-      }
-    ]);
 
-    vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
-
-    let results = vectorResults;
-
-    if (hybridSearch && results.length < limit) {
-      const textResults = await performTextSearchInternal(
-        query, 
-        limit - results.length, 
-        includeUnpublished, 
-        filters,
-        isAuthenticated
-      );
-      
-      const resultIds = new Set(results.map(r => r._id.toString()));
-      const uniqueTextResults = textResults.filter(
-        r => !resultIds.has(r._id.toString())
-      );
-      
-      results = [...results, ...uniqueTextResults];
-    }
-    
-    const processingTime = Date.now() - startTime;
-    
-    let suggestions = [];
-    if (generateSuggestions && results.length > 0) {
-      try {
-        suggestions = await generateSearchSuggestions(query, results.slice(0, 5));
-      } catch (suggestionError) {
-        console.error('Failed to generate suggestions:', suggestionError);
-      }
-    }
-    
-    res.json({
-      message: 'Search completed successfully',
-      results: results.map(blog => {
-        return {
-          _id: blog._id,
-          title: blog.title,
-          summary: blog.summary,
-          content: blog.content ? blog.content.substring(0, 300) + '...' : '',
-          slug: blog.slug,
-          author: {
-            _id: blog.author?._id,
-            name: blog.author?.name || 'Unknown Author'
-          },
-          tags: blog.tags || [],
-          featuredImage: blog.featuredImage,
-          publishedAt: blog.publishedAt,
-          reactionCounts: blog.reactionCounts,
-          commentsCount: blog.commentsCount,
-          totalReads: blog.totalReads,
-          isSubscriberOnly: blog.isSubscriberOnly || false,
-          similarityScore: blog.similarityScore || 0,
-          relevanceLevel: getRelevanceLevel(blog.similarityScore)
-        };
-      }),
-      suggestions,
-      searchMetadata: {
-        query,
-        totalResults: results.length,
-        processingTime: `${processingTime}ms`,
-        searchType: 'semantic_vector',
-        hybridSearchUsed: hybridSearch,
-        averageSimilarity: results.length > 0 
-          ? (results.reduce((sum, r) => sum + (r.similarityScore || 0), 0) / results.length).toFixed(3)
-          : 0
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error in semantic search:', error);
-    res.status(500).json({ 
-      message: 'Search failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
 
 // NEW: Report a blog post (Public route)
 router.post('/api/blogs/:identifier/report', async (req, res) => {
@@ -2929,47 +2741,89 @@ router.post(
       }
     }
   );
+function getRelevanceLevel(score) {
+  if (score >= 0.8) return 'very_high';
+  if (score >= 0.6) return 'high';
+  if (score >= 0.4) return 'medium';
+  if (score >= 0.2) return 'low';
+  return 'very_low';
+}
 
+// -----------------------------
+// Internal text search helper
+// (only selects author.name)
+// -----------------------------
+async function performTextSearchInternal(query, limit, includeUnpublished, filters = {}) {
+  const searchQuery = { $text: { $search: query } };
 
-// ============================================
-// Helper function with proper auth check
-// ============================================
-async function performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated) {
-  const searchQuery = {
-    $text: { $search: query }
-  };
-  
-  if (!includeUnpublished) {
-    searchQuery.status = 'published';
+  if (!includeUnpublished) searchQuery.status = 'published';
+
+  if (filters.tags && filters.tags.length > 0) searchQuery.tags = { $in: filters.tags };
+  if (filters.author) searchQuery.author = filters.author;
+  if (filters.dateFrom || filters.dateTo) {
+    searchQuery.publishedAt = {};
+    if (filters.dateFrom) searchQuery.publishedAt.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) searchQuery.publishedAt.$lte = new Date(filters.dateTo);
   }
-  
-  // ✅ FIX: Only exclude subscriber-only for non-authenticated users
-  if (!isAuthenticated) {
-    searchQuery.isSubscriberOnly = false;
-  }
-  
-  if (filters.tags && filters.tags.length > 0) {
-    searchQuery.tags = { $in: filters.tags };
-  }
-  
-  if (filters.author) {
-    searchQuery.author = filters.author;
-  }
-  
-  const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
-    .sort({ score: { $meta: "textScore" } })
+
+  const results = await Blog.find(searchQuery, { score: { $meta: 'textScore' } })
+    .sort({ score: { $meta: 'textScore' } })
     .limit(limit)
     .populate('author', 'name')
     .lean();
-  
+
   return results;
 }
 
+// -----------------------------
+// Helper: prepare result for user
+// (returns preview for subscriber-only if unauthenticated)
+// -----------------------------
+function prepareResultForUser(doc, isAuthenticated) {
+  const base = {
+    _id: doc._id,
+    title: doc.title,
+    summary: doc.summary,
+    slug: doc.slug,
+    author: {
+      _id: doc.author?._id || null,
+      name: doc.author?.name || 'Unknown Author'
+    },
+    tags: doc.tags || [],
+    featuredImage: doc.featuredImage || null,
+    publishedAt: doc.publishedAt || null,
+    reactionCounts: doc.reactionCounts || 0,
+    commentsCount: doc.commentsCount || 0,
+    totalReads: doc.totalReads || 0,
+    isSubscriberOnly: !!doc.isSubscriberOnly
+  };
+
+  // Preview for subscriber-only (unauthenticated)
+  if (doc.isSubscriberOnly && !isAuthenticated) {
+    return {
+      ...base,
+      preview: true
+      // only title, summary, featuredImage, author, date, tags included as requested
+    };
+  }
+
+  // For authenticated users or non-subscriber-only posts, include content preview (but keep secure)
+  return {
+    ...base,
+    preview: false,
+    // include a short content preview always (max 300 chars) to help UX
+    contentPreview: typeof doc.content === 'string' ? (doc.content.substring(0, 300) + (doc.content.length > 300 ? '...' : '')) : ''
+  };
+}
+
+// -----------------------------
+// Suggestions generator (Gemini)
+// -----------------------------
 async function generateSearchSuggestions(originalQuery, topResults) {
   try {
     const resultTitles = topResults.map(r => r.title).join(', ');
     const resultTags = [...new Set(topResults.flatMap(r => r.tags || []))].slice(0, 10).join(', ');
-    
+
     const prompt = `Based on the search query "${originalQuery}" and these related blog titles: "${resultTitles}", and tags: "${resultTags}", suggest 5 related search queries that a user might be interested in.
 
 Requirements:
@@ -2979,57 +2833,272 @@ Requirements:
 - Return ONLY a JSON array of strings, no other text
 
 Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
-    
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text().trim();
-    
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    
     const suggestions = JSON.parse(text);
-    
-    if (Array.isArray(suggestions) && suggestions.length > 0) {
-      return suggestions.slice(0, 5);
-    }
-    
-    return [];
-    
-  } catch (error) {
-    console.error('Error generating search suggestions:', error);
+    return Array.isArray(suggestions) ? suggestions.slice(0, 5) : [];
+  } catch (err) {
+    console.error('Suggestion generation error:', err);
     return [];
   }
 }
 
+// -----------------------------
+// Main search route
+// -----------------------------
+router.post('/api/search', extractAuthFromToken, async (req, res) => {
+  try {
+    const {
+      query,
+      limit = 10,
+      minScore = 0.15, // lower default while tuning
+      includeUnpublished = false,
+      filters = {},
+      hybridSearch = true,
+      generateSuggestions = true,
+      debug = false // optional query flag to return diagnostics
+    } = req.body;
 
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
 
-/**
- * Get relevance level based on similarity score
- */
-function getRelevanceLevel(score) {
-  if (score >= 0.8) return 'very_high';
-  if (score >= 0.6) return 'high';
-  if (score >= 0.4) return 'medium';
-  if (score >= 0.2) return 'low';
-  return 'very_low';
-}
+    const isAuthenticated = !!req.user?.isAuthenticated;
+    const startTime = Date.now();
 
-/**
- * Get search analytics
- * GET /api/search/analytics
- */
+    // 1) Exact title/slug boost (quick check)
+    const normalizedQuery = query.trim();
+    const exactMatch = await Blog.findOne({
+      $or: [
+        { title: normalizedQuery },
+        { slug: normalizedQuery },
+        { titleLower: normalizedQuery.toLowerCase() }, // optional precomputed field
+      ],
+      ...(includeUnpublished ? {} : { status: 'published' })
+    }).populate('author', 'name').lean();
+
+    // 2) Create query embedding
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateQueryEmbedding(query);
+    } catch (embeddingError) {
+      console.error('Query embedding failed, falling back to text search:', embeddingError);
+      // fallback text search route response
+      return await (async () => {
+        const textResults = await performTextSearchInternal(query, limit, includeUnpublished, filters);
+        return res.json({
+          message: 'Text search (fallback) completed',
+          results: textResults.map(r => prepareResultForUser(r, isAuthenticated)),
+          searchMetadata: {
+            query,
+            totalResults: textResults.length,
+            searchType: 'text_fallback'
+          }
+        });
+      })();
+    }
+
+    // 3) Vector candidates (fetch larger candidate pool)
+    const candidateLimit = 200;
+    const vectorAgg = await Blog.aggregate([
+      {
+        $vectorSearch: {
+          index: 'blog_vector_search',
+          path: 'embedding',
+          queryVector: queryEmbedding,
+          numCandidates: candidateLimit,
+          limit: candidateLimit
+        }
+      },
+      // match publish status here to avoid leaking unpublished docs
+      { $match: includeUnpublished ? {} : { status: 'published' } },
+      // minimal projection to get embeddings if stored and fields needed
+      {
+        $project: {
+          title: 1,
+          summary: 1,
+          slug: 1,
+          author: 1,
+          tags: 1,
+          featuredImage: 1,
+          publishedAt: 1,
+          reactionCounts: 1,
+          commentsCount: 1,
+          totalReads: 1,
+          isSubscriberOnly: 1,
+          content: 1,
+          embedding: 1,
+          similarityScore: { $meta: 'vectorSearchScore' }
+        }
+      }
+    ]);
+
+    // 4) Text candidates (parallel)
+    let textCandidates = [];
+    if (hybridSearch) {
+      textCandidates = await performTextSearchInternal(query, candidateLimit, includeUnpublished, filters);
+      // annotate with score
+    }
+
+    // 5) Build id maps and compute exact cosine similarity where possible
+    const idToDoc = new Map();
+
+    // vectorAgg => compute vectorSim using stored embedding if available, fallback to meta score
+    for (const d of vectorAgg) {
+      const id = d._id.toString();
+      let vectorSim = d.similarityScore || 0;
+      if (Array.isArray(d.embedding) && d.embedding.length > 0) {
+        try {
+          vectorSim = cosineSimilarity(queryEmbedding, d.embedding);
+        } catch (e) {
+          // keep meta score as fallback
+        }
+      }
+      idToDoc.set(id, {
+        doc: d,
+        vectorSim,
+        textScore: 0
+      });
+    }
+
+    // textCandidates => attach textScore
+    for (const t of textCandidates) {
+      const id = t._id.toString();
+      if (idToDoc.has(id)) {
+        idToDoc.get(id).textScore = t.score || 0;
+        // ensure we keep the doc fields from vectorAgg if present; else set doc to t
+        if (!idToDoc.get(id).doc) idToDoc.get(id).doc = t;
+      } else {
+        idToDoc.set(id, { doc: t, vectorSim: 0, textScore: t.score || 0 });
+      }
+    }
+
+    // include exact match (boost)
+    if (exactMatch) {
+      const id = exactMatch._id.toString();
+      if (!idToDoc.has(id)) {
+        idToDoc.set(id, { doc: exactMatch, vectorSim: 1.0, textScore: 10 }); // strong boost
+      } else {
+        // boost existing
+        const item = idToDoc.get(id);
+        item.vectorSim = Math.max(item.vectorSim, 0.99);
+        item.textScore = Math.max(item.textScore, 10);
+      }
+    }
+
+    // 6) Convert map to merged array and normalize scores
+    const merged = Array.from(idToDoc.values()).map(item => ({
+      doc: item.doc,
+      vectorSim: (typeof item.vectorSim === 'number' ? item.vectorSim : 0),
+      textScore: (typeof item.textScore === 'number' ? item.textScore : 0)
+    }));
+
+    // get maxima for normalization (avoid zero division)
+    const maxVec = Math.max(...merged.map(m => m.vectorSim), 1e-6);
+    const maxText = Math.max(...merged.map(m => m.textScore), 1e-6);
+
+    // fused score (alpha vector, beta text)
+    const alpha = 0.7;
+    const beta = 0.3;
+
+    merged.forEach(m => {
+      m.vectorNorm = m.vectorSim / maxVec;
+      m.textNorm = m.textScore / maxText;
+      m.fused = alpha * m.vectorNorm + beta * m.textNorm;
+    });
+
+    // 7) Sort by fused score desc and apply minScore as soft threshold
+    merged.sort((a, b) => b.fused - a.fused);
+
+    // filter by fused >= minScore OR include top N to meet limit
+    const finalCandidates = merged.filter(m => m.fused >= minScore);
+    // if not enough, include top items to fill
+    const finalSelection = finalCandidates.length >= limit
+      ? finalCandidates.slice(0, limit)
+      : merged.slice(0, Math.max(limit, finalCandidates.length)).slice(0, limit);
+
+    // 8) Prepare response objects respecting preview rules
+    const results = finalSelection.map(m => {
+      // ensure author populated if possible
+      const doc = m.doc;
+      // if author is an id, try to lazy populate name if present
+      // (we assume .author may be populated by performTextSearchInternal or by aggregation $lookup in other routes)
+      return {
+        ...prepareResultForUser(doc, isAuthenticated),
+        similarityScore: m.vectorSim,
+        textScore: m.textScore,
+        fusedScore: m.fused,
+        relevanceLevel: getRelevanceLevel(m.fused)
+      };
+    });
+
+    // 9) Suggestions (optional)
+    let suggestions = [];
+    if (generateSuggestions && results.length > 0) {
+      try {
+        suggestions = await generateSearchSuggestions(query, results.slice(0, 5));
+      } catch (err) {
+        console.error('Suggestions error:', err);
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+
+    // 10) Optional debug info
+    const debugInfo = debug ? {
+      candidateCount: merged.length,
+      topCandidates: merged.slice(0, 10).map(m => ({
+        id: m.doc._id,
+        title: m.doc.title,
+        vectorSim: m.vectorSim,
+        textScore: m.textScore,
+        fused: m.fused
+      }))
+    } : undefined;
+
+    res.json({
+      message: 'Search completed successfully',
+      results,
+      suggestions,
+      searchMetadata: {
+        query,
+        totalResults: results.length,
+        processingTime: `${processingTime}ms`,
+        searchType: 'hybrid_fused',
+        hybridSearchUsed: hybridSearch,
+        averageFused: results.length > 0 ? (results.reduce((s, r) => s + (r.fusedScore || r.fused || 0), 0) / results.length).toFixed(3) : 0
+      },
+      debug: debugInfo
+    });
+
+  } catch (error) {
+    console.error('Search route error:', error);
+    res.status(500).json({
+      message: 'Search failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// -----------------------------
+// Analytics route (keeps previous behavior)
+// -----------------------------
 router.get('/api/search/analytics', async (req, res) => {
   try {
     const totalBlogs = await Blog.countDocuments({ status: 'published' });
-    const blogsWithEmbeddings = await Blog.countDocuments({ 
+    const blogsWithEmbeddings = await Blog.countDocuments({
       status: 'published',
       embedding: { $exists: true, $ne: null }
     });
-    
-    const embeddingCoverage = totalBlogs > 0 
+
+    const embeddingCoverage = totalBlogs > 0
       ? ((blogsWithEmbeddings / totalBlogs) * 100).toFixed(2)
-      : 0;
-    
+      : '0';
+
     res.json({
       totalBlogs,
       blogsWithEmbeddings,
@@ -3037,18 +3106,11 @@ router.get('/api/search/analytics', async (req, res) => {
       embeddingCoverage: `${embeddingCoverage}%`,
       vectorSearchReady: blogsWithEmbeddings > 0
     });
-    
-  } catch (error) {
-    console.error('Error fetching search analytics:', error);
+  } catch (err) {
+    console.error('Analytics error:', err);
     res.status(500).json({ message: 'Failed to fetch analytics' });
   }
 });
-
-
-
-
-
-
 
 
 module.exports = router;
