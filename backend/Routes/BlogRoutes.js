@@ -255,106 +255,75 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     }
   });
   
-  // Get all blog posts (with pagination and filtering)
-router.get(
-  "/api/blogs",
-  cachemiddleware,
-  async (req, res) => {
-    try {
-      const { 
-        page = 1, 
-        limit = 10, 
-        status, 
-        tag,
-        search,
-        sortBy = "createdAt",
-        sortOrder = "desc"
-      } = req.query;
-
-      const filter = {};
-
-      if (status) {
-        filter.status = status;
+// ============================================
+// FIXED: Extract both admin and user from JWT tokens
+// ============================================
+const extractAuthFromToken = async (req, res, next) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      
+      console.log('🔍 Token decoded:', decoded); // Temporary debug log
+      
+      // Check if it's ADMIN auth (has admin_id)
+      if (decoded.admin_id) {
+        req.user = {
+          admin_id: decoded.admin_id,
+          isAuthenticated: true,
+          type: 'admin'
+        };
+        console.log('✅ Admin authenticated:', decoded.admin_id);
+        next();
+      } 
+      // Check if it's USER auth (has user_id - WITH UNDERSCORE)
+      else if (decoded.user_id) {  // ✅ FIXED: user_id not userId
+        try {
+          const user = await User.findById(decoded.user_id);
+          
+          if (user) {
+            req.user = {
+              user_id: user._id,
+              userId: user._id,  // Add both for compatibility
+              email: user.email,
+              name: user.name,
+              isAuthenticated: true,
+              type: 'user'
+            };
+            console.log('✅ User authenticated:', user.name, user.email);
+          } else {
+            console.log('❌ User not found in database');
+            req.user = { isAuthenticated: false };
+          }
+          next();
+        } catch (dbError) {
+          console.error('❌ Database error fetching user:', dbError);
+          req.user = { isAuthenticated: false };
+          next();
+        }
       } else {
-        const isAuthenticated = req.user?.admin_id;
-        if (!isAuthenticated) {
-          // Public user - exclude subscriber-only blogs, only show public blogs
-          filter.status = "published";
-          filter.isSubscriberOnly = false;
-        }
+        console.log('❌ No valid user_id or admin_id in token');
+        req.user = { isAuthenticated: false };
+        next();
       }
-
-      if (tag) filter.tags = tag;
-
-      if (search) {
-        filter.$or = [
-          { title: { $regex: search, $options: "i" } },
-          { content: { $regex: search, $options: "i" } },
-          { summary: { $regex: search, $options: "i" } }
-        ];
-      }
-
-      const sort = {};
-      sort[sortBy] = sortOrder === "asc" ? 1 : -1;
-
-      const skip = (parseInt(page) - 1) * parseInt(limit);
-
-      const blogs = await Blog.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit))
-        .populate("author", "name email")
-        .exec();
-
-      // Transform blogs based on subscriber-only status
-      const processedBlogs = blogs.map(blog => {
-        const blogObj = blog.toObject();
-        
-        // If subscriber-only and user is not authenticated, return only preview
-        if (blog.isSubscriberOnly && !req.user?.admin_id) {
-          return {
-            _id: blog._id,
-            title: blog.title,
-            summary: blog.summary,
-            featuredImage: blog.featuredImage,
-            author: blog.author,
-            publishedAt: blog.publishedAt,
-            isSubscriberOnly: true,
-            preview: true
-          };
-        }
-        
-        // Full content for public blogs or authenticated users
-        blogObj.processedContent = processContent(
-          blogObj.content,
-          blogObj.contentImages,
-          blogObj.contentVideos
-        );
-        return blogObj;
-      });
-
-      const total = await Blog.countDocuments(filter);
-
-      res.json({
-        blogs: processedBlogs,
-        pagination: {
-          total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / parseInt(limit))
-        }
-      });
-    } catch (error) {
-      console.error("Error fetching blogs:", error);
-      res.status(500).json({ message: error.message });
+    } else {
+      console.log('❌ No token provided');
+      req.user = { isAuthenticated: false };
+      next();
     }
+  } catch (error) {
+    console.log('❌ Token verification failed:', error.message);
+    req.user = { isAuthenticated: false };
+    next();
   }
-);
-  
-// UPDATED: Get a single blog post (with read tracking)
+};
+// ============================================
+// UPDATED: Get a single blog post
+// ============================================
 router.get(
   '/api/blogs/:identifier',
-  cachemiddleware,
+  extractAuthFromToken, // Use combined auth middleware
   async (req, res) => {
     try {
       const { identifier } = req.params;
@@ -364,11 +333,17 @@ router.get(
         ? { _id: identifier }
         : { slug: identifier };
       
-      const isAuthenticated = req.user?.admin_id;
+      // ✅ Check both admin and user authentication
+      const isAuthenticated = req.user?.isAuthenticated;
+      
+      console.log('Auth check:', {
+        isAuthenticated,
+        authType: req.user?.type,
+        identifier
+      });
+      
       if (!isAuthenticated) {
         query.status = 'published';
-        // Public users cannot access subscriber-only blogs
-        query.isSubscriberOnly = false;
       }
       
       let blog = await Blog.findOne(query)
@@ -379,8 +354,15 @@ router.get(
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // If subscriber-only blog and not authenticated, return preview only
+      console.log('Blog found:', {
+        id: blog._id,
+        isSubscriberOnly: blog.isSubscriberOnly,
+        isAuthenticated
+      });
+      
+      // If subscriber-only blog and NOT authenticated, return preview only
       if (blog.isSubscriberOnly && !isAuthenticated) {
+        console.log('✅ Returning subscriber-only preview (not authenticated)');
         return res.json({
           _id: blog._id,
           title: blog.title,
@@ -388,15 +370,19 @@ router.get(
           featuredImage: blog.featuredImage,
           author: blog.author,
           publishedAt: blog.publishedAt,
+          tags: blog.tags || [],
           isSubscriberOnly: true,
           preview: true,
           message: 'This is subscriber-only content. Please login to access full article.'
         });
       }
       
-      // Track reads for public blogs or authenticated users accessing subscriber content
+      // ✅ FULL CONTENT for:
+      // 1. Public blogs (isSubscriberOnly = false)
+      // 2. Subscriber-only blogs when user/admin IS authenticated
+      console.log('✅ Returning full blog content (public or authenticated)');
+      
       const fingerprint = getFingerprintFromRequest(req);
-      console.log('Generated fingerprint:', fingerprint);
       
       if (!blog.readFingerprints) {
         blog.readFingerprints = [];
@@ -409,19 +395,16 @@ router.get(
       if (existingFingerprintIndex !== -1) {
         blog.readFingerprints[existingFingerprintIndex].readCount += 1;
         blog.readFingerprints[existingFingerprintIndex].readAt = new Date();
-        console.log('Incremented existing fingerprint');
       } else {
         blog.readFingerprints.push({
           fingerprint,
           readAt: new Date(),
           readCount: 1
         });
-        console.log('Added new fingerprint');
       }
       
       blog.totalReads += 1;
       await blog.save();
-      console.log('Blog saved with readFingerprints');
       
       const blogObj = blog.toObject();
       
@@ -437,8 +420,6 @@ router.get(
       delete blogObj.reports;
       delete blogObj.readFingerprints;
       
-      console.log('Response:', { totalReads: blogObj.totalReads, uniqueReaders });
-      
       res.json(blogObj);
     } catch (error) {
       console.error('Error fetching blog:', error);
@@ -447,6 +428,337 @@ router.get(
   }
 );
 
+// ============================================
+// FIXED: Get all blog posts - Tags now included for subscriber-only previews
+// ============================================
+// ============================================
+// COMPLETELY FIXED: Get all blog posts with tags working
+// ============================================
+router.get(
+  "/api/blogs",
+  extractAuthFromToken,
+  async (req, res) => {
+    try {
+      const { 
+        page = 1, 
+        limit = 10, 
+        status, 
+        tag,
+        search,
+        sortBy = "createdAt",
+        sortOrder = "desc"
+      } = req.query;
+
+      const filter = {};
+
+      // STATUS FILTER
+      if (status) {
+        filter.status = status;
+      } else {
+        filter.status = "published";
+      }
+
+      // TAG FILTER
+      if (tag) {
+        filter.tags = { $in: [tag] };
+      }
+
+      // SEARCH FILTER
+      if (search) {
+        filter.$or = [
+          { title: { $regex: search, $options: "i" } },
+          { content: { $regex: search, $options: "i" } },
+          { summary: { $regex: search, $options: "i" } }
+        ];
+      }
+
+      const sort = {};
+      sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      // ✅ EXPLICIT SELECT to ensure tags are included
+      const blogs = await Blog.find(filter)
+        .select('+tags') // Explicitly include tags
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate("author", "name email")
+        .lean() // Use lean() for better performance
+        .exec();
+
+      const isAuthenticated = req.user?.isAuthenticated;
+
+      console.log('📊 Query Results:', {
+        totalBlogs: blogs.length,
+        isAuthenticated,
+        firstBlogHasTags: blogs.length > 0 ? !!blogs[0].tags : 'no blogs',
+        firstBlogTags: blogs.length > 0 ? blogs[0].tags : 'no blogs'
+      });
+
+      const processedBlogs = blogs.map(blog => {
+        const isSubscriberOnly = blog.isSubscriberOnly || false;
+
+        // ✅ PREVIEW CASE - Subscriber-only without auth
+        if (isSubscriberOnly && !isAuthenticated) {
+          const previewBlog = {
+            _id: blog._id,
+            title: blog.title,
+            summary: blog.summary,
+            featuredImage: blog.featuredImage,
+            author: blog.author,
+            publishedAt: blog.publishedAt,
+            tags: blog.tags || [], // ✅ Tags explicitly included
+            isSubscriberOnly: true,
+            preview: true
+          };
+          
+          console.log('🔒 Preview blog:', {
+            id: previewBlog._id,
+            title: previewBlog.title,
+            tags: previewBlog.tags
+          });
+          
+          return previewBlog;
+        }
+
+        // ✅ FULL CASE - Public or authenticated user
+        const fullBlog = {
+          ...blog,
+          processedContent: processContent(
+            blog.content,
+            blog.contentImages || [],
+            blog.contentVideos || []
+          ),
+          tags: blog.tags || [] // Ensure tags always exist
+        };
+
+        console.log('🔓 Full blog:', {
+          id: fullBlog._id,
+          title: fullBlog.title,
+          tags: fullBlog.tags
+        });
+
+        return fullBlog;
+      });
+
+      const total = await Blog.countDocuments(filter);
+
+      console.log('✅ Final response:', {
+        totalProcessed: processedBlogs.length,
+        sampleBlogHasTags: processedBlogs.length > 0 ? !!processedBlogs[0].tags : 'no blogs'
+      });
+
+      res.json({
+        blogs: processedBlogs,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error fetching blogs:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+
+// ============================================
+// UPDATED: Search route with both auth types
+// ============================================
+router.post('/api/search', extractAuthFromToken, async (req, res) => {
+  try {
+    const { 
+      query, 
+      limit = 10, 
+      minScore = 0.3,
+      includeUnpublished = false,
+      filters = {},
+      hybridSearch = true,
+      generateSuggestions = true
+    } = req.body;
+    
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ 
+        message: 'Search query is required' 
+      });
+    }
+    
+    // ✅ Check both admin and user authentication
+    const isAuthenticated = req.user?.isAuthenticated;
+    console.log(`Processing semantic search for query: "${query}", isAuthenticated: ${isAuthenticated}`);
+    
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateQueryEmbedding(query);
+    } catch (embeddingError) {
+      console.error('Embedding generation failed, falling back to text search:', embeddingError);
+      return await performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res);
+    }
+    
+    const baseQuery = {
+      embedding: { $exists: true, $ne: null },
+      status: includeUnpublished ? {} : 'published'
+    };
+    
+    // Public users cannot see subscriber-only blogs in search
+    if (!isAuthenticated) {
+      baseQuery.isSubscriberOnly = false;
+    }
+    
+    if (filters.tags && filters.tags.length > 0) {
+      baseQuery.tags = { $in: filters.tags };
+    }
+    
+    if (filters.author) {
+      baseQuery.author = filters.author;
+    }
+    
+    if (filters.dateFrom || filters.dateTo) {
+      baseQuery.publishedAt = {};
+      if (filters.dateFrom) baseQuery.publishedAt.$gte = new Date(filters.dateFrom);
+      if (filters.dateTo) baseQuery.publishedAt.$lte = new Date(filters.dateTo);
+    }
+    
+    const startTime = Date.now();
+    
+    // Build vector search match query
+    const vectorMatchQuery = {
+      status: includeUnpublished ? { $exists: true } : 'published'
+    };
+    
+    if (!isAuthenticated) {
+      vectorMatchQuery.isSubscriberOnly = false;
+    }
+    
+    let vectorResults = await Blog.aggregate([
+      {
+        $vectorSearch: {
+          index: "blog_vector_search",
+          path: "embedding",
+          queryVector: queryEmbedding,
+          numCandidates: 50,
+          limit: limit
+        }
+      },
+      {
+        $match: vectorMatchQuery
+      },
+      {
+        $lookup: {
+          from: "admins",
+          localField: "author",
+          foreignField: "_id",
+          as: "author"
+        }
+      },
+      {
+        $unwind: {
+          path: "$author",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          title: 1,
+          summary: 1,
+          content: 1,
+          slug: 1,
+          isSubscriberOnly: 1,
+          "author.name": 1,
+          "author._id": 1,
+          tags: 1,
+          featuredImage: 1,
+          publishedAt: 1,
+          reactionCounts: 1,
+          commentsCount: 1,
+          totalReads: 1,
+          similarityScore: { $meta: "vectorSearchScore" }
+        }
+      }
+    ]);
+
+    vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
+
+    let results = vectorResults;
+
+    if (hybridSearch && results.length < limit) {
+      const textResults = await performTextSearchInternal(
+        query, 
+        limit - results.length, 
+        includeUnpublished, 
+        filters,
+        isAuthenticated
+      );
+      
+      const resultIds = new Set(results.map(r => r._id.toString()));
+      const uniqueTextResults = textResults.filter(
+        r => !resultIds.has(r._id.toString())
+      );
+      
+      results = [...results, ...uniqueTextResults];
+    }
+    
+    const processingTime = Date.now() - startTime;
+    
+    let suggestions = [];
+    if (generateSuggestions && results.length > 0) {
+      try {
+        suggestions = await generateSearchSuggestions(query, results.slice(0, 5));
+      } catch (suggestionError) {
+        console.error('Failed to generate suggestions:', suggestionError);
+      }
+    }
+    
+    res.json({
+      message: 'Search completed successfully',
+      results: results.map(blog => {
+        return {
+          _id: blog._id,
+          title: blog.title,
+          summary: blog.summary,
+          content: blog.content ? blog.content.substring(0, 300) + '...' : '',
+          slug: blog.slug,
+          author: {
+            _id: blog.author?._id,
+            name: blog.author?.name || 'Unknown Author'
+          },
+          tags: blog.tags || [],
+          featuredImage: blog.featuredImage,
+          publishedAt: blog.publishedAt,
+          reactionCounts: blog.reactionCounts,
+          commentsCount: blog.commentsCount,
+          totalReads: blog.totalReads,
+          isSubscriberOnly: blog.isSubscriberOnly || false,
+          similarityScore: blog.similarityScore || 0,
+          relevanceLevel: getRelevanceLevel(blog.similarityScore)
+        };
+      }),
+      suggestions,
+      searchMetadata: {
+        query,
+        totalResults: results.length,
+        processingTime: `${processingTime}ms`,
+        searchType: 'semantic_vector',
+        hybridSearchUsed: hybridSearch,
+        averageSimilarity: results.length > 0 
+          ? (results.reduce((sum, r) => sum + (r.similarityScore || 0), 0) / results.length).toFixed(3)
+          : 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in semantic search:', error);
+    res.status(500).json({ 
+      message: 'Search failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
 // NEW: Report a blog post (Public route)
 router.post('/api/blogs/:identifier/report', async (req, res) => {
@@ -2606,236 +2918,42 @@ router.post(
       }
     }
   );
- router.post('/api/search', async (req, res) => {
-  try {
-    const { 
-      query, 
-      limit = 10, 
-      minScore = 0.3,
-      includeUnpublished = false,
-      filters = {},
-      hybridSearch = true,
-      generateSuggestions = true
-    } = req.body;
-    
-    if (!query || query.trim().length === 0) {
-      return res.status(400).json({ 
-        message: 'Search query is required' 
-      });
-    }
-    
-    const isAuthenticated = req.user?.admin_id;
-    console.log(`Processing semantic search for query: "${query}"`);
-    
-    let queryEmbedding;
-    try {
-      queryEmbedding = await generateQueryEmbedding(query);
-    } catch (embeddingError) {
-      console.error('Embedding generation failed, falling back to text search:', embeddingError);
-      return await performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res);
-    }
-    
-    const baseQuery = {
-      embedding: { $exists: true, $ne: null }
-    };
-    
-    if (!includeUnpublished) {
-      baseQuery.status = 'published';
-    }
-    
-    // Public users cannot see subscriber-only blogs in search
-    if (!isAuthenticated) {
-      baseQuery.isSubscriberOnly = false;
-    }
-    
-    if (filters.tags && filters.tags.length > 0) {
-      baseQuery.tags = { $in: filters.tags };
-    }
-    
-    if (filters.author) {
-      baseQuery.author = filters.author;
-    }
-    
-    if (filters.dateFrom || filters.dateTo) {
-      baseQuery.publishedAt = {};
-      if (filters.dateFrom) baseQuery.publishedAt.$gte = new Date(filters.dateFrom);
-      if (filters.dateTo) baseQuery.publishedAt.$lte = new Date(filters.dateTo);
-    }
-    
-    const blogs = await Blog.find(baseQuery)
-      .select('+embedding')
-      .populate('author', 'name email')
-      .lean()
-      .limit(limit * 3);
-    
-    if (blogs.length === 0) {
-      return res.json({
-        message: 'No blogs found with embeddings',
-        results: [],
-        searchMetadata: {
-          query,
-          totalResults: 0,
-          processingTime: 0
-        }
-      });
-    }
-    
-    const startTime = Date.now();
-    
-    let vectorResults = await Blog.aggregate([
-      {
-        $vectorSearch: {
-          index: "blog_vector_search",
-          path: "embedding",
-          queryVector: queryEmbedding,
-          numCandidates: 50,
-          limit: limit
-        }
-      },
-      {
-        $match: {
-          status: includeUnpublished ? {} : "published",
-          // Public users can't see subscriber-only blogs
-          ...(isAuthenticated ? {} : { isSubscriberOnly: false })
-        }
-      },
-      {
-        $lookup: {
-          from: "admins",
-          localField: "author",
-          foreignField: "_id",
-          as: "author"
-        }
-      },
-      {
-        $unwind: {
-          path: "$author",
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $project: {
-          title: 1,
-          summary: 1,
-          content: 1,
-          slug: 1,
-          isSubscriberOnly: 1,
-          "author.name": 1,
-          "author._id": 1,
-          tags: 1,
-          featuredImage: 1,
-          publishedAt: 1,
-          reactionCounts: 1,
-          commentsCount: 1,
-          totalReads: 1,
-          similarityScore: { $meta: "vectorSearchScore" }
-        }
-      }
-    ]);
 
-    vectorResults = vectorResults.filter(r => r.similarityScore >= minScore);
 
-    let results = vectorResults;
-
-    if (hybridSearch && results.length < limit) {
-      const textResults = await performTextSearchInternal(
-        query, 
-        limit - results.length, 
-        includeUnpublished, 
-        filters,
-        isAuthenticated
-      );
-      
-      const resultIds = new Set(results.map(r => r._id.toString()));
-      const uniqueTextResults = textResults.filter(
-        r => !resultIds.has(r._id.toString())
-      );
-      
-      results = [...results, ...uniqueTextResults];
-    }
-    
-    const processingTime = Date.now() - startTime;
-    
-    let suggestions = [];
-    if (generateSuggestions && results.length > 0) {
-      try {
-        suggestions = await generateSearchSuggestions(query, results.slice(0, 5));
-      } catch (suggestionError) {
-        console.error('Failed to generate suggestions:', suggestionError);
-      }
-    }
-    
-    res.json({
-      message: 'Search completed successfully',
-      results: results.map(blog => {
-        // If subscriber-only and not authenticated, return preview
-        if (blog.isSubscriberOnly && !isAuthenticated) {
-          return {
-            _id: blog._id,
-            title: blog.title,
-            summary: blog.summary,
-            slug: blog.slug,
-            author: {
-              _id: blog.author?._id,
-              name: blog.author?.name || 'Unknown Author'
-            },
-            tags: blog.tags,
-            featuredImage: blog.featuredImage,
-            publishedAt: blog.publishedAt,
-            isSubscriberOnly: true,
-            preview: true,
-            similarityScore: blog.similarityScore
-          };
-        }
-        
-        // Full content for public blogs or authenticated users
-        return {
-          _id: blog._id,
-          title: blog.title,
-          summary: blog.summary,
-          content: blog.content.substring(0, 300) + '...',
-          slug: blog.slug,
-          author: {
-            _id: blog.author?._id,
-            name: blog.author?.name || 'Unknown Author'
-          },
-          tags: blog.tags,
-          featuredImage: blog.featuredImage,
-          publishedAt: blog.publishedAt,
-          reactionCounts: blog.reactionCounts,
-          commentsCount: blog.commentsCount,
-          totalReads: blog.totalReads,
-          isSubscriberOnly: blog.isSubscriberOnly,
-          similarityScore: blog.similarityScore,
-          relevanceLevel: getRelevanceLevel(blog.similarityScore)
-        };
-      }),
-      suggestions,
-      searchMetadata: {
-        query,
-        totalResults: results.length,
-        processingTime: `${processingTime}ms`,
-        searchType: 'semantic_vector',
-        hybridSearchUsed: hybridSearch,
-        averageSimilarity: results.length > 0 
-          ? (results.reduce((sum, r) => sum + r.similarityScore, 0) / results.length).toFixed(3)
-          : 0
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error in semantic search:', error);
-    res.status(500).json({ 
-      message: 'Search failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+// ============================================
+// Helper function with proper auth check
+// ============================================
+async function performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated) {
+  const searchQuery = {
+    $text: { $search: query }
+  };
+  
+  if (!includeUnpublished) {
+    searchQuery.status = 'published';
   }
-});
+  
+  // ✅ FIX: Only exclude subscriber-only for non-authenticated users
+  if (!isAuthenticated) {
+    searchQuery.isSubscriberOnly = false;
+  }
+  
+  if (filters.tags && filters.tags.length > 0) {
+    searchQuery.tags = { $in: filters.tags };
+  }
+  
+  if (filters.author) {
+    searchQuery.author = filters.author;
+  }
+  
+  const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
+    .sort({ score: { $meta: "textScore" } })
+    .limit(limit)
+    .populate('author', 'name')
+    .lean();
+  
+  return results;
+}
 
-
-/**
- * Generate related search suggestions using Gemini
- */
 async function generateSearchSuggestions(originalQuery, topResults) {
   try {
     const resultTitles = topResults.map(r => r.title).join(', ');
@@ -2872,96 +2990,7 @@ Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
   }
 }
 
-async function performTextSearch(query, limit, includeUnpublished, filters, isAuthenticated, res) {
-  try {
-    const results = await performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated);
-    
-    res.json({
-      message: 'Text search completed (vector search unavailable)',
-      results: results.map(blog => {
-        // If subscriber-only and not authenticated, return preview
-        if (blog.isSubscriberOnly && !isAuthenticated) {
-          return {
-            _id: blog._id,
-            title: blog.title,
-            summary: blog.summary,
-            slug: blog.slug,
-            author: {
-              _id: blog.author?._id,
-              name: blog.author?.name || 'Unknown Author'
-            },
-            tags: blog.tags,
-            featuredImage: blog.featuredImage,
-            publishedAt: blog.publishedAt,
-            isSubscriberOnly: true,
-            preview: true
-          };
-        }
-        
-        // Full content
-        return {
-          _id: blog._id,
-          title: blog.title,
-          summary: blog.summary,
-          content: blog.content?.substring(0, 300) + '...',
-          slug: blog.slug,
-          author: {
-            _id: blog.author?._id,
-            name: blog.author?.name || 'Unknown Author'
-          },
-          tags: blog.tags,
-          featuredImage: blog.featuredImage,
-          publishedAt: blog.publishedAt,
-          reactionCounts: blog.reactionCounts,
-          commentsCount: blog.commentsCount,
-          totalReads: blog.totalReads,
-          isSubscriberOnly: blog.isSubscriberOnly
-        };
-      }),
-      searchMetadata: {
-        query,
-        totalResults: results.length,
-        searchType: 'text_fallback'
-      }
-    });
-  } catch (error) {
-    throw error;
-  }
-}
 
-/**
- * Internal text search helper with subscriber-only handling
- */
-async function performTextSearchInternal(query, limit, includeUnpublished, filters, isAuthenticated) {
-  const searchQuery = {
-    $text: { $search: query }
-  };
-  
-  if (!includeUnpublished) {
-    searchQuery.status = 'published';
-  }
-  
-  // Public users cannot search subscriber-only blogs
-  if (!isAuthenticated) {
-    searchQuery.isSubscriberOnly = false;
-  }
-  
-  if (filters.tags && filters.tags.length > 0) {
-    searchQuery.tags = { $in: filters.tags };
-  }
-  
-  if (filters.author) {
-    searchQuery.author = filters.author;
-  }
-  
-  const results = await Blog.find(searchQuery, { score: { $meta: "textScore" } })
-    .sort({ score: { $meta: "textScore" } })
-    .limit(limit)
-    .populate('author', 'name')
-    .lean();
-  
-  return results;
-}
 
 /**
  * Get relevance level based on similarity score
