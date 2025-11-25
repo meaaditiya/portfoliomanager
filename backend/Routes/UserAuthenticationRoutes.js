@@ -6,6 +6,7 @@ const passport = require('passport');
 const User = require("../models/userSchema");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
+const getReplyEmailTemplate = require("../EmailTemplates/getReplyEmailTemplate");
 
 router.post('/user/register', async (req, res) => {
   try {
@@ -36,16 +37,22 @@ router.post('/user/register', async (req, res) => {
 
     const verificationLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
 
-    const verificationEmail = `
-      <h1>Verify Your Email</h1>
-      <p>Hello ${user.name},</p>
-      <p>Thank you for registering. Please verify your email by clicking the link below:</p>
-      <a href="${verificationLink}">Verify Your Email</a>
+    const verificationMessage = `Thank you for registering! Please verify your email by clicking the link below to activate your account.`;
+    
+    const verificationResponse = `
+      <p>Click the link below to verify your email:</p>
+      <a href="${verificationLink}" style="display: inline-block; padding: 12px 24px; background-color: #2c2c2c; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0;">Verify Your Email</a>
       <p>This link will expire in 24 hours.</p>
       <p>If you didn't create this account, please ignore this email.</p>
     `;
 
-    await sendEmail(email, 'Verify Your Email - Portfolio', verificationEmail);
+    const emailHtml = getReplyEmailTemplate(
+      user.name,
+      verificationMessage,
+      verificationResponse
+    );
+
+    await sendEmail(email, 'Verify Your Email - Portfolio', emailHtml);
 
     res.status(201).json({
       message: 'Registration successful. Please check your email to verify your account.',
@@ -152,16 +159,22 @@ router.post('/user/forgot-password', async (req, res) => {
 
     const resetLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
-    const resetEmail = `
-      <h1>Password Reset Request</h1>
-      <p>Hello ${user.name},</p>
+    const resetMessage = `You have requested to reset your password. Please follow the instructions below to create a new password for your account.`;
+    
+    const resetResponse = `
       <p>Click the link below to reset your password:</p>
-      <a href="${resetLink}">Reset Password</a>
+      <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #2c2c2c; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0;">Reset Password</a>
       <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request this, please ignore this email.</p>
+      <p><strong>Important:</strong> If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
     `;
 
-    await sendEmail(email, 'Password Reset - Portfolio', resetEmail);
+    const emailHtml = getReplyEmailTemplate(
+      user.name,
+      resetMessage,
+      resetResponse
+    );
+
+    await sendEmail(email, 'Password Reset - Portfolio', emailHtml);
 
     res.json({
       message: 'Password reset instructions sent to your email',
@@ -189,6 +202,27 @@ router.post('/user/reset-password', async (req, res) => {
     user.password = hashedPassword;
     await user.save();
 
+    // Send confirmation email
+    const confirmationMessage = `Your password has been successfully reset. You can now login with your new password.`;
+    const confirmationResponse = `
+      <p>Your password was changed successfully at ${new Date().toLocaleString()}.</p>
+      <p>If you did not make this change, please contact us immediately.</p>
+      <p>For security reasons, we recommend that you:</p>
+      <ul style="text-align: left; margin: 15px 0; padding-left: 20px;">
+        <li>Use a strong, unique password</li>
+        <li>Enable two-factor authentication if available</li>
+        <li>Keep your login credentials secure</li>
+      </ul>
+    `;
+
+    const emailHtml = getReplyEmailTemplate(
+      user.name,
+      confirmationMessage,
+      confirmationResponse
+    );
+
+    await sendEmail(user.email, 'Password Reset Successful - Portfolio', emailHtml);
+
     res.json({ message: 'Password reset successful. You can now login with your new password.' });
   } catch (error) {
     res.status(400).json({ message: 'Invalid or expired reset link' });
@@ -210,7 +244,7 @@ router.get('/user/profile', UserAuthMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Route: GET /api/auth/verify
+
 router.get('/verify', async (req, res) => {
   try {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
@@ -223,8 +257,6 @@ router.get('/verify', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    
-    // ✅ FIX: Use decoded.user_id instead of decoded.userId
     const user = await User.findById(decoded.user_id).select('-password');
     
     if (!user) {
@@ -252,6 +284,7 @@ router.get('/verify', async (req, res) => {
     });
   }
 });
+
 router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
   try {
     const { name } = req.body;
@@ -265,8 +298,25 @@ router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const oldName = user.name;
     user.name = name.trim();
     await user.save();
+
+    // Send confirmation email
+    const updateMessage = `Your profile name has been successfully updated from "${oldName}" to "${name.trim()}".`;
+    const updateResponse = `
+      <p>Your profile information was updated at ${new Date().toLocaleString()}.</p>
+      <p><strong>New Name:</strong> ${name.trim()}</p>
+      <p>If you did not make this change, please contact us immediately to secure your account.</p>
+    `;
+
+    const emailHtml = getReplyEmailTemplate(
+      user.name,
+      updateMessage,
+      updateResponse
+    );
+
+    await sendEmail(user.email, 'Profile Updated - Portfolio', emailHtml);
 
     res.json({ 
       message: 'Name updated successfully',
@@ -282,13 +332,13 @@ router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 router.get('/google',
   passport.authenticate('google', { 
     scope: ['profile', 'email'] 
   })
 );
 
-// Google OAuth callback route
 router.get('/google/callback',
   passport.authenticate('google', { 
     failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=google_auth_failed`,
@@ -296,14 +346,12 @@ router.get('/google/callback',
   }),
   async (req, res) => {
     try {
-      // ADD: Update user with profile picture if it exists
       if (req.user.profilePicture) {
         await User.findByIdAndUpdate(req.user._id, {
           profilePicture: req.user.profilePicture
         });
       }
 
-      // Generate JWT token for the authenticated user
       const token = jwt.sign(
         {
           user_id: req.user._id,
@@ -314,7 +362,6 @@ router.get('/google/callback',
         { expiresIn: '24h' }
       );
 
-      // Set cookie
       const isProduction = process.env.NODE_ENV === 'production';
       res.cookie('token', token, {
         httpOnly: true,
@@ -324,7 +371,22 @@ router.get('/google/callback',
         path: '/'
       });
 
-      // Redirect to frontend with token
+      // Send welcome email for Google login
+      const welcomeMessage = `You have successfully signed in using your Google account.`;
+      const welcomeResponse = `
+        <p>Welcome to your portfolio dashboard! You've successfully authenticated using Google OAuth.</p>
+        <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
+        <p>If this wasn't you, please secure your Google account immediately.</p>
+      `;
+
+      const emailHtml = getReplyEmailTemplate(
+        req.user.name,
+        welcomeMessage,
+        welcomeResponse
+      );
+
+      await sendEmail(req.user.email, 'Google Login Successful - Portfolio', emailHtml);
+
       res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&google_login=success`);
     } catch (error) {
       console.error('Google callback error:', error);
@@ -332,4 +394,5 @@ router.get('/google/callback',
     }
   }
 );
+
 module.exports = router;
