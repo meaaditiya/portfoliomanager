@@ -1,3 +1,4 @@
+const  extractPlainText  = require("./extractPlainText");
 function calculateReadTime(content) {
   const plainText = extractPlainText(content);
   const wordCount = plainText.trim().split(/\s+/).length;
