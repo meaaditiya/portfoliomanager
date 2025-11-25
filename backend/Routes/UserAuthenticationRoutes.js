@@ -371,22 +371,6 @@ router.get('/google/callback',
         path: '/'
       });
 
-      // Send welcome email for Google login
-      const welcomeMessage = `You have successfully signed in using your Google account.`;
-      const welcomeResponse = `
-        <p>Welcome to your portfolio dashboard! You've successfully authenticated using Google OAuth.</p>
-        <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
-        <p>If this wasn't you, please secure your Google account immediately.</p>
-      `;
-
-      const emailHtml = getReplyEmailTemplate2(
-        req.user.name,
-        welcomeMessage,
-        welcomeResponse
-      );
-
-      await sendEmail(req.user.email, 'Google Login Successful - Portfolio', emailHtml);
-
       res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&google_login=success`);
     } catch (error) {
       console.error('Google callback error:', error);
