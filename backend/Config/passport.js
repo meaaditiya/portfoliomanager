@@ -24,26 +24,25 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        // Check if user already exists
         let user = await User.findOne({ email: profile.emails[0].value });
 
         if (user) {
-          // User exists - link Google ID if not already linked
           if (!user.googleId) {
             user.googleId = profile.id;
-            user.isVerified = true; // Google accounts are pre-verified
-            await user.save();
+            user.isVerified = true;
           }
+          user.profilePicture = profile.photos[0]?.value || null;
+          await user.save();
           return done(null, user);
         }
 
-        // Create new user
         user = new User({
           googleId: profile.id,
           name: profile.displayName,
           email: profile.emails[0].value,
-          password: Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8), // Random password
-          isVerified: true // Google accounts are pre-verified
+          password: Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8),
+          isVerified: true,
+          profilePicture: profile.photos[0]?.value || null
         });
 
         await user.save();

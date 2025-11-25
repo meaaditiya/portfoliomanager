@@ -23,6 +23,11 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String,
       default: null
+    },
+    // ADD THIS FIELD
+    profilePicture: {
+      type: String,
+      default: null
     }
   },
   { timestamps: true }

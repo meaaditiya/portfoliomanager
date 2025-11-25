@@ -296,6 +296,13 @@ router.get('/google/callback',
   }),
   async (req, res) => {
     try {
+      // ADD: Update user with profile picture if it exists
+      if (req.user.profilePicture) {
+        await User.findByIdAndUpdate(req.user._id, {
+          profilePicture: req.user.profilePicture
+        });
+      }
+
       // Generate JWT token for the authenticated user
       const token = jwt.sign(
         {
