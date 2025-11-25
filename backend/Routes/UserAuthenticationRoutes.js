@@ -6,7 +6,7 @@ const passport = require('passport');
 const User = require("../models/userSchema");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
-const getReplyEmailTemplate = require("../EmailTemplates/getReplyEmailTemplate");
+const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyEmailTemplate22");
 
 router.post('/user/register', async (req, res) => {
   try {
@@ -46,7 +46,7 @@ router.post('/user/register', async (req, res) => {
       <p>If you didn't create this account, please ignore this email.</p>
     `;
 
-    const emailHtml = getReplyEmailTemplate(
+    const emailHtml = getReplyEmailTemplate2(
       user.name,
       verificationMessage,
       verificationResponse
@@ -168,7 +168,7 @@ router.post('/user/forgot-password', async (req, res) => {
       <p><strong>Important:</strong> If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
     `;
 
-    const emailHtml = getReplyEmailTemplate(
+    const emailHtml = getReplyEmailTemplate2(
       user.name,
       resetMessage,
       resetResponse
@@ -215,7 +215,7 @@ router.post('/user/reset-password', async (req, res) => {
       </ul>
     `;
 
-    const emailHtml = getReplyEmailTemplate(
+    const emailHtml = getReplyEmailTemplate2(
       user.name,
       confirmationMessage,
       confirmationResponse
@@ -310,7 +310,7 @@ router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
       <p>If you did not make this change, please contact us immediately to secure your account.</p>
     `;
 
-    const emailHtml = getReplyEmailTemplate(
+    const emailHtml = getReplyEmailTemplate2(
       user.name,
       updateMessage,
       updateResponse
@@ -379,7 +379,7 @@ router.get('/google/callback',
         <p>If this wasn't you, please secure your Google account immediately.</p>
       `;
 
-      const emailHtml = getReplyEmailTemplate(
+      const emailHtml = getReplyEmailTemplate2(
         req.user.name,
         welcomeMessage,
         welcomeResponse
