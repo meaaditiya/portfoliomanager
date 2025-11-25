@@ -6,7 +6,7 @@ const passport = require('passport');
 const User = require("../models/userSchema");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
-const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyEmailTemplate2");
+const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
 
 router.post('/user/register', async (req, res) => {
   try {
