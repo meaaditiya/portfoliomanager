@@ -2970,6 +2970,7 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
           totalReads: 1,
           isSubscriberOnly: 1,
           content: 1,
+          readTime: 1,
           embedding: 1,
           similarityScore: { $meta: 'vectorSearchScore' }
         }
@@ -3071,7 +3072,8 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
         similarityScore: m.vectorSim,
         textScore: m.textScore,
         fusedScore: m.fused,
-        relevanceLevel: getRelevanceLevel(m.fused)
+        relevanceLevel: getRelevanceLevel(m.fused),
+
       };
     });
 
