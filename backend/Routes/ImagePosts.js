@@ -11,24 +11,24 @@ const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const apicache = require("apicache");
 
-// Helper function to clear all related caches
+
 const clearPostCaches = (postId = null) => {
-  // Clear all cache
+  
   apicache.clear();
   
-  // Specifically clear post-related routes
+  
   if (postId) {
     apicache.clear(`/api/image-posts/${postId}`);
     apicache.clear(`/api/image-posts/${postId}/comments`);
   }
   apicache.clear('/api/image-posts');
 };
-// Simple cache middleware for GET requests only
+
 const cacheMiddleware = (req, res, next) => {
   if (req.method === 'GET') {
-    // Check if there's a cache-bust query parameter
+    
     if (req.query.bustCache) {
-      // Skip cache for this request
+      
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
@@ -39,9 +39,9 @@ const cacheMiddleware = (req, res, next) => {
   next();
 };
 
-// ==================== ADMIN ROUTES ====================
 
-// Create image/video post (admin only)
+
+
 router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
@@ -112,7 +112,7 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   }
 });
 
-// Update an image/video post (admin only)
+
 router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
@@ -194,7 +194,7 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
   }
 });
 
-// Delete an image post (admin only)
+
 router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,7 +221,7 @@ router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) 
   }
 });
 
-// Get all image posts for admin dashboard
+
 router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, mediaType } = req.query;
@@ -257,7 +257,7 @@ router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
   }
 });
 
-// Get single image/video post with admin details
+
 router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -303,9 +303,9 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
   }
 });
 
-// ==================== PUBLIC ROUTES (VIEWING - NO AUTH) ====================
 
-// Get all published image/video posts (public) - WITH PROGRESSIVE LOADING & CACHING
+
+
 router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 10, mediaType } = req.query;
@@ -320,9 +320,9 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
     
     const total = await ImagePost.countDocuments(filter);
     
-    // Check if client wants progressive loading
+    
     if (limitNum > 3 && req.headers['accept'] !== 'application/json-stream') {
-      // Standard response - all posts at once
+      
       const posts = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -344,11 +344,11 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
       });
     }
     
-    // Progressive loading (only if more than 3 posts requested)
+    
     if (limitNum > 3) {
       res.setHeader('Content-Type', 'application/json');
       
-      // Fetch first 3 posts
+      
       const firstBatch = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -356,7 +356,7 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
         .select('-image.data -video.data -video.thumbnail.data')
         .lean();
       
-      // Send first batch
+      
       res.write(JSON.stringify({
         streaming: true,
         batch: 1,
@@ -372,7 +372,7 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
         }
       }));
       
-      // Delay and fetch remaining posts
+      
       setTimeout(async () => {
         try {
           const remainingPosts = await ImagePost.find(filter)
@@ -398,7 +398,7 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
         }
       }, 150);
     } else {
-      // Less than 3 posts, send all at once
+      
       const posts = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -428,12 +428,12 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   }
 });
 
-// Get single image/video post (public) - CACHED POST, FRESH COMMENTS
+
 router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Add no-cache headers if bustCache is present
+    
     if (req.query.bustCache) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -458,7 +458,7 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       }
     }
     
-    // Get active TOP-LEVEL comments (NOT CACHED)
+    
     const comments = await ImageComment.find({ 
       post: id,
       status: 'active',
@@ -482,7 +482,7 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         commentCount: post.commentCount
       },
       comments,
-      // Add timestamp to help client know this is fresh data
+      
       timestamp: Date.now()
     });
   } catch (error) {
@@ -492,7 +492,7 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
 });
 
 
-// Get comments for an image post (public - NO AUTH)
+
 router.get('/api/image-posts/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
@@ -534,7 +534,7 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
   }
 });
 
-// Get replies for a comment (public - NO AUTH)
+
 router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -574,9 +574,9 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   }
 });
 
-// ==================== PUBLIC ROUTES (INTERACTIONS - REQUIRE AUTH) ====================
 
-// Like an image post (REQUIRES AUTH)
+
+
 router.post('/api/image-posts/:id/react', UserAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -635,7 +635,7 @@ router.post('/api/image-posts/:id/react', UserAuthMiddleware, async (req, res) =
   }
 });
 
-// Check if user has reacted to a post (REQUIRES AUTH)
+
 router.get('/api/image-posts/:id/has-reacted', UserAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -655,7 +655,7 @@ router.get('/api/image-posts/:id/has-reacted', UserAuthMiddleware, async (req, r
   }
 });
 
-// Add a regular comment (REQUIRES AUTH)
+
 router.post('/api/image-posts/:id/comments', 
   UserAuthMiddleware,
   [
@@ -713,7 +713,7 @@ router.post('/api/image-posts/:id/comments',
       
       clearPostCaches(id);
       
-      // Fetch updated comments to return
+      
       const updatedComments = await ImageComment.find({ 
         post: id,
         status: 'active',
@@ -726,8 +726,8 @@ router.post('/api/image-posts/:id/comments',
       res.status(201).json({
         message: parentCommentId ? 'Reply added successfully' : 'Comment added successfully',
         comment: newComment,
-        updatedComments: parentCommentId ? null : updatedComments, // Only return for top-level comments
-        timestamp: Date.now() // Help client identify fresh data
+        updatedComments: parentCommentId ? null : updatedComments, 
+        timestamp: Date.now() 
       });
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -736,7 +736,7 @@ router.post('/api/image-posts/:id/comments',
   }
 );
 
-// Like a comment (REQUIRES AUTH)
+
 router.post('/api/image-posts/comments/:commentId/like',
   UserAuthMiddleware,
   async (req, res) => {
@@ -781,7 +781,7 @@ router.post('/api/image-posts/comments/:commentId/like',
   }
 );
 
-// Dislike a comment (REQUIRES AUTH)
+
 router.post('/api/image-posts/comments/:commentId/dislike',
   UserAuthMiddleware,
   async (req, res) => {
@@ -826,7 +826,7 @@ router.post('/api/image-posts/comments/:commentId/dislike',
   }
 );
 
-// Check user's reaction on a comment (REQUIRES AUTH)
+
 router.get('/api/image-posts/comments/:commentId/user-reaction',
   UserAuthMiddleware,
   async (req, res) => {
@@ -863,7 +863,7 @@ router.get('/api/image-posts/comments/:commentId/user-reaction',
   }
 );
 
-// Delete own comment (REQUIRES AUTH)
+
 router.delete('/api/image-posts/comments/:commentId', 
   UserAuthMiddleware,
   async (req, res) => {
@@ -906,7 +906,7 @@ router.delete('/api/image-posts/comments/:commentId',
       
       clearPostCaches(comment.post);
       
-      // Fetch updated comments
+      
       const updatedComments = await ImageComment.find({ 
         post: comment.post,
         status: 'active',
@@ -929,9 +929,9 @@ router.delete('/api/image-posts/comments/:commentId',
   }
 );
 
-// ==================== ADMIN COMMENT MANAGEMENT ROUTES ====================
 
-// Add author comment or reply (admin only)
+
+
 router.post('/api/image-posts/:id/author-comment',
   authenticateToken,
   [
@@ -997,7 +997,7 @@ router.post('/api/image-posts/:id/author-comment',
   }
 );
 
-// Get all comments for admin (including hidden and with replies)
+
 router.get('/api/admin/image-posts/:id/comments', 
   authenticateToken,
   async (req, res) => {
@@ -1050,7 +1050,7 @@ router.get('/api/admin/image-posts/:id/comments',
   }
 );
 
-// Update author comment (admin only)
+
 router.put('/api/admin/image-comments/:commentId',
   authenticateToken,
   [
@@ -1097,7 +1097,7 @@ router.put('/api/admin/image-comments/:commentId',
   }
 );
 
-// Hide/unhide comment status (admin only)
+
 router.patch('/api/admin/image-comments/:commentId', 
   authenticateToken,
   [
@@ -1153,7 +1153,7 @@ router.patch('/api/admin/image-comments/:commentId',
   }
 );
 
-// Delete any comment (admin only)
+
 router.delete('/api/admin/image-comments/:commentId',
   authenticateToken,
   async (req, res) => {
@@ -1197,7 +1197,7 @@ router.delete('/api/admin/image-comments/:commentId',
   }
 );
 
-// Get comment statistics (admin only)
+
 router.get('/api/admin/image-posts/:id/comments/stats',
   authenticateToken,
   async (req, res) => {
@@ -1252,7 +1252,7 @@ router.get('/api/admin/image-posts/:id/comments/stats',
   }
 );
 
-// Get all comments across all posts (admin dashboard)
+
 router.get('/api/admin/image-comments',
   authenticateToken,
   async (req, res) => {
@@ -1296,7 +1296,7 @@ router.get('/api/admin/image-comments',
   }
 );
 
-// Bulk delete comments (admin only)
+
 router.post('/api/admin/image-comments/bulk-delete',
   authenticateToken,
   [
@@ -1364,7 +1364,7 @@ router.post('/api/admin/image-comments/bulk-delete',
   }
 );
 
-// Bulk update comment status (admin only)
+
 router.patch('/api/admin/image-comments/bulk-status',
   authenticateToken,
   [

@@ -6,7 +6,7 @@ router.post('/api/queries/create', async (req, res) => {
   try {
     const { name, email, queryText } = req.body;
 
-    // Validation
+    
     if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Name is required' });
     }
@@ -17,16 +17,16 @@ router.post('/api/queries/create', async (req, res) => {
       return res.status(400).json({ message: 'Query text is required' });
     }
 
-    // Email validation
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    // Generate unique ticket ID
+    
     const ticketId = await Query.generateTicketId();
 
-    // Create query
+    
     const query = new Query({
       ticketId,
       name: name.trim(),
@@ -47,12 +47,12 @@ router.post('/api/queries/create', async (req, res) => {
   }
 });
 
-// GET - Check query status and reply by ticket ID (Public route)
+
 router.get('/api/queries/check/:ticketId', async (req, res) => {
   try {
     const { ticketId } = req.params;
 
-    // Validate ticket ID format (6 digits)
+    
     if (!/^QRY\d{12}$/.test(ticketId)) {
       return res.status(400).json({ message: 'Invalid ticket ID format. Must be 15 digits.' });
     }
@@ -64,7 +64,7 @@ router.get('/api/queries/check/:ticketId', async (req, res) => {
       return res.status(404).json({ message: 'Query not found with this ticket ID' });
     }
 
-    // Check if admin has replied
+    
     if (!query.adminReply) {
       return res.status(200).json({
         ticketId: query.ticketId,
@@ -77,7 +77,7 @@ router.get('/api/queries/check/:ticketId', async (req, res) => {
       });
     }
 
-    // Return query with reply
+    
     res.status(200).json({
       ticketId: query.ticketId,
       name: query.name,
@@ -96,7 +96,7 @@ router.get('/api/queries/check/:ticketId', async (req, res) => {
 
 router.get('/api/admin/queries', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -104,7 +104,7 @@ router.get('/api/admin/queries', authenticateToken, async (req, res) => {
     const { status, page = 1, limit = 20 } = req.query;
     const query = {};
 
-    // Filter by status if provided
+    
     if (status && ['pending', 'replied', 'closed'].includes(status)) {
       query.status = status;
     }
@@ -134,10 +134,10 @@ router.get('/api/admin/queries', authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Get single query by ticket ID (Admin only)
+
 router.get('/api/admin/queries/:ticketId', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -158,10 +158,10 @@ router.get('/api/admin/queries/:ticketId', authenticateToken, async (req, res) =
   }
 });
 
-// PUT - Add/Update reply to query (Admin only)
+
 router.put('/api/admin/queries/:ticketId/reply', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -169,7 +169,7 @@ router.put('/api/admin/queries/:ticketId/reply', authenticateToken, async (req, 
     const { ticketId } = req.params;
     const { adminReply } = req.body;
 
-    // Validation
+    
     if (!adminReply || !adminReply.trim()) {
       return res.status(400).json({ message: 'Reply text is required' });
     }
@@ -180,7 +180,7 @@ router.put('/api/admin/queries/:ticketId/reply', authenticateToken, async (req, 
       return res.status(404).json({ message: 'Query not found' });
     }
 
-    // Update query with reply
+    
     query.adminReply = adminReply.trim();
     query.repliedBy = req.user.admin_id;
     query.repliedAt = new Date();
@@ -201,10 +201,10 @@ router.put('/api/admin/queries/:ticketId/reply', authenticateToken, async (req, 
   }
 });
 
-// PUT - Update query status (Admin only)
+
 router.put('/api/admin/queries/:ticketId/status', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -212,7 +212,7 @@ router.put('/api/admin/queries/:ticketId/status', authenticateToken, async (req,
     const { ticketId } = req.params;
     const { status } = req.body;
 
-    // Validation
+    
     if (!['pending', 'replied', 'closed'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status. Must be: pending, replied, or closed' });
     }
@@ -237,10 +237,10 @@ router.put('/api/admin/queries/:ticketId/status', authenticateToken, async (req,
   }
 });
 
-// DELETE - Delete query (Admin only)
+
 router.delete('/api/admin/queries/:ticketId', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
@@ -264,7 +264,7 @@ router.delete('/api/admin/queries/:ticketId', authenticateToken, async (req, res
 });
 router.post('/api/admin/queries/bulk-delete', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }

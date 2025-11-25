@@ -15,7 +15,7 @@ router.post(
   ],
   async (req, res) => {
     try {
-      // Validate request
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -23,7 +23,7 @@ router.post(
 
       const { content, author } = req.body;
 
-      // Delete existing quote and create new one
+      
       await Quote.deleteMany({});
       
       const newQuote = new Quote({
@@ -49,11 +49,11 @@ router.post(
   }
 );
 
-// PUBLIC ROUTE: Get the current quote
+
 router.get('/api/quote', async (req, res) => {
   try {
     const quote = await Quote.findOne({ isActive: true })
-      .select('-addedBy'); // Don't expose admin info publicly
+      .select('-addedBy'); 
 
     if (!quote) {
       return res.status(404).json({ message: 'No quote found' });
@@ -70,7 +70,7 @@ router.get('/api/quote', async (req, res) => {
   }
 });
 
-// ADMIN ROUTE: Get quote with admin info
+
 router.get('/api/admin/quote', authenticateToken, async (req, res) => {
   try {
     const quote = await Quote.findOne();
@@ -90,7 +90,7 @@ router.get('/api/admin/quote', authenticateToken, async (req, res) => {
   }
 });
 
-// ADMIN ROUTE: Update the current quote
+
 router.put(
   '/api/quote',
   authenticateToken,
@@ -103,7 +103,7 @@ router.put(
   ],
   async (req, res) => {
     try {
-      // Validate request
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -133,7 +133,7 @@ router.put(
   }
 );
 
-// ADMIN ROUTE: Delete the current quote
+
 router.delete('/api/quote', authenticateToken, async (req, res) => {
   try {
     const deletedQuote = await Quote.findOneAndDelete({});
@@ -152,7 +152,7 @@ router.delete('/api/quote', authenticateToken, async (req, res) => {
   }
 });
 
-// ADMIN ROUTE: Toggle quote active status
+
 router.patch('/api/quote/toggle', authenticateToken, async (req, res) => {
   try {
     const quote = await Quote.findOne();

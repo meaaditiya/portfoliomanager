@@ -13,19 +13,19 @@ router.post('/api/project/send-otp', async (req, res) => {
   try {
     const { email } = req.body;
     
-    // Validate email
+    
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!email || !emailRegex.test(email)) {
       return res.status(400).json({ message: 'Please provide a valid email' });
     }
     
-    // Generate 6-digit OTP
+    
     const otp = crypto.randomInt(100000, 999999).toString();
     
-    // Delete any existing OTP for this email and purpose
+    
     await OTP.deleteMany({ email, purpose: 'project_verification' });
     
-    // Save new OTP
+    
     const newOTP = new OTP({
       email,
       otp,
@@ -33,7 +33,7 @@ router.post('/api/project/send-otp', async (req, res) => {
     });
     await newOTP.save();
     
-    // Send OTP via email
+    
     const otpEmailTemplate = getOTPEmailTemplate(otp);
     await sendEmail(email, 'Your Project Submission Verification Code', otpEmailTemplate);
     
@@ -107,12 +107,12 @@ router.post('/api/project/submit', upload.array('files', 5), async (req, res) =>
     res.status(500).json({ message: 'Failed to submit project request. Please try again later.' });
   }
 });
-// Get all project requests (admin only) - exclude file data for performance
+
 router.get('/api/admin/project/requests', authenticateToken, async (req, res) => {
   try {
     const requests = await ProjectRequest.find()
       .sort({ createdAt: -1 })
-      .select('-files.data'); // Exclude file data for list view
+      .select('-files.data'); 
 
     res.json({ requests });
   } catch (error) {
@@ -121,7 +121,7 @@ router.get('/api/admin/project/requests', authenticateToken, async (req, res) =>
   }
 });
 
-// Get single project request with files (admin only)
+
 router.get('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -138,7 +138,7 @@ router.get('/api/admin/project/requests/:id', authenticateToken, async (req, res
   }
 });
 
-// Download specific file from project request (admin only)
+
 router.get('/api/admin/project/requests/:id/files/:fileIndex', authenticateToken, async (req, res) => {
   try {
     const { id, fileIndex } = req.params;
@@ -197,7 +197,7 @@ router.put('/api/admin/project/requests/:id/acknowledge', authenticateToken, asy
   }
 });
 
-// Delete specific project request (admin only)
+
 router.delete('/api/admin/project/requests/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -214,7 +214,7 @@ router.delete('/api/admin/project/requests/:id', authenticateToken, async (req, 
   }
 });
 
-// Delete all project requests (admin only)
+
 router.delete('/api/admin/project/requests', authenticateToken, async (req, res) => {
   try {
     const result = await ProjectRequest.deleteMany({});

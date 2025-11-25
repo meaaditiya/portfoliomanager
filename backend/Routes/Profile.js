@@ -14,30 +14,30 @@ router.post(
   ],
   async (req, res) => {
     try {
-      // Validate request
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      // Check if file was uploaded
+      
       if (!req.file) {
         return res.status(400).json({ message: 'Profile image file is required' });
       }
 
-      // Validate file type
+      
       const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
       if (!allowedImageTypes.includes(req.file.mimetype)) {
         return res.status(400).json({ message: 'Invalid file type. Only images are allowed.' });
       }
 
-      // Deactivate previous active profile image
+      
       await ProfileImage.updateMany(
         { isActive: true },
         { isActive: false }
       );
 
-      // Create new profile image
+      
       const newProfileImage = new ProfileImage({
         imageData: req.file.buffer,
         contentType: req.file.mimetype,
@@ -70,7 +70,7 @@ router.post(
   }
 );
 
-// PUBLIC ROUTE: Get active profile image
+
 router.get('/api/profile-image/active', async (req, res) => {
   try {
     const profileImage = await ProfileImage.findOne({ isActive: true });
@@ -93,7 +93,7 @@ router.get('/api/profile-image/active', async (req, res) => {
   }
 });
 
-// PUBLIC ROUTE: Get profile image by ID
+
 router.get('/api/profile-image/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -118,11 +118,11 @@ router.get('/api/profile-image/:id', async (req, res) => {
   }
 });
 
-// ADMIN ROUTE: Get all profile images info
+
 router.get('/api/profile-images', authenticateToken, async (req, res) => {
   try {
     const profileImages = await ProfileImage.find()
-      .select('-imageData') // Exclude binary data
+      .select('-imageData') 
       .sort({ uploadedAt: -1 });
 
     res.json({
@@ -136,7 +136,7 @@ router.get('/api/profile-images', authenticateToken, async (req, res) => {
   }
 });
 
-// ADMIN ROUTE: Delete profile image
+
 router.delete('/api/profile-image/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -156,18 +156,18 @@ router.delete('/api/profile-image/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-// ADMIN ROUTE: Set profile image as active
+
 router.patch('/api/profile-image/:id/activate', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Deactivate all images
+    
     await ProfileImage.updateMany(
       { isActive: true },
       { isActive: false }
     );
 
-    // Activate the selected image
+    
     const profileImage = await ProfileImage.findByIdAndUpdate(
       id,
       { isActive: true },

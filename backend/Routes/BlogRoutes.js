@@ -20,7 +20,8 @@ const cachemiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const jwt = require('jsonwebtoken');
 const User = require("../models/userSchema");
-const {calculateReadTime} = require('../utils/calculateReadTime')
+const calculateReadTime = require('../utils/calculateReadTime');
+
 const { 
   generateQueryEmbedding, 
   cosineSimilarity,
