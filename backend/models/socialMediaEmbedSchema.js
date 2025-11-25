@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// Social Media Embed Schema
+
 const socialMediaEmbedSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -46,5 +46,4 @@ const socialMediaEmbedSchema = new mongoose.Schema({
   }
 });
 
-// Create model
 module.exports = mongoose.model('SocialMediaEmbed', socialMediaEmbedSchema);

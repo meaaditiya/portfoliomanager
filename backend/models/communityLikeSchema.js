@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// Fixed CommunityLike schema
+
 const communityLikeSchema = new mongoose.Schema({
   post: {
     type: mongoose.Schema.Types.ObjectId,

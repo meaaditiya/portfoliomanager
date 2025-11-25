@@ -16,6 +16,7 @@ const getEmailTemplate = (subject, message, senderName = 'Aaditiya Tyagi', recei
       line-height: 1.6;
     }
 
+    
     .email-container {
       width: 100%;
       background-color: #ffffff;

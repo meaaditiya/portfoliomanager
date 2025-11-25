@@ -28,7 +28,7 @@ const audioRecordingSchema = new mongoose.Schema({
     required: true
   },
   duration: {
-    type: Number, // in seconds
+    type: Number,
     required: true
   },
   transcription: {

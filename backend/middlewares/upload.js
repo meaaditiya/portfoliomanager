@@ -1,6 +1,4 @@
 const multer = require('multer');
-
-// Configure multer for memory storage (MongoDB store)
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {

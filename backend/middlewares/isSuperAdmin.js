@@ -1,5 +1,4 @@
-const Admin = require("../models/admin");   // <-- IMPORT
-
+const Admin = require("../models/admin"); 
 const isSuperAdmin = async (req, res, next) => {
   try {
     const admin = await Admin.findById(req.user.admin_id);
@@ -17,5 +16,4 @@ const isSuperAdmin = async (req, res, next) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-module.exports = isSuperAdmin; // <-- EXPORT
+module.exports = isSuperAdmin;

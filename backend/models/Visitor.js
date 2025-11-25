@@ -46,17 +46,17 @@ const visitorSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create indexes using schema.index() method ONLY (removes duplicates)
+
 visitorSchema.index({ sessionId: 1 }, { unique: true });
 visitorSchema.index({ socketId: 1 });
 visitorSchema.index({ isActive: 1 });
 visitorSchema.index({ lastActivity: 1, isActive: 1 });
 visitorSchema.index({ firstVisit: 1 });
 
-// TTL index - auto-delete after 24 hours
+
 visitorSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 86400 });
 
-// Static method to get live count
+
 visitorSchema.statics.getLiveCount = async function() {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   return this.countDocuments({
@@ -65,7 +65,7 @@ visitorSchema.statics.getLiveCount = async function() {
   });
 };
 
-// Mark visitor as inactive
+
 visitorSchema.statics.markInactive = async function(sessionId) {
   return this.updateOne(
     { sessionId },
@@ -73,7 +73,7 @@ visitorSchema.statics.markInactive = async function(sessionId) {
   );
 };
 
-// Mark by socket ID
+
 visitorSchema.statics.markInactiveBySocket = async function(socketId) {
   return this.updateOne(
     { socketId },
@@ -81,7 +81,7 @@ visitorSchema.statics.markInactiveBySocket = async function(socketId) {
   );
 };
 
-// Update activity
+
 visitorSchema.statics.updateActivity = async function(sessionId, page, socketId = null) {
   const update = { 
     lastActivity: Date.now(),

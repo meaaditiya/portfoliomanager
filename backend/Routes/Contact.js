@@ -16,19 +16,19 @@ const Admin = require("../models/admin.js");
   try {
     const { email } = req.body;
 
-    // Validate email
+    
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!email || !emailRegex.test(email)) {
       return res.status(400).json({ message: 'Please provide a valid email' });
     }
     
-    // Generate 6-digit OTP
+    
     const otp = crypto.randomInt(100000, 999999).toString();
     
-    // Delete any existing OTP for this email and purpose
+    
     await OTP.deleteMany({ email, purpose: 'contact_verification' });
     
-    // Save new OTP
+    
     const newOTP = new OTP({
       email,
       otp,
@@ -36,7 +36,7 @@ const Admin = require("../models/admin.js");
     });
     await newOTP.save();
     
-    // Send OTP via email
+    
     const otpEmailTemplate = getOTPEmailTemplate(otp);
     await sendEmail(email, 'Your Contact Form Verification Code', otpEmailTemplate);
     
@@ -53,18 +53,18 @@ router.post('/api/contact', async (req, res) => {
   try {
     const { name, email, message, otp } = req.body;
     
-    // Validate inputs
+    
     if (!name || !email || !message || !otp) {
       return res.status(400).json({ message: 'All fields including OTP are required' });
     }
     
-    // Validate email format
+    
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: 'Please provide a valid email' });
     }
     
-    // Verify OTP
+    
     const otpRecord = await OTP.findOne({ 
       email, 
       otp, 
@@ -77,7 +77,7 @@ router.post('/api/contact', async (req, res) => {
       });
     }
     
-    // Create new message
+    
     const newMessage = new Message({
       name,
       email,
@@ -86,14 +86,14 @@ router.post('/api/contact', async (req, res) => {
     
     await newMessage.save();
     
-    // Delete used OTP
+    
     await OTP.deleteOne({ _id: otpRecord._id });
     
-    // Send enhanced confirmation email to user
+    
     const confirmationEmail = getConfirmationEmailTemplate(name, message);
     await sendEmail(email, 'Thank You for Reaching Out - I\'ll Be in Touch Soon!', confirmationEmail);
     
-    // Send enhanced notification to admin
+    
     const adminNotification = getAdminNotificationTemplate(name, email, message);
     
     const admin = await Admin.findOne();
@@ -111,16 +111,16 @@ router.post('/api/contact', async (req, res) => {
   }
 });
   
-  // Admin Routes for Messages
-  // Get all messages (for admin) - Enhanced with grouping by email
+  
+  
   router.get('/api/admin/messages', authenticateToken, async (req, res) => {
     try {
       const { grouped = false, email } = req.query;
       if (grouped === 'true') {
-  // Fetch all messages and group them in JavaScript
+  
   const messages = await Message.find().sort({ createdAt: -1 }).lean();
   
-  // Group messages by email manually
+  
   const groupedMessages = messages.reduce((acc, msg) => {
     const { email, name, _id, message, createdAt, status, replied } = msg;
     
@@ -136,23 +136,23 @@ router.post('/api/contact', async (req, res) => {
         unreadCount: 0,
         readCount: 0,
         repliedCount: 0,
-        overallStatus: 'replied', // Default
-        priority: 3 // Default for replied
+        overallStatus: 'replied', 
+        priority: 3 
       };
     }
     
-    // Update group data
+    
     acc[email].messages.push({ _id, message, createdAt, status, replied });
     acc[email].totalMessages += 1;
     acc[email].latestMessage = new Date(acc[email].latestMessage) > new Date(createdAt) ? acc[email].latestMessage : createdAt;
     acc[email].firstMessage = new Date(acc[email].firstMessage) < new Date(createdAt) ? acc[email].firstMessage : createdAt;
     
-    // Update status counts
+    
     if (status === 'unread') acc[email].unreadCount += 1;
     if (status === 'read') acc[email].readCount += 1;
     if (status === 'replied') acc[email].repliedCount += 1;
     
-    // Determine overallStatus and priority
+    
     if (acc[email].unreadCount > 0) {
       acc[email].overallStatus = 'unread';
       acc[email].priority = 1;
@@ -164,7 +164,7 @@ router.post('/api/contact', async (req, res) => {
     return acc;
   }, {});
   
-  // Convert to array and sort by priority and latestMessage
+  
   const sortedMessages = Object.values(groupedMessages).sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return new Date(b.latestMessage) - new Date(a.latestMessage);
@@ -177,7 +177,7 @@ router.post('/api/contact', async (req, res) => {
   });
 }
      else if (email) {
-        // Get all messages from specific email
+        
         const messages = await Message.find({ email }).sort({ createdAt: -1 });
         res.json({
           success: true,
@@ -185,7 +185,7 @@ router.post('/api/contact', async (req, res) => {
           email: email
         });
       } else {
-        // Regular view - all messages individually
+        
         const messages = await Message.find().sort({ createdAt: -1 });
         res.json({
           success: true,
@@ -198,7 +198,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // Get message details (for admin)
+  
   router.get('/api/admin/messages/:id', authenticateToken, async (req, res) => {
     try {
       const message = await Message.findById(req.params.id);
@@ -206,13 +206,13 @@ router.post('/api/contact', async (req, res) => {
         return res.status(404).json({ message: 'Message not found' });
       }
       
-      // Mark as read if it's unread
+      
       if (message.status === 'unread') {
         message.status = 'read';
         await message.save();
       }
       
-      // Get any replies
+      
       const replies = await Reply.find({ messageId: message._id })
         .populate('repliedBy', 'name email')
         .sort({ repliedAt: -1 });
@@ -227,7 +227,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // Get all messages from specific email (for admin)
+  
   router.get('/api/admin/messages/email/:email', authenticateToken, async (req, res) => {
     try {
       const { email } = req.params;
@@ -237,13 +237,13 @@ router.post('/api/contact', async (req, res) => {
         return res.status(404).json({ message: 'No messages found for this email' });
       }
       
-      // Get replies for all messages from this email
+      
       const messageIds = messages.map(msg => msg._id);
       const replies = await Reply.find({ messageId: { $in: messageIds } })
         .populate('repliedBy', 'name email')
         .sort({ repliedAt: -1 });
       
-      // Group replies by messageId
+      
       const repliesByMessage = replies.reduce((acc, reply) => {
         if (!acc[reply.messageId]) {
           acc[reply.messageId] = [];
@@ -254,7 +254,7 @@ router.post('/api/contact', async (req, res) => {
       
      
 
-      // Add replies to corresponding messages
+      
       const messagesWithReplies = messages.map(message => ({
         ...message.toObject(),
         replies: repliesByMessage[message._id] || []
@@ -278,11 +278,11 @@ router.post('/api/contact', async (req, res) => {
   
   router.post('/api/admin/messages/:id/reply', authenticateToken, async (req, res) => {
   try {
-    const { replyContent } = req.body; // Remove originalMessage from destructuring
+    const { replyContent } = req.body; 
     const messageId = req.params.id;
     const adminId = req.user.admin_id;
 
-    // Validate inputs
+    
     if (!replyContent || replyContent.trim() === '') {
       return res.status(400).json({ message: 'Reply content is required' });
     }
@@ -293,13 +293,13 @@ router.post('/api/contact', async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized: Invalid admin credentials' });
     }
 
-    // Find the message
+    
     const message = await Message.findById(messageId);
     if (!message) {
       return res.status(404).json({ message: 'Message not found' });
     }
 
-    // Create the reply
+    
     const newReply = new Reply({
       messageId,
       replyContent: replyContent.trim(),
@@ -308,12 +308,12 @@ router.post('/api/contact', async (req, res) => {
 
     await newReply.save();
 
-    // Update message status
+    
     message.status = 'replied';
     message.replied = true;
     await message.save();
 
-    // Send enhanced reply email using the original message from the Message document
+    
     const replyEmail = getReplyEmailTemplate(message.name, message.message, replyContent);
 
     await sendEmail(
@@ -322,7 +322,7 @@ router.post('/api/contact', async (req, res) => {
       replyEmail
     );
 
-    // Populate the reply with admin info for response
+    
     const populatedReply = await Reply.findById(newReply._id).populate('repliedBy', 'name email');
 
     res.json({
@@ -336,7 +336,7 @@ router.post('/api/contact', async (req, res) => {
   }
 });
   
-  // Update message status (for admin)
+  
   router.put('/api/admin/messages/:id/status', authenticateToken, async (req, res) => {
     try {
       const { status } = req.body;
@@ -366,7 +366,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // Delete a message (for admin)
+  
   router.delete('/api/admin/messages/:id', authenticateToken, async (req, res) => {
     try {
       const message = await Message.findById(req.params.id);
@@ -374,10 +374,10 @@ router.post('/api/contact', async (req, res) => {
         return res.status(404).json({ message: 'Message not found' });
       }
       
-      // Delete associated replies
+      
       const deletedReplies = await Reply.deleteMany({ messageId: message._id });
       
-      // Delete the message
+      
       await Message.deleteOne({ _id: message._id });
       
       res.json({ 
@@ -391,11 +391,11 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Mark all messages as read (for admin)
+  
   router.put('/api/admin/messages/mark-all-read', authenticateToken, async (req, res) => {
     try {
       const updateResult = await Message.updateMany(
-        { status: 'unread' }, // Only update unread messages
+        { status: 'unread' }, 
         { status: 'read' }
       );
       
@@ -410,11 +410,11 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Mark all messages as unread (for admin)
+  
   router.put('/api/admin/messages/mark-all-unread', authenticateToken, async (req, res) => {
     try {
       const updateResult = await Message.updateMany(
-        { status: { $ne: 'unread' } }, // Only update messages that are not already unread
+        { status: { $ne: 'unread' } }, 
         { 
           status: 'unread',
           replied: false
@@ -432,10 +432,10 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Delete all messages (for admin)
+  
   router.delete('/api/admin/messages', authenticateToken, async (req, res) => {
     try {
-      // Get all message IDs first
+      
       const messages = await Message.find({}, '_id');
       const messageIds = messages.map(msg => msg._id);
       
@@ -446,10 +446,10 @@ router.post('/api/contact', async (req, res) => {
         });
       }
       
-      // Delete all replies first
+      
       const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIds } });
       
-      // Delete all messages
+      
       const deleteResult = await Message.deleteMany({});
       
       res.json({ 
@@ -464,12 +464,12 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Delete all messages from specific email (for admin)
+  
   router.delete('/api/admin/messages/email/:email', authenticateToken, async (req, res) => {
     try {
       const { email } = req.params;
       
-      // Find all messages from this email
+      
       const messages = await Message.find({ email }, '_id');
       
       if (messages.length === 0) {
@@ -481,10 +481,10 @@ router.post('/api/contact', async (req, res) => {
       
       const messageIds = messages.map(msg => msg._id);
       
-      // Delete all replies for these messages
+      
       const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIds } });
       
-      // Delete all messages from this email
+      
       const deleteResult = await Message.deleteMany({ email });
       
       res.json({ 
@@ -500,7 +500,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Mark all messages from specific email as read (for admin)
+  
   router.put('/api/admin/messages/email/:email/mark-read', authenticateToken, async (req, res) => {
     try {
       const { email } = req.params;
@@ -532,7 +532,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Mark all messages from specific email as unread (for admin)
+  
   router.put('/api/admin/messages/email/:email/mark-unread', authenticateToken, async (req, res) => {
     try {
       const { email } = req.params;
@@ -567,7 +567,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // Get message stats (counts by status) - Enhanced with more detailed statistics
+  
   router.get('/api/admin/message-stats', authenticateToken, async (req, res) => {
     try {
       const totalCount = await Message.countDocuments();
@@ -575,24 +575,24 @@ router.post('/api/contact', async (req, res) => {
       const readCount = await Message.countDocuments({ status: 'read' });
       const repliedCount = await Message.countDocuments({ status: 'replied' });
       
-      // Get unique email count
+      
       const uniqueEmailsCount = await Message.distinct('email').then(emails => emails.length);
       
-      // Get recent activity (last 7 days)
+      
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const recentCount = await Message.countDocuments({ 
         createdAt: { $gte: sevenDaysAgo } 
       });
       
-      // Get today's messages
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayCount = await Message.countDocuments({
         createdAt: { $gte: today }
       });
       
-      // Get this month's messages
+      
       const thisMonth = new Date();
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
@@ -600,10 +600,10 @@ router.post('/api/contact', async (req, res) => {
         createdAt: { $gte: thisMonth }
       });
       
-      // Get total replies count
+      
       const totalRepliesCount = await Reply.countDocuments();
       
-      // Get messages per status with percentage
+      
       const stats = {
         total: totalCount,
         unread: unreadCount,
@@ -631,10 +631,10 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Get message analytics (for admin dashboard)
+  
  router.get('/api/admin/message-analytics', authenticateToken, async (req, res) => {
   try {
-    const { period = '7' } = req.query; // Default to 7 days
+    const { period = '7' } = req.query; 
     const days = parseInt(period);
     
     if (isNaN(days) || days < 1 || days > 365) {
@@ -645,10 +645,10 @@ router.post('/api/contact', async (req, res) => {
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
     
-    // Fetch messages within the period
+    
     const messages = await Message.find({ createdAt: { $gte: startDate } }).lean();
     
-    // Daily stats
+    
     const dailyStats = messages.reduce((acc, msg) => {
       const date = new Date(msg.createdAt);
       const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
@@ -671,14 +671,14 @@ router.post('/api/contact', async (req, res) => {
       return acc;
     }, {});
     
-    // Convert to array and sort by date
+    
     const sortedDailyStats = Object.values(dailyStats).sort((a, b) => {
       const dateA = new Date(a._id.year, a._id.month - 1, a._id.day);
       const dateB = new Date(b._id.year, b._id.month - 1, b._id.day);
       return dateA - dateB;
     });
     
-    // Top senders
+    
     const senderStats = messages.reduce((acc, msg) => {
       const { email, name, createdAt, status } = msg;
       
@@ -699,17 +699,17 @@ router.post('/api/contact', async (req, res) => {
       return acc;
     }, {});
     
-    // Convert to array, sort by count, and limit to 10
+    
     const topSenders = Object.values(senderStats)
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
     
-    // Response rate
+    
     const totalMessages = await Message.countDocuments();
     const repliedMessages = await Message.countDocuments({ status: 'replied' });
     const responseRate = totalMessages > 0 ? Math.round((repliedMessages / totalMessages) * 100) : 0;
     
-    // Summary
+    
     const totalInPeriod = messages.length;
     const avgPerDay = days > 0 ? Math.round((totalInPeriod / days) * 10) / 10 : 0;
     
@@ -730,7 +730,7 @@ router.post('/api/contact', async (req, res) => {
   }
 });
   
-  // NEW: Bulk operations for messages (for admin)
+  
   router.post('/api/admin/messages/bulk-action', authenticateToken, async (req, res) => {
     try {
       const { action, messageIds, email } = req.body;
@@ -742,7 +742,7 @@ router.post('/api/contact', async (req, res) => {
       let filter = {};
       
       if (messageIds && Array.isArray(messageIds) && messageIds.length > 0) {
-        // Validate ObjectId format
+        
         const validIds = messageIds.filter(id => mongoose.Types.ObjectId.isValid(id));
         if (validIds.length === 0) {
           return res.status(400).json({ message: 'No valid message IDs provided' });
@@ -767,14 +767,14 @@ router.post('/api/contact', async (req, res) => {
           result = await Message.updateMany(filter, { status: 'replied', replied: true });
           break;
         case 'delete':
-          // First find messages to get their IDs for reply deletion
+          
           const messagesToDelete = await Message.find(filter, '_id');
           const messageIdsToDelete = messagesToDelete.map(msg => msg._id);
           
-          // Delete associated replies
+          
           const deletedReplies = await Reply.deleteMany({ messageId: { $in: messageIdsToDelete } });
           
-          // Delete messages
+          
           result = await Message.deleteMany(filter);
           result.deletedReplies = deletedReplies.deletedCount;
           break;
@@ -801,7 +801,7 @@ router.post('/api/contact', async (req, res) => {
     }
   });
   
-  // NEW: Search messages (for admin)
+  
   router.get('/api/admin/messages/search', authenticateToken, async (req, res) => {
     try {
       const { q, status, email, startDate, endDate, page = 1, limit = 20 } = req.query;
@@ -812,7 +812,7 @@ router.post('/api/contact', async (req, res) => {
       
       let filter = {};
       
-      // Text search
+      
       if (q) {
         filter.$or = [
           { name: { $regex: q, $options: 'i' } },
@@ -821,17 +821,17 @@ router.post('/api/contact', async (req, res) => {
         ];
       }
       
-      // Status filter
+      
       if (status && ['unread', 'read', 'replied'].includes(status)) {
         filter.status = status;
       }
       
-      // Email filter
+      
       if (email) {
         filter.email = { $regex: email, $options: 'i' };
       }
       
-      // Date range filter
+      
       if (startDate || endDate) {
         filter.createdAt = {};
         if (startDate) {

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const marked = require('marked');
 const DOMPurify = require('isomorphic-dompurify');
 
-// Configure marked for better markdown support
+
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -30,7 +30,7 @@ const announcementSchema = new mongoose.Schema({
     enum: ['markdown', 'plain'],
     default: 'markdown'
   },
-  // Array to store inline images used in caption
+  
   captionImages: [{
     url: {
       type: String,
@@ -52,10 +52,10 @@ const announcementSchema = new mongoose.Schema({
     imageId: {
       type: String,
       required: true,
-      // REMOVED unique: true - this was causing the duplicate key error
+      
     }
   }],
-  // Array to store inline videos used in caption
+  
   captionVideos: [{
     url: {
       type: String,
@@ -94,10 +94,10 @@ const announcementSchema = new mongoose.Schema({
     embedId: {
       type: String,
       required: true,
-      // REMOVED unique: true - this was causing the duplicate key error
+      
     }
   }],
-  // Enhanced link with name
+  
   link: {
     url: {
       type: String,
@@ -113,13 +113,13 @@ const announcementSchema = new mongoose.Schema({
       default: true
     }
   },
-  // Featured image (separate from caption images)
+  
   image: {
     data: Buffer,
     contentType: String,
     filename: String
   },
-  // Downloadable document
+  
   document: {
     data: Buffer,
     contentType: String,
@@ -156,11 +156,11 @@ const announcementSchema = new mongoose.Schema({
   }
 });
 
-// Pre-save middleware
+
 announcementSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Generate unique IDs for new caption images
+  
   if (this.isModified('captionImages')) {
     this.captionImages.forEach(image => {
       if (!image.imageId) {
@@ -169,7 +169,7 @@ announcementSchema.pre('save', function(next) {
     });
   }
   
-  // Generate unique IDs for new caption videos
+  
   if (this.isModified('captionVideos')) {
     this.captionVideos.forEach(video => {
       if (!video.embedId) {
@@ -178,7 +178,7 @@ announcementSchema.pre('save', function(next) {
     });
   }
   
-  // Auto-mark as expired if expiresAt is in the past
+  
   if (this.expiresAt && this.expiresAt < new Date()) {
     this.isExpired = true;
     this.isActive = false;
@@ -187,7 +187,7 @@ announcementSchema.pre('save', function(next) {
   next();
 });
 
-// Method to get rendered HTML from markdown with inline styles
+
 announcementSchema.methods.getRenderedCaption = function() {
   if (this.captionFormat === 'markdown' && this.caption) {
     const rawHtml = marked.parse(this.caption);
@@ -224,7 +224,7 @@ announcementSchema.methods.getRenderedCaption = function() {
   return this.caption;
 };
 
-// Method to check if announcement is expired
+
 announcementSchema.methods.checkExpiry = function() {
   if (this.expiresAt && this.expiresAt < new Date() && !this.isExpired) {
     this.isExpired = true;
@@ -234,7 +234,7 @@ announcementSchema.methods.checkExpiry = function() {
   return false;
 };
 
-// Static method to expire old announcements
+
 announcementSchema.statics.expireOldAnnouncements = async function() {
   const now = new Date();
   const result = await this.updateMany(

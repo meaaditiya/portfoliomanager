@@ -24,8 +24,6 @@ const imageReactionSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
-// Compound index to prevent multiple reactions from the same user/device on the same post
 imageReactionSchema.index({ post: 1, 'user.email': 1 }, { unique: true });
 imageReactionSchema.index({ post: 1, 'user.deviceId': 1 }, { unique: true });
 module.exports= mongoose.model('ImageReaction', imageReactionSchema);

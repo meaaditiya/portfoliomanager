@@ -10,7 +10,7 @@ const BlacklistedToken = require("../models/blacklistedtoken.js");
 const authenticateToken = require("../middlewares/authMiddleware");
 const generateOTP = require("../utils/otp");
 const sendEmail = require("../utils/email");
-// Login
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;

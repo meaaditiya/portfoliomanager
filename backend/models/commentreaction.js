@@ -21,7 +21,7 @@ const CommentReactionSchema = new mongoose.Schema({
       required: true
     }
   },
-  // NEW: Fingerprint for tracking unique users
+  
   fingerprint: {
     type: String,
     default: null

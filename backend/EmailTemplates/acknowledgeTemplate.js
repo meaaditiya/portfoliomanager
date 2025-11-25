@@ -237,7 +237,6 @@ const acknowledgeTemplate = (name, projectType) => {
         </p>
       </div>
     </div>
-
     <div class="email-footer">
       <p>This email was generated automatically. Please do not reply directly.</p>
       <p>For inquiries, contact <a href="mailto:aaditiyatyagi123@gmail.com">aaditiyatyagi123@gmail.com</a></p>

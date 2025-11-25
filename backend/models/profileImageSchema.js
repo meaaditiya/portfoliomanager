@@ -37,4 +37,5 @@ const profileImageSchema = new mongoose.Schema({
   }
 });
 
+
 module.exports = mongoose.model('ProfileImage', profileImageSchema);

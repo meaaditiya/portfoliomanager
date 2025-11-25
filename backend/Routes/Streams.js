@@ -30,14 +30,14 @@ router.post('/api/admin/streams', authenticateToken, async (req, res) => {
   }
 });
 
-// Update stream
+
 router.put('/api/admin/streams/:id', authenticateToken, async (req, res) => {
   try {
     const { title, description, scheduledDate, scheduledTime, youtubeLink, status, password } = req.body;
     
     const updateData = { title, description, scheduledDate, scheduledTime, status };
     
-    // Handle password update (can be set, updated, or removed)
+   
     if (password !== undefined) {
       updateData.password = password || null;
     }
@@ -62,7 +62,7 @@ router.put('/api/admin/streams/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Delete stream
+
 router.delete('/api/admin/streams/:id', authenticateToken, async (req, res) => {
   try {
     const stream = await Stream.findByIdAndDelete(req.params.id);
@@ -75,7 +75,6 @@ router.delete('/api/admin/streams/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all streams for admin
 router.get('/api/admin/streams', authenticateToken, async (req, res) => {
   try {
     const streams = await Stream.find().sort({ scheduledDate: 1, scheduledTime: 1 });
@@ -85,16 +84,14 @@ router.get('/api/admin/streams', authenticateToken, async (req, res) => {
   }
 });
 
-// PUBLIC ROUTES
 
-// Get all upcoming streams (password-protected streams show limited info)
+
 router.get('/api/streams', async (req, res) => {
   try {
     const streams = await Stream.find()
       .sort({ scheduledDate: 1, scheduledTime: 1 })
       .select('-__v');
     
-    // Filter out sensitive data for password-protected streams
     const filteredStreams = streams.map(stream => {
       if (stream.password) {
         return {
@@ -278,7 +275,7 @@ router.use('/api/youtube-chat-proxy', createProxyMiddleware({
     '^/api/youtube-chat-proxy': ''
   },
   onProxyReq: (proxyReq, req, res) => {
-    // Remove X-Frame-Options header
+  
     proxyReq.removeHeader('X-Frame-Options');
     proxyReq.removeHeader('Content-Security-Policy');
     proxyReq.setHeader('X-Forwarded-Host', req.headers.host);

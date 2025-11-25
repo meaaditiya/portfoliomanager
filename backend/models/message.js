@@ -23,6 +23,7 @@ const MessageSchema = new mongoose.Schema({
       default: 'unread'
     },
     replied: {
+      
       type: Boolean,
       default: false
     }

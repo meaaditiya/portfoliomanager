@@ -201,17 +201,16 @@ const blogSchema = new mongoose.Schema({
     searchableText: {
       type: String,
       select: false
-    },
-    
-    // ============================================
-    // NEW: SUBSCRIBER ONLY FIELD
-    // ============================================
-    
+    },  
     isSubscriberOnly: {
       type: Boolean,
       default: false,
       ref: 'User'
-    }
+    },
+  readTime: {
+  type: Number,
+  default: 0
+}
 });
 
 // Index for faster fingerprint lookups

@@ -11,7 +11,7 @@ router.post('/api/admin/send-email', authenticateToken, upload.array('attachment
   try {
     const { to, subject, message, senderName, receiverName } = req.body;
     
-    // Validation
+    
     if (!to || !subject || !message) {
       return res.status(400).json({ 
         success: false, 
@@ -19,7 +19,7 @@ router.post('/api/admin/send-email', authenticateToken, upload.array('attachment
       });
     }
 
-    // Process attachments
+    
     const attachments = req.files ? req.files.map(file => ({
       filename: file.originalname,
       contentType: file.mimetype,
@@ -27,13 +27,13 @@ router.post('/api/admin/send-email', authenticateToken, upload.array('attachment
       size: file.size
     })) : [];
      const imageUrl = `${req.protocol}://${req.get('host')}/public/profile.png`;
-    // Generate professional HTML template
+  
     const htmlTemplate = getEmailTemplate(subject, message, senderName, receiverName);
     
-    // Send email
+   
     await sendEmail(to, subject, htmlTemplate, attachments);
     
-    // Save email record to MongoDB
+   
     const emailRecord = new Email({
       to,
       subject,
@@ -53,8 +53,6 @@ router.post('/api/admin/send-email', authenticateToken, upload.array('attachment
     
   } catch (error) {
     console.error('Send email error:', error);
-    
-    // Save failed email record
     try {
       const failedEmailRecord = new Email({
         to: req.body.to,
@@ -83,13 +81,11 @@ router.post('/api/admin/send-email', authenticateToken, upload.array('attachment
   }
 });
 
-// Route 2: Send bulk emails with attachments
 
 router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attachments', 10), async (req, res) => {
   try {
     let { recipients, subject, message, senderName ,receiverName} = req.body;
-    
-    // Parse recipients if it's a JSON string
+   
     if (typeof recipients === 'string') {
       try {
         recipients = JSON.parse(recipients);
@@ -100,8 +96,7 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
         });
       }
     }
-    
-    // Validation
+
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
       return res.status(400).json({ 
         success: false, 
@@ -115,8 +110,6 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
         message: 'Subject and message are required' 
       });
     }
-
-    // Validate email formats
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const invalidEmails = recipients.filter(email => !emailRegex.test(email.trim()));
     
@@ -126,8 +119,6 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
         message: `Invalid email format(s): ${invalidEmails.join(', ')}` 
       });
     }
-
-    // Process attachments
     const attachments = req.files ? req.files.map(file => ({
       filename: file.originalname,
       contentType: file.mimetype,
@@ -135,21 +126,16 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
       size: file.size
     })) : [];
 
-    // Generate professional HTML template
     const htmlTemplate = getEmailTemplate(subject, message, senderName,receiverName);
     
     const results = {
       successful: [],
       failed: []
     };
-    
-    // Send emails to all recipients
     for (const recipient of recipients) {
       try {
         await sendEmail(recipient.trim(), subject, htmlTemplate, attachments);
         results.successful.push(recipient);
-        
-        // Save successful email record
         const emailRecord = new Email({
           to: recipient.trim(),
           subject,
@@ -164,8 +150,6 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
       } catch (error) {
         console.error(`Failed to send email to ${recipient}:`, error);
         results.failed.push({ email: recipient, error: error.message });
-        
-        // Save failed email record
         const failedEmailRecord = new Email({
           to: recipient.trim(),
           subject,
@@ -195,7 +179,6 @@ router.post('/api/admin/send-bulk-email', authenticateToken, upload.array('attac
   }
 });
 
-// Route 3: Get email history
 router.get('/api/admin/email-history', authenticateToken, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -203,7 +186,7 @@ router.get('/api/admin/email-history', authenticateToken, async (req, res) => {
     const skip = (page - 1) * limit;
     
     const emails = await Email.find()
-      .select('-attachments.data') // Exclude attachment data for performance
+      .select('-attachments.data')
       .sort({ sentAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -231,7 +214,7 @@ router.get('/api/admin/email-history', authenticateToken, async (req, res) => {
   }
 });
 
-// Route 4: Get specific email with attachments
+
 router.get('/api/admin/email/:id', authenticateToken, async (req, res) => {
   try {
     const email = await Email.findById(req.params.id);
@@ -258,7 +241,7 @@ router.get('/api/admin/email/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Route 5: Download attachment
+
 router.get('/api/admin/email/:id/attachment/:attachmentId', authenticateToken, async (req, res) => {
   try {
     const email = await Email.findById(req.params.id);
@@ -275,7 +258,7 @@ router.get('/api/admin/email/:id/attachment/:attachmentId', authenticateToken, a
     if (!attachment) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Attachment not found' 
+        
       });
     }
     
@@ -293,7 +276,6 @@ router.get('/api/admin/email/:id/attachment/:attachmentId', authenticateToken, a
   }
 });
 
-// Route 6: Delete email
 router.delete('/api/admin/email/:id', authenticateToken, async (req, res) => {
   try {
     const email = await Email.findByIdAndDelete(req.params.id);
@@ -320,7 +302,6 @@ router.delete('/api/admin/email/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Route 7: Get email statistics
 router.get('/api/admin/email-stats', authenticateToken, async (req, res) => {
   try {
     const stats = await Email.aggregate([

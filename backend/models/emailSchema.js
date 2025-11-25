@@ -10,7 +10,7 @@ const emailSchema = new mongoose.Schema({
     size: Number
   }],
   sentAt: { type: Date, default: Date.now },
-  sentBy: { type: String, required: true }, // admin email or ID
+  sentBy: { type: String, required: true },
   status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
 });
 

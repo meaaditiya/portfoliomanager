@@ -14,13 +14,13 @@ const communityPostSchema = new mongoose.Schema({
     type: String,
     required: false
   },
-  // For image posts
+  
   images: [{
     data: Buffer,
     contentType: String,
     filename: String
   }],
-  // For video posts
+  
   video: {
     data: Buffer,
     contentType: String,
@@ -30,7 +30,7 @@ const communityPostSchema = new mongoose.Schema({
      type: String,
     required: false
   } ,
-  // For poll posts
+  
   pollOptions: [{
     option: String,
     votes: [{
@@ -43,14 +43,14 @@ const communityPostSchema = new mongoose.Schema({
     }]
   }],
   pollExpiresAt: Date,
-  // For quiz posts
+  
   quizQuestions: [{
     question: String,
     options: [String],
     correctAnswer: Number,
     explanation: String
   }],
-  // For link posts
+  
   linkUrl: String,
   linkTitle: String,
   linkDescription: String,
@@ -58,7 +58,7 @@ const communityPostSchema = new mongoose.Schema({
     data: Buffer,
     contentType: String
   },
-  // Common fields
+  
   likes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CommunityLike'

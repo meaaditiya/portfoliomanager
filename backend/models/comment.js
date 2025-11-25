@@ -15,7 +15,6 @@ const CommentSchema = new mongoose.Schema({
       type: String,
       required: true
     },
-    // ✅ ADD THIS - Link to User collection
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

@@ -9,7 +9,7 @@ const cleanupUnusedVideos = require("../utils/cleanupUnusedVideos");
 const extractVideoInfo = require("../utils/extractVideoInfo");
 const processContent = require("../utils/processContent");
 
-// ==================== CREATE ANNOUNCEMENT ====================
+
 router.post('/api/admin/announcement', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
@@ -35,7 +35,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       return res.status(400).json({ error: 'Title and caption are required' });
     }
 
-    // Clean up unused images and videos from caption
+    
     const cleanedImages = cleanupUnusedImages(caption, captionImages ? JSON.parse(captionImages) : []);
     const cleanedVideos = cleanupUnusedVideos(caption, captionVideos ? JSON.parse(captionVideos) : []);
 
@@ -55,7 +55,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       createdBy: req.user.admin_id
     };
 
-    // Handle expiry
+    
     if (expiryType) {
       const expiryDate = calculateExpiryDate(expiryType, expiryValue, expiresAt);
       if (expiryDate) {
@@ -63,7 +63,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       }
     }
 
-    // Handle featured image
+    
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcementData.image = {
@@ -73,7 +73,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       };
     }
 
-    // Handle document
+    
     if (req.files && req.files.document) {
       const docFile = req.files.document[0];
       announcementData.document = {
@@ -86,7 +86,7 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
     const announcement = new Announcement(announcementData);
     await announcement.save();
 
-    // Process caption content
+    
     const processedCaption = processContent(
       announcement.caption, 
       announcement.captionImages, 
@@ -121,9 +121,9 @@ hasDocument: !!(announcement.document && announcement.document.data),
   }
 });
 
-// ==================== CAPTION IMAGE ROUTES ====================
 
-// Add image to announcement caption
+
+
 router.post('/api/admin/announcement/:id/caption-images', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,12 +139,12 @@ router.post('/api/admin/announcement/:id/caption-images', authenticateToken, asy
       return res.status(404).json({ message: 'Announcement not found' });
     }
     
-    // Check authorization
+    
     if (announcement.createdBy.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to modify this announcement' });
     }
     
-    // Generate unique image ID
+    
     const imageId = 'ann_img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
     const newImage = {
@@ -170,7 +170,7 @@ router.post('/api/admin/announcement/:id/caption-images', authenticateToken, asy
   }
 });
 
-// Update caption image
+
 router.put('/api/admin/announcement/:id/caption-images/:imageId', authenticateToken, async (req, res) => {
   try {
     const { id, imageId } = req.params;
@@ -209,7 +209,7 @@ router.put('/api/admin/announcement/:id/caption-images/:imageId', authenticateTo
   }
 });
 
-// Delete caption image
+
 router.delete('/api/admin/announcement/:id/caption-images/:imageId', authenticateToken, async (req, res) => {
   try {
     const { id, imageId } = req.params;
@@ -240,7 +240,7 @@ router.delete('/api/admin/announcement/:id/caption-images/:imageId', authenticat
   }
 });
 
-// Get all caption images for an announcement
+
 router.get('/api/admin/announcement/:id/caption-images', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -265,9 +265,9 @@ router.get('/api/admin/announcement/:id/caption-images', authenticateToken, asyn
   }
 });
 
-// ==================== CAPTION VIDEO ROUTES ====================
 
-// Add video to announcement caption
+
+
 router.post('/api/admin/announcement/:id/caption-videos', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -287,7 +287,7 @@ router.post('/api/admin/announcement/:id/caption-videos', authenticateToken, asy
       return res.status(403).json({ message: 'Not authorized to modify this announcement' });
     }
     
-    // Extract video info from URL
+    
     const videoInfo = extractVideoInfo(url);
     
     if (!videoInfo) {
@@ -296,7 +296,7 @@ router.post('/api/admin/announcement/:id/caption-videos', authenticateToken, asy
       });
     }
     
-    // Generate unique embed ID
+    
     const embedId = 'ann_vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
     const newVideo = {
@@ -326,7 +326,7 @@ router.post('/api/admin/announcement/:id/caption-videos', authenticateToken, asy
   }
 });
 
-// Update caption video
+
 router.put('/api/admin/announcement/:id/caption-videos/:embedId', authenticateToken, async (req, res) => {
   try {
     const { id, embedId } = req.params;
@@ -376,7 +376,7 @@ router.put('/api/admin/announcement/:id/caption-videos/:embedId', authenticateTo
   }
 });
 
-// Delete caption video
+
 router.delete('/api/admin/announcement/:id/caption-videos/:embedId', authenticateToken, async (req, res) => {
   try {
     const { id, embedId } = req.params;
@@ -407,7 +407,7 @@ router.delete('/api/admin/announcement/:id/caption-videos/:embedId', authenticat
   }
 });
 
-// Get all caption videos for an announcement
+
 router.get('/api/admin/announcement/:id/caption-videos', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -432,9 +432,9 @@ router.get('/api/admin/announcement/:id/caption-videos', authenticateToken, asyn
   }
 });
 
-// ==================== MAIN ANNOUNCEMENT ROUTES ====================
 
-// GET ACTIVE ANNOUNCEMENTS (Public)
+
+
 router.get('/api/announcement/active', async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
@@ -461,8 +461,8 @@ router.get('/api/announcement/active', async (req, res) => {
         captionFormat: ann.captionFormat,
         processedCaption: processedCaption,
         renderedCaption: ann.getRenderedCaption(),
-        captionImages: ann.captionImages || [], // ← ADD THIS
-        captionVideos: ann.captionVideos || [], // ← ADD THIS
+        captionImages: ann.captionImages || [], 
+        captionVideos: ann.captionVideos || [], 
         link: ann.link,
         priority: ann.priority,
         expiresAt: ann.expiresAt,
@@ -481,7 +481,7 @@ hasDocument: !!(ann.document && ann.document.filename),
   }
 });
 
-// GET ALL ANNOUNCEMENTS (Admin)
+
 router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
@@ -506,8 +506,8 @@ router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
         captionFormat: ann.captionFormat,
         processedCaption: processedCaption,
         renderedCaption: ann.getRenderedCaption(),
-        captionImages: ann.captionImages || [], // ← ADD THIS
-        captionVideos: ann.captionVideos || [], // ← ADD THIS
+        captionImages: ann.captionImages || [], 
+        captionVideos: ann.captionVideos || [], 
         link: ann.link,
         priority: ann.priority,
         isActive: ann.isActive,
@@ -532,7 +532,7 @@ hasDocument: !!(ann.document && ann.document.filename),
   }
 });
 
-// GET SINGLE ANNOUNCEMENT BY ID (Admin)
+
 router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
@@ -563,8 +563,8 @@ router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) =>
         captionFormat: announcement.captionFormat,
         processedCaption: processedCaption,
         renderedCaption: announcement.getRenderedCaption(),
-        captionImages: announcement.captionImages || [], // ← ADD THIS
-        captionVideos: announcement.captionVideos || [], // ← ADD THIS
+        captionImages: announcement.captionImages || [], 
+        captionVideos: announcement.captionVideos || [], 
         link: announcement.link,
         priority: announcement.priority,
         isActive: announcement.isActive,
@@ -586,7 +586,7 @@ hasDocument: !!(announcement.document && announcement.document.filename),
 });
 
 
-// GET ANNOUNCEMENT FEATURED IMAGE
+
 router.get('/api/announcement/:id/image', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -603,7 +603,7 @@ router.get('/api/announcement/:id/image', async (req, res) => {
   }
 });
 
-// GET ANNOUNCEMENT DOCUMENT
+
 router.get('/api/announcement/:id/document', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -621,7 +621,7 @@ router.get('/api/announcement/:id/document', async (req, res) => {
   }
 });
 
-// UPDATE ANNOUNCEMENT
+
 router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'document', maxCount: 1 }
@@ -652,7 +652,7 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
-// In UPDATE ANNOUNCEMENT route (around line 651)
+
 if (!req.user || !req.user.admin_id) {
   return res.status(401).json({ error: 'Unauthorized - Invalid user session' });
 }
@@ -666,7 +666,7 @@ if (!req.user || !req.user.admin_id) {
     if (caption !== undefined) {
       announcement.caption = caption;
       
-      // Clean up unused media if caption was updated
+      
       if (captionImages) {
         announcement.captionImages = cleanupUnusedImages(
           caption, 
@@ -682,7 +682,7 @@ if (!req.user || !req.user.admin_id) {
     }
     if (captionFormat !== undefined) announcement.captionFormat = captionFormat;
     
-    // Update link
+    
     if (linkUrl !== undefined) announcement.link.url = linkUrl;
     if (linkName !== undefined) announcement.link.name = linkName;
     if (linkOpenInNewTab !== undefined) {
@@ -692,7 +692,7 @@ if (!req.user || !req.user.admin_id) {
     if (priority !== undefined) announcement.priority = priority;
     if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
 
-    // Handle expiry
+    
     if (removeExpiry === 'true' || removeExpiry === true) {
       announcement.expiresAt = null;
       announcement.isExpired = false;
@@ -704,7 +704,7 @@ if (!req.user || !req.user.admin_id) {
       }
     }
 
-    // Handle featured image removal/update
+    
     if (removeImage === 'true' || removeImage === true) {
       announcement.image = undefined;
     }
@@ -717,7 +717,7 @@ if (!req.user || !req.user.admin_id) {
       };
     }
 
-    // Handle document removal/update
+    
     if (removeDocument === 'true' || removeDocument === true) {
       announcement.document = undefined;
     }
@@ -766,7 +766,7 @@ hasDocument: !!(announcement.document && announcement.document.data),
   }
 });
 
-// TOGGLE ANNOUNCEMENT ACTIVE STATUS
+
 router.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -801,7 +801,7 @@ router.patch('/api/admin/announcement/:id/toggle', authenticateToken, async (req
   }
 });
 
-// DELETE SINGLE ANNOUNCEMENT
+
 router.delete('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
@@ -823,7 +823,7 @@ router.delete('/api/admin/announcement/:id', authenticateToken, async (req, res)
   }
 });
 
-// DELETE ALL ANNOUNCEMENTS
+
 router.delete('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
     const result = await Announcement.deleteMany({});

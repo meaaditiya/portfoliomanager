@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const adminSchema = new mongoose.Schema({
-  // Authentication & Account Info
+  
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -11,7 +11,7 @@ const adminSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
   lastLogin: { type: Date },
   
-  // Profile Info
+  
   profileImage: {
     data: Buffer,
     contentType: String
@@ -19,7 +19,7 @@ const adminSchema = new mongoose.Schema({
   bio: { type: String, maxlength: 200 },
   designation: { type: String },
   
-  // Social Links
+  
   socialLinks: {
     twitter: { type: String },
     linkedin: { type: String },
@@ -31,7 +31,7 @@ const adminSchema = new mongoose.Schema({
     medium: { type: String }
   },
   
-  // Additional Info
+  
   location: { type: String },
   expertise: [{ type: String }],
   interests: [{ type: String }],

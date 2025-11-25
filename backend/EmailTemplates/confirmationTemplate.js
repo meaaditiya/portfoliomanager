@@ -2,7 +2,6 @@ const confirmationTemplate = (name, projectType, files) => {
   const fileList = files.length > 0 ? 
     `<p><strong>Uploaded files:</strong></p><ul>${files.map(f => `<li>${f.originalName} (${(f.size / 1024).toFixed(2)} KB)</li>`).join('')}</ul>` : 
     '<p>No files uploaded.</p>';
-
   return `
 <!DOCTYPE html>
 <html lang="en">

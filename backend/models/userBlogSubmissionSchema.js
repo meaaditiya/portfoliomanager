@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const userBlogSubmissionSchema = new mongoose.Schema({
-    // User Information
+    
     userName: {
       type: String,
       required: true,
@@ -13,7 +13,7 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       lowercase: true
     },
     
-    // Blog Content
+    
     title: { 
       type: String, 
       required: true,
@@ -24,7 +24,7 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       required: true 
     },
     
-    // Array to store inline images used in content
+    
     contentImages: [{
       url: {
         type: String,
@@ -49,7 +49,7 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       }
     }],
     
-    // Array to store inline videos used in content
+    
     contentVideos: [{
       url: {
         type: String,
@@ -107,7 +107,7 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       required: true
     },
     
-    // Submission Status & Tracking
+    
     blogSubmissionId: {
       type: String,
       required: true,
@@ -121,21 +121,21 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       default: 'pending' 
     },
     
-    // Rejection Details
+    
     rejectionReason: {
       type: String,
       trim: true,
       default: ''
     },
     
-    // Admin Feedback
+    
     changesSuggested: {
       type: String,
       trim: true,
       default: ''
     },
     
-    // Admin who reviewed
+    
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Admin'
@@ -145,13 +145,13 @@ const userBlogSubmissionSchema = new mongoose.Schema({
       type: Date
     },
     
-    // Reference to published blog (if approved)
+    
     publishedBlogId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Blog'
     },
     
-    // Timestamps
+    
     submittedAt: { 
       type: Date, 
       default: Date.now 
@@ -162,12 +162,12 @@ const userBlogSubmissionSchema = new mongoose.Schema({
     }
 });
 
-// Function to generate unique blog submission ID
+
 function generateBlogSubmissionId() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let submissionId = 'BSI-'; // Prefix: Blog Submission ID
+  let submissionId = 'BSI-'; 
   
-  // Generate 12 more characters (total 15 with prefix)
+  
   for (let i = 0; i < 12; i++) {
     submissionId += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -175,7 +175,7 @@ function generateBlogSubmissionId() {
   return submissionId;
 }
 
-// Generate unique blog submission ID before saving
+
 userBlogSubmissionSchema.pre('validate', async function(next) {
   if (!this.blogSubmissionId) {
     let isUnique = false;
@@ -198,7 +198,6 @@ userBlogSubmissionSchema.pre('validate', async function(next) {
 });
 
 
-// Update the updatedAt timestamp before saving
 userBlogSubmissionSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

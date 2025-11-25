@@ -12,6 +12,7 @@ function getOTPEmailTemplate(otp) {
       </style>
     </head>
     <body>
+    
       <div class="container">
         <h2>OTP Verification</h2>
         <p>Hello,</p>

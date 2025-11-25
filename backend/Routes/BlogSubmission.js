@@ -14,9 +14,9 @@ const Blog = require("../models/blog.js");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ==================== PUBLIC ROUTES ====================
 
-// Submit a new blog (Public route with content moderation and media processing)
+
+
 router.post('/api/blog-submissions',
   [
     body('userName').trim().notEmpty().withMessage('Name is required'),
@@ -44,10 +44,10 @@ router.post('/api/blog-submissions',
         contentVideos 
       } = req.body;
 
-      // CONTENT MODERATION CHECK
+      
       console.log(`🔍 Moderating blog submission from ${userName}...`);
       
-      // Moderate title
+      
       const titleModeration = await moderateContent(title, userName);
       if (!titleModeration.approved) {
         console.log(`✅ Content moderation blocked title from ${userName}`);
@@ -59,7 +59,7 @@ router.post('/api/blog-submissions',
         });
       }
 
-      // Moderate content
+      
       const plainTextContent = extractPlainText(content);
       const contentModeration = await moderateContent(plainTextContent, userName);
       if (!contentModeration.approved) {
@@ -72,7 +72,7 @@ router.post('/api/blog-submissions',
         });
       }
 
-      // Moderate summary if provided
+      
       if (summary && summary.trim() !== '') {
         const summaryModeration = await moderateContent(summary, userName);
         if (!summaryModeration.approved) {
@@ -88,7 +88,7 @@ router.post('/api/blog-submissions',
 
       console.log(`✅ All content approved for ${userName}`);
 
-      // Clean up unused images and videos (same as admin blog creation)
+      
       const cleanedImages = cleanupUnusedImages(content, contentImages || []);
       const cleanedVideos = cleanupUnusedVideos(content, contentVideos || []);
 
@@ -130,7 +130,7 @@ router.post('/api/blog-submissions',
   }
 );
 
-// Check status of blog submission using blogSubmissionId
+
 router.get('/api/blog-submissions/status/:blogSubmissionId', async (req, res) => {
   try {
     const { blogSubmissionId } = req.params;
@@ -159,7 +159,7 @@ router.get('/api/blog-submissions/status/:blogSubmissionId', async (req, res) =>
   }
 });
 
-// Get full submission details using blogSubmissionId with processed content
+
 router.get('/api/blog-submissions/details/:blogSubmissionId', async (req, res) => {
   try {
     const { blogSubmissionId } = req.params;
@@ -172,7 +172,7 @@ router.get('/api/blog-submissions/details/:blogSubmissionId', async (req, res) =
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    // Process content to replace image and video placeholders (same as blog processing)
+    
     const submissionObj = submission.toObject();
     submissionObj.processedContent = processContent(
       submissionObj.content, 
@@ -187,7 +187,7 @@ router.get('/api/blog-submissions/details/:blogSubmissionId', async (req, res) =
   }
 });
 
-// Generate summary for blog submission (Public route)
+
 router.post('/api/blog-submissions/:identifier/generate-summary', async (req, res) => {
   try {
     validateApiKey();
@@ -195,7 +195,7 @@ router.post('/api/blog-submissions/:identifier/generate-summary', async (req, re
     const { identifier } = req.params;
     const { wordLimit = 300, temperature = 0.7 } = req.body;
     
-    // Find submission by ID or blogSubmissionId
+    
     const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
     const query = isObjectId 
       ? { _id: identifier }
@@ -207,7 +207,7 @@ router.post('/api/blog-submissions/:identifier/generate-summary', async (req, re
       return res.status(404).json({ message: 'Submission not found' });
     }
     
-    // Extract plain text from submission content
+    
     const plainTextContent = extractPlainText(submission.content);
     
     if (plainTextContent.length < 100) {
@@ -304,9 +304,9 @@ router.post('/api/blog-submissions/:identifier/generate-summary', async (req, re
   }
 });
 
-// ==================== ADMIN ROUTES (Authentication Required) ====================
 
-// Get all blog submissions with filters
+
+
 router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -363,7 +363,7 @@ router.get('/api/admin/blog-submissions', authenticateToken, async (req, res) =>
   }
 });
 
-// Get single blog submission by ID (for admin review with processed content)
+
 router.get('/api/admin/blog-submissions/:id', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -378,7 +378,7 @@ router.get('/api/admin/blog-submissions/:id', authenticateToken, async (req, res
       return res.status(404).json({ message: 'Submission not found' });
     }
 
-    // Process content to replace image and video placeholders
+    
     const submissionObj = submission.toObject();
     submissionObj.processedContent = processContent(
       submissionObj.content, 
@@ -393,7 +393,7 @@ router.get('/api/admin/blog-submissions/:id', authenticateToken, async (req, res
   }
 });
 
-// Approve blog submission and create published blog
+
 router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -410,7 +410,7 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
       return res.status(400).json({ message: 'Submission already approved' });
     }
 
-    // Create actual blog post with all processed content
+    
     const newBlog = new Blog({
       title: submission.title,
       content: submission.content,
@@ -426,7 +426,7 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
 
     await newBlog.save();
 
-    // Update submission status
+    
     submission.status = 'approved';
     submission.reviewedBy = req.user.admin_id;
     submission.reviewedAt = new Date();
@@ -445,7 +445,7 @@ router.post('/api/admin/blog-submissions/:id/approve', authenticateToken, async 
   }
 });
 
-// Reject blog submission
+
 router.post('/api/admin/blog-submissions/:id/reject', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -485,7 +485,7 @@ router.post('/api/admin/blog-submissions/:id/reject', authenticateToken, async (
   }
 });
 
-// Suggest changes to blog submission
+
 router.post('/api/admin/blog-submissions/:id/suggest-changes', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -520,7 +520,7 @@ router.post('/api/admin/blog-submissions/:id/suggest-changes', authenticateToken
   }
 });
 
-// Delete blog submission
+
 router.delete('/api/admin/blog-submissions/:id', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -542,7 +542,7 @@ router.delete('/api/admin/blog-submissions/:id', authenticateToken, async (req, 
   }
 });
 
-// Get dashboard statistics
+
 router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -556,7 +556,7 @@ router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, asy
       rejected: await UserBlogSubmission.countDocuments({ status: 'rejected' })
     };
 
-    // Get recent submissions (last 7 days)
+    
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
@@ -564,7 +564,7 @@ router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, asy
       submittedAt: { $gte: sevenDaysAgo }
     });
 
-    // Get top contributors
+    
     const topContributors = await UserBlogSubmission.aggregate([
       {
         $group: {
@@ -589,7 +589,7 @@ router.get('/api/admin/blog-submissions/stats/dashboard', authenticateToken, asy
   }
 });
 
-// Bulk approve submissions
+
 router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -616,7 +616,7 @@ router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async
           continue;
         }
 
-        // Create blog post with processed content
+        
         const newBlog = new Blog({
           title: submission.title,
           content: submission.content,
@@ -632,7 +632,7 @@ router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async
 
         await newBlog.save();
 
-        // Update submission
+        
         submission.status = 'approved';
         submission.reviewedBy = req.user.admin_id;
         submission.reviewedAt = new Date();
@@ -656,7 +656,7 @@ router.post('/api/admin/blog-submissions/bulk/approve', authenticateToken, async
   }
 });
 
-// Bulk reject submissions
+
 router.post('/api/admin/blog-submissions/bulk/reject', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -698,4 +698,4 @@ router.post('/api/admin/blog-submissions/bulk/reject', authenticateToken, async 
   }
 });
 
-module.exports = router;
+module.exports = router;  

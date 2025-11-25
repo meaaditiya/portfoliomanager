@@ -238,3 +238,4 @@ const getAdminNotificationTemplate = (name, email, message) => {
     `;
 };
 module.exports = getAdminNotificationTemplate;
+

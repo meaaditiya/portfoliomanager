@@ -32,6 +32,7 @@ const ReactionSchema = new mongoose.Schema({
   }
 });
 
+
 ReactionSchema.index({ blog: 1, 'user.email': 1 }, { unique: true });
 
 module.exports = mongoose.model('Reaction', ReactionSchema);

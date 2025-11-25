@@ -12,11 +12,11 @@ const streamSchema = new mongoose.Schema({
   },
   scheduledDate: {
     type: String,
-    required: true // Format: "YYYY-MM-DD"
+    required: true 
   },
   scheduledTime: {
     type: String,
-    required: true // Format: "HH:MM AM/PM"
+    required: true 
   },
   youtubeLink: {
     type: String,

@@ -20,26 +20,22 @@ const cachemiddleware = require("../middlewares/cacheMiddleware");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const jwt = require('jsonwebtoken');
 const User = require("../models/userSchema");
+const {calculateReadTime} = require('../utils/calculateReadTime')
 const { 
   generateQueryEmbedding, 
   cosineSimilarity,
   doextractPlainText,
-  generateBlogEmbedding  // ADD THIS
+  generateBlogEmbedding 
 } = require('../services/embeddingService');
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
-    // ✅ ADD isSubscriberOnly here
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos, isSubscriberOnly } = req.body;
-    
-    // Validate required fields
     if (!title || !content || !summary) {
       return res.status(400).json({ message: 'Title, content, and summary are required' });
     }
-    
-    // Clean up unused images and videos
     const cleanedImages = cleanupUnusedImages(content, contentImages || []);
     const cleanedVideos = cleanupUnusedVideos(content, contentVideos || []);
-    
+    const readTime = calculateReadTime(content);
     const newBlog = new Blog({
       title,
       content,
@@ -50,12 +46,11 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       featuredImage,
       contentImages: cleanedImages,
       contentVideos: cleanedVideos,
-      isSubscriberOnly: isSubscriberOnly || false  // ✅ ADD THIS
+      isSubscriberOnly: isSubscriberOnly || false,
+      readTime: readTime
     });
     
     await newBlog.save();
-    
-    // ✅ AUTO-GENERATE EMBEDDING IF PUBLISHED
     if (newBlog.status === 'published') {
       try {
         await generateBlogEmbedding(newBlog);
@@ -77,7 +72,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
   }
 });
 
-  // Add image to blog content
+  
   router.post('/api/blogs/:id/images', authenticateToken, async (req, res) => {
     try {
       const { id } = req.params;
@@ -93,12 +88,12 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // Check authorization
+      
       if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
       
-      // Generate unique image ID
+      
       const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       
       const newImage = {
@@ -140,12 +135,12 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Calculate statistics
+    
     const uniqueReaders = blog.readFingerprints.length;
     const totalReads = blog.totalReads;
     const averageReadsPerReader = uniqueReaders > 0 ? (totalReads / uniqueReaders).toFixed(2) : 0;
     
-    // Get top readers (most reads from same fingerprint)
+    
     const topReaders = blog.readFingerprints
       .sort((a, b) => b.readCount - a.readCount)
       .slice(0, 10)
@@ -155,7 +150,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         lastReadAt: rf.readAt
       }));
     
-    // Calculate read trend (reads per day for last 30 days)
+    
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -183,7 +178,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-  // Update content image
+  
   router.put('/api/blogs/:id/images/:imageId', authenticateToken, async (req, res) => {
     try {
       const { id, imageId } = req.params;
@@ -195,7 +190,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // Check authorization
+      
       if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
@@ -206,7 +201,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Image not found' });
       }
       
-      // Update image properties
+      
       if (url) blog.contentImages[imageIndex].url = url;
       if (alt !== undefined) blog.contentImages[imageIndex].alt = alt;
       if (caption !== undefined) blog.contentImages[imageIndex].caption = caption;
@@ -224,7 +219,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     }
   });
   
-  // Delete content image
+  
   router.delete('/api/blogs/:id/images/:imageId', authenticateToken, async (req, res) => {
     try {
       const { id, imageId } = req.params;
@@ -235,7 +230,7 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // Check authorization
+      
       if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to modify this blog post' });
       }
@@ -256,9 +251,9 @@ router.post('/api/blogs', authenticateToken, async (req, res) => {
     }
   });
   
-// ============================================
-// FIXED: Extract both admin and user from JWT tokens
-// ============================================
+
+
+
 const extractAuthFromToken = async (req, res, next) => {
   try {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
@@ -266,9 +261,9 @@ const extractAuthFromToken = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
       
-      console.log('🔍 Token decoded:', decoded); // Temporary debug log
+      console.log('🔍 Token decoded:', decoded); 
       
-      // Check if it's ADMIN auth (has admin_id)
+      
       if (decoded.admin_id) {
         req.user = {
           admin_id: decoded.admin_id,
@@ -278,15 +273,15 @@ const extractAuthFromToken = async (req, res, next) => {
         console.log('✅ Admin authenticated:', decoded.admin_id);
         next();
       } 
-      // Check if it's USER auth (has user_id - WITH UNDERSCORE)
-      else if (decoded.user_id) {  // ✅ FIXED: user_id not userId
+      
+      else if (decoded.user_id) {  
         try {
           const user = await User.findById(decoded.user_id);
           
           if (user) {
             req.user = {
               user_id: user._id,
-              userId: user._id,  // Add both for compatibility
+              userId: user._id,  
               email: user.email,
               name: user.name,
               isAuthenticated: true,
@@ -319,12 +314,12 @@ const extractAuthFromToken = async (req, res, next) => {
     next();
   }
 };
-// ============================================
-// UPDATED: Get a single blog post
-// ============================================
+
+
+
 router.get(
   '/api/blogs/:identifier',
-  extractAuthFromToken, // Use combined auth middleware
+  extractAuthFromToken, 
   async (req, res) => {
     try {
       const { identifier } = req.params;
@@ -334,7 +329,7 @@ router.get(
         ? { _id: identifier }
         : { slug: identifier };
       
-      // ✅ Check both admin and user authentication
+      
       const isAuthenticated = req.user?.isAuthenticated;
       
       console.log('Auth check:', {
@@ -361,7 +356,7 @@ router.get(
         isAuthenticated
       });
       
-      // If subscriber-only blog and NOT authenticated, return preview only
+      
       if (blog.isSubscriberOnly && !isAuthenticated) {
         console.log('✅ Returning subscriber-only preview (not authenticated)');
         return res.json({
@@ -372,15 +367,16 @@ router.get(
           author: blog.author,
           publishedAt: blog.publishedAt,
           tags: blog.tags || [],
+          readTime: blog.readTime,  
           isSubscriberOnly: true,
           preview: true,
           message: 'This is subscriber-only content. Please login to access full article.'
         });
       }
       
-      // ✅ FULL CONTENT for:
-      // 1. Public blogs (isSubscriberOnly = false)
-      // 2. Subscriber-only blogs when user/admin IS authenticated
+      
+      
+      
       console.log('✅ Returning full blog content (public or authenticated)');
       
       const fingerprint = getFingerprintFromRequest(req);
@@ -429,12 +425,12 @@ router.get(
   }
 );
 
-// ============================================
-// FIXED: Get all blog posts - Tags now included for subscriber-only previews
-// ============================================
-// ============================================
-// COMPLETELY FIXED: Get all blog posts with tags working
-// ============================================
+
+
+
+
+
+
 router.get(
   "/api/blogs",
   extractAuthFromToken,
@@ -452,19 +448,19 @@ router.get(
 
       const filter = {};
 
-      // STATUS FILTER
+      
       if (status) {
         filter.status = status;
       } else {
         filter.status = "published";
       }
 
-      // TAG FILTER
+      
       if (tag) {
         filter.tags = { $in: [tag] };
       }
 
-      // SEARCH FILTER
+      
       if (search) {
         filter.$or = [
           { title: { $regex: search, $options: "i" } },
@@ -478,14 +474,14 @@ router.get(
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // ✅ EXPLICIT SELECT to ensure tags are included
+      
       const blogs = await Blog.find(filter)
-        .select('+tags') // Explicitly include tags
+        .select('+tags') 
         .sort(sort)
         .skip(skip)
         .limit(parseInt(limit))
         .populate("author", "name email")
-        .lean() // Use lean() for better performance
+        .lean() 
         .exec();
 
       const isAuthenticated = req.user?.isAuthenticated;
@@ -500,7 +496,7 @@ router.get(
       const processedBlogs = blogs.map(blog => {
         const isSubscriberOnly = blog.isSubscriberOnly || false;
 
-        // ✅ PREVIEW CASE - Subscriber-only without auth
+       
         if (isSubscriberOnly && !isAuthenticated) {
           const previewBlog = {
             _id: blog._id,
@@ -509,7 +505,8 @@ router.get(
             featuredImage: blog.featuredImage,
             author: blog.author,
             publishedAt: blog.publishedAt,
-            tags: blog.tags || [], // ✅ Tags explicitly included
+            tags: blog.tags || [], 
+            readTime: blog.readTime,
             isSubscriberOnly: true,
             preview: true
           };
@@ -523,7 +520,7 @@ router.get(
           return previewBlog;
         }
 
-        // ✅ FULL CASE - Public or authenticated user
+        
         const fullBlog = {
           ...blog,
           processedContent: processContent(
@@ -531,7 +528,7 @@ router.get(
             blog.contentImages || [],
             blog.contentVideos || []
           ),
-          tags: blog.tags || [] // Ensure tags always exist
+          tags: blog.tags || [] 
         };
 
         console.log('🔓 Full blog:', {
@@ -568,12 +565,12 @@ router.get(
 );
 
 
-// ============================================
-// UPDATED: Search route with both auth types
-// ============================================
 
 
-// NEW: Report a blog post (Public route)
+
+
+
+
 router.post('/api/blogs/:identifier/report', async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -639,7 +636,7 @@ router.post('/api/blogs/:identifier/report', async (req, res) => {
   }
 });
 
-// NEW: Get reports for a specific blog (Admin only)
+
 router.get('/api/blogs/:identifier/reports', authenticateToken, async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -670,7 +667,7 @@ router.get('/api/blogs/:identifier/reports', authenticateToken, async (req, res)
   }
 });
 
-// NEW: Delete a specific report (Admin only)
+
 router.delete('/api/blogs/:identifier/reports/:reportId', authenticateToken, async (req, res) => {
   try {
     const { identifier, reportId } = req.params;
@@ -707,7 +704,7 @@ router.delete('/api/blogs/:identifier/reports/:reportId', authenticateToken, asy
   }
 });
 
-// NEW: Clear all reports for a specific blog (Admin only)
+
 router.delete('/api/blogs/:identifier/reports', authenticateToken, async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -736,7 +733,7 @@ router.delete('/api/blogs/:identifier/reports', authenticateToken, async (req, r
   }
 });
 
-// NEW: Get all blogs with reports (Admin only)
+
 router.get('/api/blogs/reports/all', authenticateToken, async (req, res) => {
   try {
     const blogs = await Blog.find({ totalReports: { $gt: 0 } })
@@ -752,10 +749,10 @@ router.get('/api/blogs/reports/all', authenticateToken, async (req, res) => {
   }
 });
 
-// NEW: Get blog statistics (Admin only)
-// ============================================
-// UPDATED ROUTE: Get blog statistics (Admin only)
-// ============================================
+
+
+
+
 router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -798,7 +795,7 @@ router.get('/api/blogs/:identifier/stats', authenticateToken, async (req, res) =
     res.status(500).json({ message: error.message });
   }
 });
-// NEW: Get overall blog statistics (Admin only)
+
 router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
   try {
     const totalBlogs = await Blog.countDocuments();
@@ -806,7 +803,7 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
     const draftBlogs = await Blog.countDocuments({ status: 'draft' });
     const blogsWithReports = await Blog.countDocuments({ totalReports: { $gt: 0 } });
     
-    // Calculate total reads and unique readers
+    
     const readStatsResult = await Blog.aggregate([
       { 
         $group: { 
@@ -837,7 +834,7 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
       .limit(5)
       .exec();
     
-    // Add unique readers count to most read blogs
+    
     const mostReadBlogsWithUnique = mostReadBlogs.map(blog => ({
       title: blog.title,
       slug: blog.slug,
@@ -872,8 +869,8 @@ router.get('/api/blogs/stats/overview', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Update a blog post (updated to handle videos)
-// Update a blog post (updated to handle videos + auto-embedding)
+
+
 router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -889,13 +886,13 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this blog post' });
     }
     
-    // ✅ TRACK CHANGES THAT AFFECT EMBEDDINGS
+   
     const wasPublished = blog.status === 'published';
     const contentChanged = updates.content !== undefined || 
                           updates.title !== undefined || 
                           updates.summary !== undefined;
     
-    // ✅ ADD isSubscriberOnly to allowed updates
+    
     const allowedUpdates = [
       'title', 
       'content', 
@@ -905,7 +902,7 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       'featuredImage', 
       'contentImages', 
       'contentVideos',
-      'isSubscriberOnly'  // ← ADD THIS
+      'isSubscriberOnly'  
     ];
     
     allowedUpdates.forEach(field => {
@@ -914,15 +911,16 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       }
     });
     
-    // Clean up unused media if content was updated
+    
     if (updates.content !== undefined) {
+      blog.readTime = calculateReadTime(updates.content);
       blog.contentImages = cleanupUnusedImages(updates.content, blog.contentImages);
       blog.contentVideos = cleanupUnusedVideos(updates.content, blog.contentVideos);
     }
     
     await blog.save();
     
-    // ✅ AUTO-REGENERATE EMBEDDING IF NEEDED
+    
     const isNowPublished = blog.status === 'published';
     const shouldRegenerateEmbedding = isNowPublished && (
       contentChanged ||                    
@@ -954,19 +952,19 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
 });
   
   
-  // Delete a blog post
+  
   router.delete('/api/blogs/:id', authenticateToken, async (req, res) => {
     try {
       const { id } = req.params;
       
-      // Find blog post
+      
       const blog = await Blog.findById(id);
       
       if (!blog) {
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // Check if user is the author or has admin rights
+      
       if (blog.author.toString() !== req.user.admin_id) {
         return res.status(403).json({ message: 'Not authorized to delete this blog post' });
       }
@@ -979,7 +977,7 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
       res.status(500).json({ message: error.message });
     }
   });
-  // Get all images for a specific blog post
+  
   router.get('/api/blogs/:id/images', authenticateToken, async (req, res) => {
     try {
       const { id } = req.params;
@@ -990,7 +988,7 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Blog post not found' });
       }
       
-      // Check authorization
+      
       if (blog.author.toString() !== req.user.admin_id ) {
         return res.status(403).json({ message: 'Not authorized to view this blog post images' });
       }
@@ -1008,9 +1006,9 @@ router.put('/api/blogs/:id', authenticateToken, async (req, res) => {
 
 
 
-  // Video Routes for Blog Posts
+  
 
-// Add video to blog content
+
 router.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1026,19 +1024,19 @@ router.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check authorization
+    
     if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
     
-    // Extract video info from URL
+    
     const videoInfo = extractVideoInfo(url);
     
     if (!videoInfo) {
       return res.status(400).json({ message: 'Invalid video URL. Currently supported: YouTube, Vimeo, Dailymotion' });
     }
     
-    // Generate unique embed ID
+    
     const embedId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
     const newVideo = {
@@ -1068,7 +1066,7 @@ router.post('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
   }
 });
 
-// Update content video
+
 router.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res) => {
   try {
     const { id, embedId } = req.params;
@@ -1080,7 +1078,7 @@ router.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res)
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check authorization
+    
     if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
@@ -1091,7 +1089,7 @@ router.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res)
       return res.status(404).json({ message: 'Video not found' });
     }
     
-    // Update video properties
+    
     if (url) {
       const videoInfo = extractVideoInfo(url);
       if (!videoInfo) {
@@ -1120,7 +1118,7 @@ router.put('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res)
   }
 });
 
-// Delete content video
+
 router.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, res) => {
   try {
     const { id, embedId } = req.params;
@@ -1131,7 +1129,7 @@ router.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, r
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check authorization
+    
     if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
@@ -1152,7 +1150,7 @@ router.delete('/api/blogs/:id/videos/:embedId', authenticateToken, async (req, r
   }
 });
 
-// Get all videos for a specific blog post
+
 router.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1163,7 +1161,7 @@ router.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check authorization
+    
     if (blog.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to view this blog post videos' });
     }
@@ -1178,14 +1176,14 @@ router.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
   }
 });
 
-// Generate summary for a blog post (Public route)
+
 router.post('/api/blogs/:id/generate-summary', async (req, res) => {
   try {
-    // Validate API key first
+    
     validateApiKey();
     
     const { id } = req.params;
-    const { wordLimit = 300, temperature = 0.7 } = req.body; // Made wordLimit configurable
+    const { wordLimit = 300, temperature = 0.7 } = req.body; 
     
     const blog = await Blog.findById(id);
     
@@ -1193,7 +1191,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Extract plain text from blog content
+    
     const plainTextContent = extractPlainText(blog.content);
     
     if (plainTextContent.length < 100) {
@@ -1202,7 +1200,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
       });
     }
     
-    // Create the prompt for Gemini with better structure
+    
     const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
     - Be approximately ${wordLimit} words long
     - Capture the main points and key insights
@@ -1218,12 +1216,12 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
     
     Please provide only the summary without any additional commentary, formatting, or meta-text.`;
     
-    // Configure generation parameters for better results
+    
     const generationConfig = {
       temperature: temperature,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: Math.ceil(wordLimit * 1.5), // Allow some flexibility
+      maxOutputTokens: Math.ceil(wordLimit * 1.5), 
     };
     
     const modelWithConfig = genAI.getGenerativeModel({ 
@@ -1231,7 +1229,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
       generationConfig: generationConfig
     });
     
-    // Generate summary using Gemini with retry logic
+    
     let result;
     let attempts = 0;
     const maxAttempts = 3;
@@ -1244,7 +1242,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
         attempts++;
         if (attempts >= maxAttempts) throw retryError;
         
-        // Wait before retry (exponential backoff)
+        
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
       }
     }
@@ -1252,13 +1250,13 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
     const response = await result.response;
     let generatedSummary = response.text().trim();
     
-    // Clean up any unwanted formatting that might be added
+    
     generatedSummary = generatedSummary
       .replace(/^\*\*Summary\*\*:?\s*/i, '')
       .replace(/^\*\*\s*|\s*\*\*$/g, '')
       .trim();
     
-    // Validate generated summary length (rough word count)
+    
     const wordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
     
     if (wordCount < Math.floor(wordLimit * 0.7)) {
@@ -1282,7 +1280,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
   } catch (error) {
     console.error('Error generating blog summary:', error);
     
-    // Enhanced error handling with more specific cases
+    
     if (error.message.includes('API_KEY') || error.message.includes('key')) {
       return res.status(500).json({ 
         message: 'Gemini API configuration error. Please check your API key.',
@@ -1319,7 +1317,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
   }
 });
 
-// Update blog with AI-generated summary (Public route)
+
 router.put('/api/blogs/:id/update-summary', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1329,7 +1327,7 @@ router.put('/api/blogs/:id/update-summary', async (req, res) => {
       return res.status(400).json({ message: 'Valid summary is required' });
     }
     
-    if (summary.length > 2000) { // Increased limit for better summaries
+    if (summary.length > 2000) { 
       return res.status(400).json({ 
         message: 'Summary is too long. Maximum 2000 characters allowed.' 
       });
@@ -1341,7 +1339,7 @@ router.put('/api/blogs/:id/update-summary', async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check if summary already exists and replaceExisting is false
+    
     if (blog.summary && blog.summary.trim() !== '' && !replaceExisting) {
       return res.status(409).json({ 
         message: 'Blog already has a summary. Set replaceExisting to true to overwrite.',
@@ -1349,7 +1347,7 @@ router.put('/api/blogs/:id/update-summary', async (req, res) => {
       });
     }
     
-    // Update the summary with metadata
+    
     blog.summary = summary.trim();
     blog.summaryUpdatedAt = new Date();
     blog.summaryWordCount = summary.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -1374,7 +1372,7 @@ router.put('/api/blogs/:id/update-summary', async (req, res) => {
   }
 });
 
-// Generate and auto-update summary in one step (Public route)
+
 router.post('/api/blogs/:id/auto-summary', async (req, res) => {
   try {
     validateApiKey();
@@ -1388,7 +1386,7 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check if summary already exists
+    
     if (blog.summary && blog.summary.trim() !== '' && !forceUpdate) {
       return res.status(409).json({ 
         message: 'Blog already has a summary. Set forceUpdate to true to regenerate.',
@@ -1396,7 +1394,7 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
       });
     }
     
-    // Generate summary (reuse logic from generate-summary route)
+    
     const plainTextContent = extractPlainText(blog.content);
     
     if (plainTextContent.length < 100) {
@@ -1436,13 +1434,13 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
     const response = await result.response;
     let generatedSummary = response.text().trim();
     
-    // Clean up formatting
+    
     generatedSummary = generatedSummary
       .replace(/^\*\*Summary\*\*:?\s*/i, '')
       .replace(/^\*\*\s*|\s*\*\*$/g, '')
       .trim();
     
-    // Update the blog with generated summary and metadata
+    
     blog.summary = generatedSummary;
     blog.summaryUpdatedAt = new Date();
     blog.summaryWordCount = generatedSummary.split(/\s+/).filter(word => word.length > 0).length;
@@ -1465,7 +1463,7 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
   } catch (error) {
     console.error('Error in auto-summary generation:', error);
     
-    // Apply same error handling as generate-summary route
+    
     if (error.message.includes('API_KEY') || error.message.includes('key')) {
       return res.status(500).json({ 
         message: 'Gemini API configuration error. Please check your API key.',
@@ -1480,7 +1478,7 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
   }
 });
 
-// Get summary status for multiple blogs (batch check) - Public route
+
 router.post('/api/blogs/summary-status', async (req, res) => {
   try {
     const { blogIds } = req.body;
@@ -1489,7 +1487,7 @@ router.post('/api/blogs/summary-status', async (req, res) => {
       return res.status(400).json({ message: 'Blog IDs array is required' });
     }
     
-    if (blogIds.length > 100) { // Increased limit
+    if (blogIds.length > 100) { 
       return res.status(400).json({ message: 'Maximum 100 blog IDs allowed per request' });
     }
     
@@ -1521,12 +1519,12 @@ router.post('/api/blogs/summary-status', async (req, res) => {
   }
 });
 
-// Health check endpoint for API connectivity
+
 router.get('/api/gemini/health', async (req, res) => {
   try {
     validateApiKey();
     
-    // Test with a simple generation request
+    
     const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const testResult = await testModel.generateContent("Say 'API is working' in exactly 3 words.");
     const testResponse = await testResult.response;
@@ -1564,9 +1562,9 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
-    .lean();  // ✅ Use lean() for performance
+    .lean();  
     
-    // ✅ POPULATE USER DATA FROM USER COLLECTION
+    
     for (let comment of comments) {
       if (comment.user.userId) {
         const userData = await User.findById(comment.user.userId)
@@ -1579,7 +1577,7 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
         }
       }
       
-      // Count replies
+      
       comment.repliesCount = await Comment.countDocuments({
         parentComment: comment._id,
         status: 'approved'
@@ -1623,17 +1621,17 @@ router.post(
       const { blogId } = req.params;
       let { name, email, content } = req.body;
 
-      // ✅ EXTRACT USER FROM JWT IF PRESENT
+      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       let userId = null;
       
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          // ✅ FIXED: Use user_id not userId
+          
           userId = decoded.user_id;
           
-          // Get user data to override name/email
+          
           const user = await User.findById(userId);
           if (user) {
             name = user.name;
@@ -1670,13 +1668,13 @@ router.post(
 
       console.log(`✅ Content approved for ${name}`);
 
-      // ✅ UPDATED: Store userId in comment
+      
       const newComment = new Comment({
         blog: blogId,
         user: { 
           name, 
           email,
-          userId: userId || null  // ✅ Store userId if authenticated
+          userId: userId || null  
         },
         content,
         fingerprint
@@ -1707,7 +1705,7 @@ router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
     const { commentId } = req.params;
     const { email } = req.body;
     
-    // Get token if user is logged in
+    
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
     
     const comment = await Comment.findById(commentId);
@@ -1715,7 +1713,7 @@ router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
       return res.status(404).json({ canDelete: false, message: 'Comment not found' });
     }
     
-    // Prevent deletion of author comments through this route
+    
     if (comment.isAuthorComment) {
       return res.status(200).json({ canDelete: false, reason: 'author_comment' });
     }
@@ -1723,7 +1721,7 @@ router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
     let canDelete = false;
     let verificationMethod = 'none';
     
-    // Priority 1: Check JWT token (most secure)
+    
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
@@ -1738,11 +1736,11 @@ router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
       }
     }
     
-    // Priority 2: Check fingerprint match (if not authenticated)
+    
     if (!canDelete && email) {
       const requestFingerprint = getFingerprintFromRequest(req);
       
-      // Must match BOTH email AND fingerprint
+      
       if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
         canDelete = true;
         verificationMethod = 'fingerprint_match';
@@ -1779,17 +1777,17 @@ router.delete('/api/comments/:commentId/user',
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      // Prevent deletion of author comments
+      
       if (comment.isAuthorComment) {
         return res.status(403).json({ message: 'Author comments cannot be deleted through this route' });
       }
 
-      // Get token if user is logged in
+      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
       let isAuthorized = false;
       
-      // Priority 1: Verify JWT token (most secure)
+      
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
@@ -1804,11 +1802,11 @@ router.delete('/api/comments/:commentId/user',
         }
       }
       
-      // Priority 2: Verify fingerprint + email match (for guests)
+      
       if (!isAuthorized) {
         const requestFingerprint = getFingerprintFromRequest(req);
         
-        // Must match BOTH email AND fingerprint
+        
         if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
           isAuthorized = true;
           console.log('✅ Deletion authorized via fingerprint match');
@@ -1828,7 +1826,7 @@ router.delete('/api/comments/:commentId/user',
         });
       }
 
-      // Proceed with deletion (rest of the code remains the same)
+      
       if (comment.parentComment) {
         await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
       }
@@ -1856,17 +1854,17 @@ router.delete('/api/comments/:commentId/user',
   }
 );
   
-  // Admin route: Get all comments for a blog (including pending/rejected)
+  
   router.get('/api/admin/blogs/:blogId/comments', authenticateToken, async (req, res) => {
     try {
       const { blogId } = req.params;
       
-      // Pagination
+      
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
       
-      // Get all comments (status filter optional)
+      
       const statusFilter = req.query.status ? { status: req.query.status } : {};
       
       const comments = await Comment.find({ 
@@ -1896,7 +1894,7 @@ router.delete('/api/comments/:commentId/user',
     }
   });
   
-  // Admin route: Update comment status
+  
   router.patch('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
     try {
       const { commentId } = req.params;
@@ -1911,12 +1909,12 @@ router.delete('/api/comments/:commentId/user',
         return res.status(404).json({ message: 'Comment not found' });
       }
       
-      // If comment was not approved before but is now being approved, increment the count
+      
       if (comment.status !== 'approved' && status === 'approved') {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: 1 } });
       }
       
-      // If comment was approved before but is now being unapproved, decrement the count
+      
       if (comment.status === 'approved' && status !== 'approved') {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       }
@@ -1934,7 +1932,7 @@ router.delete('/api/comments/:commentId/user',
     }
   });
   
-  // Admin route: Delete comment
+  
   router.delete('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
     try {
       const { commentId } = req.params;
@@ -1944,7 +1942,7 @@ router.delete('/api/comments/:commentId/user',
         return res.status(404).json({ message: 'Comment not found' });
       }
       
-      // If comment was approved, update the count on blog
+      
       if (comment.status === 'approved') {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       }
@@ -1958,7 +1956,7 @@ router.delete('/api/comments/:commentId/user',
     }
   });
 
-// POST comment route with content moderation
+
 router.post(
   '/api/blogs/:blogId/comments',
   [
@@ -1982,7 +1980,7 @@ router.post(
         return res.status(404).json({ message: 'Blog not found' });
       }
 
-      // Get fingerprint
+      
       const fingerprint = getFingerprintFromRequest(req);
 
       console.log(`🔍 Moderating comment from ${name}...`);
@@ -2030,7 +2028,7 @@ router.post(
   }
 );
 
-// POST reply route with content moderation
+
 router.post(
   '/api/comments/:commentId/replies',
   [
@@ -2049,14 +2047,14 @@ router.post(
       const { commentId } = req.params;
       let { name, email, content } = req.body;
 
-      // ✅ EXTRACT USER FROM JWT IF PRESENT
+      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       let userId = null;
       
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          userId = decoded.user_id;  // ✅ FIXED: user_id not userId
+          userId = decoded.user_id;  
           
           const user = await User.findById(userId);
           if (user) {
@@ -2092,13 +2090,13 @@ router.post(
         });
       }
 
-      // ✅ UPDATED: Store userId in reply
+      
       const newReply = new Comment({
         blog: parentComment.blog,
         user: { 
           name, 
           email,
-          userId: userId || null  // ✅ Store userId
+          userId: userId || null  
         },
         content,
         parentComment: commentId,
@@ -2122,7 +2120,7 @@ router.post(
     }
   }
 );
-// Get replies for a comment
+
 router.get('/api/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2140,7 +2138,7 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     .limit(limit)
     .lean();
     
-    // ✅ POPULATE USER DATA FOR REPLIES
+    
     for (let reply of replies) {
       if (reply.user.userId) {
         const userData = await User.findById(reply.user.userId)
@@ -2172,7 +2170,7 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-// Add/Remove reaction to a comment
+
 router.post(
   '/api/comments/:commentId/reactions',
   [
@@ -2193,7 +2191,7 @@ router.post(
       const { commentId } = req.params;
       let { name, email, type } = req.body;
 
-      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
       if (token) {
@@ -2323,7 +2321,7 @@ router.post(
     }
   }
 );
-// Get user's reaction to a comment
+
 router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2352,7 +2350,7 @@ router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
   }
 });
 
-// Get reaction counts for a comment
+
 router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2371,16 +2369,16 @@ router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-  // Author route: Add author comment (requires authentication)
+  
 router.post(
   '/api/blogs/:blogId/author-comment',
-  authenticateToken, // Assuming you have auth middleware
+  authenticateToken, 
   [
     body('content').trim().notEmpty().withMessage('Comment content is required')
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
   ],
   async (req, res) => {
-    // Validate request
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -2390,27 +2388,27 @@ router.post(
       const { blogId } = req.params;
       const { content } = req.body;
 
-      // Check if blog exists
+      
       const blog = await Blog.findById(blogId);
       if (!blog) {
         return res.status(404).json({ message: 'Blog not found' });
       }
 
-      // Create new author comment
+      
       const newComment = new Comment({
         blog: blogId,
         user: { 
-          name: req.user.name || 'Aaditiya Tyagi', // Get from authenticated user
-          email: req.user.email // Get from authenticated user
+          name: req.user.name || 'Aaditiya Tyagi', 
+          email: req.user.email 
         },
         content,
         isAuthorComment: true,
-        status: 'approved' // Author comments are auto-approved
+        status: 'approved' 
       });
 
       await newComment.save();
       
-      // Update blog comments count
+      
       await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
 
       res.status(201).json({ 
@@ -2424,17 +2422,17 @@ router.post(
   }
 );
 
-// Author route: Get author comments for a blog
+
 router.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, res) => {
   try {
     const { blogId } = req.params;
     
-    // Pagination
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Get only author comments
+    
     const comments = await Comment.find({ 
       blog: blogId,
       isAuthorComment: true
@@ -2462,7 +2460,7 @@ router.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, 
   }
 });
 
-// Author route: Delete author comment
+
 router.delete('/api/author-comments/:commentId', authenticateToken, async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2472,30 +2470,30 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    // Check if it's an author comment
+    
     if (!comment.isAuthorComment) {
       return res.status(403).json({ message: 'Not an author comment' });
     }
 
-    // If it's a reply, update parent comment's replies count
+    
     if (comment.parentComment) {
       await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
     }
     
-    // If it's a top-level comment, update blog comments count
+    
     if (!comment.parentComment) {
       await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       
-      // Delete all replies to this comment
+      
       const repliesToDelete = await Comment.find({ parentComment: commentId });
       for (const reply of repliesToDelete) {
-        // Delete reactions for each reply
+        
         await CommentReaction.deleteMany({ comment: reply._id });
       }
       await Comment.deleteMany({ parentComment: commentId });
     }
 
-    // Delete reactions for this comment
+    
     await CommentReaction.deleteMany({ comment: commentId });
     
     await Comment.deleteOne({ _id: commentId });
@@ -2506,9 +2504,9 @@ router.delete('/api/author-comments/:commentId', authenticateToken, async (req, 
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-  // ============================================
-// UPDATED ROUTE: Post blog reaction with fingerprint
-// ============================================
+  
+
+
 router.post(
   '/api/blogs/:blogId/reactions',
   [
@@ -2529,7 +2527,7 @@ router.post(
       const { blogId } = req.params;
       let { name, email, type } = req.body;
 
-      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
       if (token) {
@@ -2650,7 +2648,7 @@ router.post(
     }
   }
 );
-  // Get user's reaction to a blog
+  
   router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {
     try {
       const { blogId } = req.params;
@@ -2679,7 +2677,7 @@ router.post(
     }
   });
   
-  // Get reaction counts for a blog
+  
   router.get('/api/blogs/:blogId/reactions/count', async (req, res) => {
     try {
       const { blogId } = req.params;
@@ -2699,7 +2697,7 @@ router.post(
     }
   });
   
-  // Admin route: Get detailed reactions data (requires authentication)
+  
   router.get('/api/admin/blogs/:blogId/reactions', authenticateToken, async (req, res) => {
     try {
       const { blogId } = req.params;
@@ -2722,7 +2720,7 @@ router.post(
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   });
-  // AUTHOR ROUTE: Add author reply to a comment
+  
   router.post(
     '/api/comments/:commentId/author-reply',
     authenticateToken,
@@ -2731,7 +2729,7 @@ router.post(
         .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
     ],
     async (req, res) => {
-      // Validate request
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -2741,18 +2739,18 @@ router.post(
         const { commentId } = req.params;
         const { content } = req.body;
   
-        // Check if parent comment exists
+        
         const parentComment = await Comment.findById(commentId);
         if (!parentComment) {
           return res.status(404).json({ message: 'Parent comment not found' });
         }
   
-        // Check if parent comment is approved
+        
         if (parentComment.status !== 'approved') {
           return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
         }
   
-        // Create new author reply
+        
         const newReply = new Comment({
           blog: parentComment.blog,
           user: { 
@@ -2762,12 +2760,12 @@ router.post(
           content,
           parentComment: commentId,
           isAuthorComment: true,
-          status: 'approved' // Author replies are auto-approved
+          status: 'approved' 
         });
   
         await newReply.save();
         
-        // Update parent comment's replies count
+        
         await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
   
         res.status(201).json({ 
@@ -2788,10 +2786,10 @@ function getRelevanceLevel(score) {
   return 'very_low';
 }
 
-// -----------------------------
-// Internal text search helper
-// (only selects author.name)
-// -----------------------------
+
+
+
+
 async function performTextSearchInternal(query, limit, includeUnpublished, filters = {}) {
   const searchQuery = { $text: { $search: query } };
 
@@ -2814,10 +2812,10 @@ async function performTextSearchInternal(query, limit, includeUnpublished, filte
   return results;
 }
 
-// -----------------------------
-// Helper: prepare result for user
-// (returns preview for subscriber-only if unauthenticated)
-// -----------------------------
+
+
+
+
 function prepareResultForUser(doc, isAuthenticated) {
   const base = {
     _id: doc._id,
@@ -2834,30 +2832,31 @@ function prepareResultForUser(doc, isAuthenticated) {
     reactionCounts: doc.reactionCounts || 0,
     commentsCount: doc.commentsCount || 0,
     totalReads: doc.totalReads || 0,
+     readTime: doc.readTime || 0,
     isSubscriberOnly: !!doc.isSubscriberOnly
   };
 
-  // Preview for subscriber-only (unauthenticated)
+  
   if (doc.isSubscriberOnly && !isAuthenticated) {
     return {
       ...base,
       preview: true
-      // only title, summary, featuredImage, author, date, tags included as requested
+      
     };
   }
 
-  // For authenticated users or non-subscriber-only posts, include content preview (but keep secure)
+  
   return {
     ...base,
     preview: false,
-    // include a short content preview always (max 300 chars) to help UX
+    
     contentPreview: typeof doc.content === 'string' ? (doc.content.substring(0, 300) + (doc.content.length > 300 ? '...' : '')) : ''
   };
 }
 
-// -----------------------------
-// Suggestions generator (Gemini)
-// -----------------------------
+
+
+
 async function generateSearchSuggestions(originalQuery, topResults) {
   try {
     const resultTitles = topResults.map(r => r.title).join(', ');
@@ -2886,20 +2885,20 @@ Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
   }
 }
 
-// -----------------------------
-// Main search route
-// -----------------------------
+
+
+
 router.post('/api/search', extractAuthFromToken, async (req, res) => {
   try {
     const {
       query,
       limit = 10,
-      minScore = 0.15, // lower default while tuning
+      minScore = 0.15, 
       includeUnpublished = false,
       filters = {},
       hybridSearch = true,
       generateSuggestions = true,
-      debug = false // optional query flag to return diagnostics
+      debug = false 
     } = req.body;
 
     if (!query || query.trim().length === 0) {
@@ -2909,24 +2908,24 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
     const isAuthenticated = !!req.user?.isAuthenticated;
     const startTime = Date.now();
 
-    // 1) Exact title/slug boost (quick check)
+    
     const normalizedQuery = query.trim();
     const exactMatch = await Blog.findOne({
       $or: [
         { title: normalizedQuery },
         { slug: normalizedQuery },
-        { titleLower: normalizedQuery.toLowerCase() }, // optional precomputed field
+        { titleLower: normalizedQuery.toLowerCase() }, 
       ],
       ...(includeUnpublished ? {} : { status: 'published' })
     }).populate('author', 'name').lean();
 
-    // 2) Create query embedding
+    
     let queryEmbedding;
     try {
       queryEmbedding = await generateQueryEmbedding(query);
     } catch (embeddingError) {
       console.error('Query embedding failed, falling back to text search:', embeddingError);
-      // fallback text search route response
+      
       return await (async () => {
         const textResults = await performTextSearchInternal(query, limit, includeUnpublished, filters);
         return res.json({
@@ -2941,7 +2940,7 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
       })();
     }
 
-    // 3) Vector candidates (fetch larger candidate pool)
+    
     const candidateLimit = 200;
     const vectorAgg = await Blog.aggregate([
       {
@@ -2953,9 +2952,9 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
           limit: candidateLimit
         }
       },
-      // match publish status here to avoid leaking unpublished docs
+      
       { $match: includeUnpublished ? {} : { status: 'published' } },
-      // minimal projection to get embeddings if stored and fields needed
+      
       {
         $project: {
           title: 1,
@@ -2976,17 +2975,17 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
       }
     ]);
 
-    // 4) Text candidates (parallel)
+    
     let textCandidates = [];
     if (hybridSearch) {
       textCandidates = await performTextSearchInternal(query, candidateLimit, includeUnpublished, filters);
-      // annotate with score
+      
     }
 
-    // 5) Build id maps and compute exact cosine similarity where possible
+    
     const idToDoc = new Map();
 
-    // vectorAgg => compute vectorSim using stored embedding if available, fallback to meta score
+    
     for (const d of vectorAgg) {
       const id = d._id.toString();
       let vectorSim = d.similarityScore || 0;
@@ -2994,7 +2993,7 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
         try {
           vectorSim = cosineSimilarity(queryEmbedding, d.embedding);
         } catch (e) {
-          // keep meta score as fallback
+          
         }
       }
       idToDoc.set(id, {
@@ -3004,43 +3003,43 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
       });
     }
 
-    // textCandidates => attach textScore
+    
     for (const t of textCandidates) {
       const id = t._id.toString();
       if (idToDoc.has(id)) {
         idToDoc.get(id).textScore = t.score || 0;
-        // ensure we keep the doc fields from vectorAgg if present; else set doc to t
+        
         if (!idToDoc.get(id).doc) idToDoc.get(id).doc = t;
       } else {
         idToDoc.set(id, { doc: t, vectorSim: 0, textScore: t.score || 0 });
       }
     }
 
-    // include exact match (boost)
+    
     if (exactMatch) {
       const id = exactMatch._id.toString();
       if (!idToDoc.has(id)) {
-        idToDoc.set(id, { doc: exactMatch, vectorSim: 1.0, textScore: 10 }); // strong boost
+        idToDoc.set(id, { doc: exactMatch, vectorSim: 1.0, textScore: 10 }); 
       } else {
-        // boost existing
+        
         const item = idToDoc.get(id);
         item.vectorSim = Math.max(item.vectorSim, 0.99);
         item.textScore = Math.max(item.textScore, 10);
       }
     }
 
-    // 6) Convert map to merged array and normalize scores
+    
     const merged = Array.from(idToDoc.values()).map(item => ({
       doc: item.doc,
       vectorSim: (typeof item.vectorSim === 'number' ? item.vectorSim : 0),
       textScore: (typeof item.textScore === 'number' ? item.textScore : 0)
     }));
 
-    // get maxima for normalization (avoid zero division)
+    
     const maxVec = Math.max(...merged.map(m => m.vectorSim), 1e-6);
     const maxText = Math.max(...merged.map(m => m.textScore), 1e-6);
 
-    // fused score (alpha vector, beta text)
+    
     const alpha = 0.7;
     const beta = 0.3;
 
@@ -3050,22 +3049,22 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
       m.fused = alpha * m.vectorNorm + beta * m.textNorm;
     });
 
-    // 7) Sort by fused score desc and apply minScore as soft threshold
+    
     merged.sort((a, b) => b.fused - a.fused);
 
-    // filter by fused >= minScore OR include top N to meet limit
+    
     const finalCandidates = merged.filter(m => m.fused >= minScore);
-    // if not enough, include top items to fill
+    
     const finalSelection = finalCandidates.length >= limit
       ? finalCandidates.slice(0, limit)
       : merged.slice(0, Math.max(limit, finalCandidates.length)).slice(0, limit);
 
-    // 8) Prepare response objects respecting preview rules
+    
     const results = finalSelection.map(m => {
-      // ensure author populated if possible
+      
       const doc = m.doc;
-      // if author is an id, try to lazy populate name if present
-      // (we assume .author may be populated by performTextSearchInternal or by aggregation $lookup in other routes)
+      
+      
       return {
         ...prepareResultForUser(doc, isAuthenticated),
         similarityScore: m.vectorSim,
@@ -3075,7 +3074,7 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
       };
     });
 
-    // 9) Suggestions (optional)
+    
     let suggestions = [];
     if (generateSuggestions && results.length > 0) {
       try {
@@ -3087,7 +3086,7 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
 
     const processingTime = Date.now() - startTime;
 
-    // 10) Optional debug info
+    
     const debugInfo = debug ? {
       candidateCount: merged.length,
       topCandidates: merged.slice(0, 10).map(m => ({
@@ -3123,9 +3122,9 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
   }
 });
 
-// -----------------------------
-// Analytics route (keeps previous behavior)
-// -----------------------------
+
+
+
 router.get('/api/search/analytics', async (req, res) => {
   try {
     const totalBlogs = await Blog.countDocuments({ status: 'published' });

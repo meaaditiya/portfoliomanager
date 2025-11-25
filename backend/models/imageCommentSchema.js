@@ -30,13 +30,13 @@ const imageCommentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // Parent comment ID for replies
+  
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ImageComment',
     default: null
   },
-  // Likes and dislikes
+  
   likes: [{
     deviceId: String,
     email: String,
@@ -80,12 +80,12 @@ const imageCommentSchema = new mongoose.Schema({
   }
 });
 
-// Indexes
+
 imageCommentSchema.index({ post: 1, status: 1, parentComment: 1, createdAt: -1 });
 imageCommentSchema.index({ parentComment: 1 });
 imageCommentSchema.index({ 'user.email': 1 });
 
-// Pre-save middleware to update counts
+
 imageCommentSchema.pre('save', function(next) {
   this.likeCount = this.likes.length;
   this.dislikeCount = this.dislikes.length;

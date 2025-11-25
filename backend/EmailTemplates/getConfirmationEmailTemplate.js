@@ -258,4 +258,5 @@ const getConfirmationEmailTemplate = (name, message) => {
 </html>
     `;
 };
+
 module.exports = getConfirmationEmailTemplate;

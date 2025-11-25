@@ -19,7 +19,7 @@ const imagePostSchema = new mongoose.Schema({
   video: {
     data: Buffer,
     contentType: String,
-    duration: Number, // in seconds
+    duration: Number, 
     thumbnail: {
       data: Buffer,
       contentType: String

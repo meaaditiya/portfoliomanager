@@ -12,6 +12,7 @@ const getReplyEmailTemplate = (name, originalMessage, replyContent) => {
       padding: 0;
       box-sizing: border-box;
     }
+      
     body {
       font-family: 'Georgia', 'Times New Roman', serif;
       line-height: 1.4;

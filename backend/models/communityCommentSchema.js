@@ -16,7 +16,8 @@ const communityCommentSchema = new mongoose.Schema({
   comment: {
     type: String,
     required: true
-  },
+  }, 
+  
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CommunityComment'

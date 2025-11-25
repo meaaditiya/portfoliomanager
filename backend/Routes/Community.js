@@ -6,20 +6,20 @@ const CommunityPost = require('../models/communityPostSchema');
 const CommunityComment = require('../models/communityCommentSchema');
 const CommunityLike = require('../models/communityLikeSchema');
 const CommunityShare = require('../models/communityShareSchema');
-// Create a new community post - FIXED
+
 router.post('/api/community/posts', authenticateToken, upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'video', maxCount: 1 }
 ]), async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only admins can create community posts' });
     }
 
     const { postType, description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
     
-    // Validate required fields
+    
     if (!postType) {
       return res.status(400).json({ message: 'Post type is required' });
     }
@@ -29,12 +29,12 @@ router.post('/api/community/posts', authenticateToken, upload.fields([
       postType
     };
 
-    // Add description only if provided
+    
     if (description && description.trim()) {
       postData.description = description.trim();
     }
 
-    // Handle different post types
+    
     switch (postType) {
       case 'image':
         if (!req.files || !req.files.images || req.files.images.length === 0) {
@@ -56,7 +56,7 @@ router.post('/api/community/posts', authenticateToken, upload.fields([
           contentType: req.files.video[0].mimetype,
           filename: req.files.video[0].originalname
         };
-        // Caption is optional for video posts
+        
         if (caption && caption.trim()) {
           postData.caption = caption.trim();
         }
@@ -86,7 +86,7 @@ router.post('/api/community/posts', authenticateToken, upload.fields([
           postData.pollExpiresAt = new Date(pollExpiresAt);
         }
         
-        // Add description for poll posts if provided
+        
         if (description && description.trim()) {
           postData.description = description.trim();
         }
@@ -130,7 +130,7 @@ router.post('/api/community/posts', authenticateToken, upload.fields([
     const post = new CommunityPost(postData);
     await post.save();
 
-    // Populate author details for response
+    
     const populatedPost = await CommunityPost.findById(post._id)
       .populate('author', 'name email');
 
@@ -157,15 +157,15 @@ router.get('/api/community/posts', async (req, res) => {
       .populate('author', 'name email')
       .populate({
         path: 'likes',
-        // No additional filtering needed for likes since they don't have isActive
+        
       })
       .populate({
         path: 'comments',
-        match: { isActive: true }, // FIXED: Only populate active comments
+        match: { isActive: true }, 
       })
       .populate({
         path: 'shares',
-        // No additional filtering needed for shares since they don't have isActive
+        
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -189,19 +189,19 @@ router.get('/api/community/posts/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }) // FIXED: Only get active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }) 
       .populate('author', 'name email')
       .populate({
         path: 'likes',
-        // No additional filtering needed for likes
+        
       })
       .populate({
         path: 'comments',
-        match: { isActive: true }, // FIXED: Only populate active comments
+        match: { isActive: true }, 
       })
       .populate({
         path: 'shares',
-        // No additional filtering needed for shares
+        
       });
 
     if (!post) {
@@ -214,7 +214,7 @@ router.get('/api/community/posts/:id', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// Replace your PUT route with this corrected version:
+
 router.put('/api/community/posts/:id', authenticateToken, upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'video', maxCount: 1 }
@@ -227,22 +227,22 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check authorization
+    
     if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to update this post' });
     }
 
     const { description, caption, pollOptions, pollExpiresAt, quizQuestions, linkUrl, linkTitle, linkDescription } = req.body;
 
-    // Update description - always update this field
+    
     if (description !== undefined) {
       post.description = description.trim();
     }
 
-    // Update type-specific fields
+    
     switch (post.postType) {
       case 'image':
-        // Only update images if new ones are provided
+        
         if (req.files && req.files.images && req.files.images.length > 0) {
           post.images = req.files.images.map(file => ({
             data: file.buffer,
@@ -253,7 +253,7 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
         break;
 
       case 'video':
-        // Only update video if new one is provided
+        
         if (req.files && req.files.video && req.files.video.length > 0) {
           post.video = {
             data: req.files.video[0].buffer,
@@ -261,7 +261,7 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
             filename: req.files.video[0].originalname
           };
         }
-        // Always update caption for video posts
+        
         if (caption !== undefined) {
           post.caption = caption.trim();
         }
@@ -272,7 +272,7 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
           try {
             const parsedOptions = typeof pollOptions === 'string' ? JSON.parse(pollOptions) : pollOptions;
             if (Array.isArray(parsedOptions) && parsedOptions.length >= 2) {
-              // Preserve existing votes when updating options
+              
               const existingVotes = {};
               post.pollOptions.forEach((option, index) => {
                 existingVotes[option.option] = option.votes;
@@ -315,7 +315,7 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
     post.updatedAt = new Date();
     await post.save();
 
-    // Populate and return the updated post
+    
     const updatedPost = await CommunityPost.findById(post._id)
       .populate('author', 'name email')
       .populate('likes')
@@ -332,7 +332,7 @@ router.put('/api/community/posts/:id', authenticateToken, upload.fields([
   }
 });
 
-// Delete a community post - PERMANENT DELETION
+
 router.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -342,23 +342,23 @@ router.delete('/api/community/posts/:id', authenticateToken, async (req, res) =>
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check authorization
+    
     if (post.author.toString() !== req.user.admin_id ) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
     }
 
-    // PERMANENT DELETE: Remove all associated data first
     
-    // 1. Delete all likes for this post
+    
+    
     await CommunityLike.deleteMany({ post: id });
 
-    // 2. Delete all comments and replies for this post
+    
     await CommunityComment.deleteMany({ post: id });
 
-    // 3. Delete all shares for this post
+    
     await CommunityShare.deleteMany({ post: id });
 
-    // 4. Finally delete the post itself
+    
     await CommunityPost.findByIdAndDelete(id);
 
     res.json({ message: 'Community post permanently deleted successfully' });
@@ -368,7 +368,7 @@ router.delete('/api/community/posts/:id', authenticateToken, async (req, res) =>
   }
 });
 
-// Delete a comment - PERMANENT DELETION
+
 router.delete('/api/community/comments/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -383,23 +383,23 @@ router.delete('/api/community/comments/:id', async (req, res) => {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    // Check authorization - only comment owner can delete
+    
     if (comment.userEmail !== userEmail) {
       return res.status(403).json({ message: 'Not authorized to delete this comment' });
     }
 
-    // PERMANENT DELETE: Remove all associated data
     
-    // 1. Delete all replies to this comment
+    
+    
     await CommunityComment.deleteMany({ parentComment: id });
 
-    // 2. Remove this comment from the post's comments array
+    
     await CommunityPost.updateOne(
       { _id: comment.post },
       { $pull: { comments: id } }
     );
 
-    // 3. Remove this comment from parent comment's replies array (if it's a reply)
+    
     if (comment.parentComment) {
       await CommunityComment.updateOne(
         { _id: comment.parentComment },
@@ -407,7 +407,7 @@ router.delete('/api/community/comments/:id', async (req, res) => {
       );
     }
 
-    // 4. Finally delete the comment itself
+    
     await CommunityComment.findByIdAndDelete(id);
 
     res.json({ message: 'Comment permanently deleted successfully' });
@@ -417,7 +417,7 @@ router.delete('/api/community/comments/:id', async (req, res) => {
   }
 });
 
-// Delete a reply - PERMANENT DELETION
+
 router.delete('/api/community/comments/:commentId/replies/:replyId', async (req, res) => {
   try {
     const { commentId, replyId } = req.params;
@@ -427,37 +427,37 @@ router.delete('/api/community/comments/:commentId/replies/:replyId', async (req,
       return res.status(400).json({ message: 'User email is required' });
     }
 
-    // Find the reply
+    
     const reply = await CommunityComment.findById(replyId);
     if (!reply) {
       return res.status(404).json({ message: 'Reply not found' });
     }
 
-    // Check if this is actually a reply to the specified comment
+    
     if (reply.parentComment?.toString() !== commentId) {
       return res.status(400).json({ message: 'Reply does not belong to the specified comment' });
     }
 
-    // Check authorization - only reply owner can delete
+    
     if (reply.userEmail !== userEmail) {
       return res.status(403).json({ message: 'Not authorized to delete this reply' });
     }
 
-    // PERMANENT DELETE: Remove all references
     
-    // 1. Remove the reply from parent comment's replies array
+    
+    
     await CommunityComment.updateOne(
       { _id: commentId },
       { $pull: { replies: replyId } }
     );
 
-    // 2. Remove from post's comments array
+    
     await CommunityPost.updateOne(
       { _id: reply.post },
       { $pull: { comments: replyId } }
     );
 
-    // 3. Finally delete the reply itself
+    
     await CommunityComment.findByIdAndDelete(replyId);
 
     res.json({ message: 'Reply permanently deleted successfully' });
@@ -466,14 +466,14 @@ router.delete('/api/community/comments/:commentId/replies/:replyId', async (req,
     res.status(500).json({ message: error.message });
   }
 });
-// FIXED: Get comments for a community post - Already correctly filtered
+
 router.get('/api/community/posts/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    // First check if the post exists and is active
+    
     const post = await CommunityPost.findOne({ _id: id, isActive: true });
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
@@ -486,7 +486,7 @@ router.get('/api/community/posts/:id/comments', async (req, res) => {
     })
       .populate({
         path: 'replies',
-        match: { isActive: true } // FIXED: Only populate active replies
+        match: { isActive: true } 
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -511,7 +511,7 @@ router.get('/api/community/posts/:id/comments', async (req, res) => {
 });
 
 
-// Get community post media (images/videos)
+
 router.get('/api/community/posts/:id/media/:type/:index', async (req, res) => {
   try {
     const { id, type, index } = req.params;
@@ -538,7 +538,7 @@ router.get('/api/community/posts/:id/media/:type/:index', async (req, res) => {
   }
 });
 
-// FIXED: Like a community post - Check if post is active
+
 router.post('/api/community/posts/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
@@ -548,23 +548,23 @@ router.post('/api/community/posts/:id/like', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow liking active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check if user already liked the post
+    
     const existingLike = await CommunityLike.findOne({ post: id, userEmail });
         
     if (existingLike) {
-      // Unlike the post
+      
       await CommunityLike.findByIdAndDelete(existingLike._id);
       post.likes.pull(existingLike._id);
       await post.save();
             
       res.json({ message: 'Post unliked successfully', liked: false });
     } else {
-      // Like the post
+      
       const newLike = new CommunityLike({
         post: id,
         userEmail,
@@ -583,7 +583,7 @@ router.post('/api/community/posts/:id/like', async (req, res) => {
   }
 });
 
-// FIXED: Comment on a community post - Check if post is active
+
 router.post('/api/community/posts/:id/comment', async (req, res) => {
   try {
     const { id } = req.params;
@@ -597,12 +597,12 @@ router.post('/api/community/posts/:id/comment', async (req, res) => {
       return res.status(400).json({ message: 'Comment text is required' });
     }
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow commenting on active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // FIXED: If replying to a comment, check if parent comment is active
+    
     if (parentComment) {
       const parentCommentDoc = await CommunityComment.findOne({ 
         _id: parentComment, 
@@ -623,11 +623,11 @@ router.post('/api/community/posts/:id/comment', async (req, res) => {
 
     await newComment.save();
         
-    // Add comment to post
+    
     post.comments.push(newComment._id);
     await post.save();
 
-    // If this is a reply, add to parent comment's replies
+    
     if (parentComment) {
       const parentCommentDoc = await CommunityComment.findOne({ 
         _id: parentComment, 
@@ -649,7 +649,7 @@ router.post('/api/community/posts/:id/comment', async (req, res) => {
   }
 });
 
-// FIXED: Share a community post - Check if post is active
+
 router.post('/api/community/posts/:id/share', async (req, res) => {
   try {
     const { id } = req.params;
@@ -659,12 +659,12 @@ router.post('/api/community/posts/:id/share', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow sharing active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Check if user already shared the post
+    
     const existingShare = await CommunityShare.findOne({ post: id, userEmail });
         
     if (existingShare) {
@@ -689,7 +689,7 @@ router.post('/api/community/posts/:id/share', async (req, res) => {
   }
 });
 
-// FIXED: Vote on a poll - Check if post is active
+
 router.post('/api/community/posts/:id/vote', async (req, res) => {
   try {
     const { id } = req.params;
@@ -699,7 +699,7 @@ router.post('/api/community/posts/:id/vote', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow voting on active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -708,12 +708,12 @@ router.post('/api/community/posts/:id/vote', async (req, res) => {
       return res.status(400).json({ message: 'This post is not a poll' });
     }
 
-    // Check if poll has expired
+    
     if (post.pollExpiresAt && new Date() > post.pollExpiresAt) {
       return res.status(400).json({ message: 'Poll has expired' });
     }
 
-    // Check if user already voted
+    
     const hasVoted = post.pollOptions.some(option => 
       option.votes.some(vote => vote.userEmail === userEmail)
     );
@@ -741,7 +741,7 @@ router.post('/api/community/posts/:id/vote', async (req, res) => {
   }
 });
 
-// FIXED: Submit quiz answer - Check if post is active
+
 router.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
   try {
     const { id } = req.params;
@@ -751,7 +751,7 @@ router.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const post = await CommunityPost.findOne({ _id: id, isActive: true }); // FIXED: Only allow quiz submission on active posts
+    const post = await CommunityPost.findOne({ _id: id, isActive: true }); 
     if (!post) {
       return res.status(404).json({ message: 'Community post not found' });
     }
@@ -787,7 +787,7 @@ router.post('/api/community/posts/:id/quiz-answer', async (req, res) => {
   }
 });
 
-// BONUS: Unlike a post (removes like from database)
+
 router.delete('/api/community/posts/:id/unlike', async (req, res) => {
   try {
     const { id } = req.params;
@@ -802,14 +802,14 @@ router.delete('/api/community/posts/:id/unlike', async (req, res) => {
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Find and delete the like
+    
     const like = await CommunityLike.findOneAndDelete({ post: id, userEmail });
     
     if (!like) {
       return res.status(404).json({ message: 'Like not found' });
     }
 
-    // Remove like reference from post
+    
     post.likes.pull(like._id);
     await post.save();
 
@@ -820,7 +820,7 @@ router.delete('/api/community/posts/:id/unlike', async (req, res) => {
   }
 });
 
-// BONUS: Remove share (permanent deletion)
+
 router.delete('/api/community/posts/:id/unshare', async (req, res) => {
   try {
     const { id } = req.params;
@@ -835,14 +835,14 @@ router.delete('/api/community/posts/:id/unshare', async (req, res) => {
       return res.status(404).json({ message: 'Community post not found' });
     }
 
-    // Find and delete the share
+    
     const share = await CommunityShare.findOneAndDelete({ post: id, userEmail });
     
     if (!share) {
       return res.status(404).json({ message: 'Share not found' });
     }
 
-    // Remove share reference from post
+    
     post.shares.pull(share._id);
     await post.save();
 
@@ -853,10 +853,10 @@ router.delete('/api/community/posts/:id/unshare', async (req, res) => {
   }
 });
 
-// BONUS: Admin route to permanently delete any user's comment
+
 router.delete('/api/community/admin/comments/:id', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only admins can delete any comment' });
     }
@@ -868,18 +868,18 @@ router.delete('/api/community/admin/comments/:id', authenticateToken, async (req
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    // PERMANENT DELETE: Remove all associated data
     
-    // 1. Delete all replies to this comment
+    
+    
     await CommunityComment.deleteMany({ parentComment: id });
 
-    // 2. Remove this comment from the post's comments array
+    
     await CommunityPost.updateOne(
       { _id: comment.post },
       { $pull: { comments: id } }
     );
 
-    // 3. Remove this comment from parent comment's replies array (if it's a reply)
+    
     if (comment.parentComment) {
       await CommunityComment.updateOne(
         { _id: comment.parentComment },
@@ -887,7 +887,7 @@ router.delete('/api/community/admin/comments/:id', authenticateToken, async (req
       );
     }
 
-    // 4. Finally delete the comment itself
+    
     await CommunityComment.findByIdAndDelete(id);
 
     res.json({ message: 'Comment permanently deleted by admin' });
@@ -897,10 +897,10 @@ router.delete('/api/community/admin/comments/:id', authenticateToken, async (req
   }
 });
 
-// BONUS: Bulk delete - Admin can delete multiple posts at once
+
 router.delete('/api/community/admin/posts/bulk', authenticateToken, async (req, res) => {
   try {
-    // Check if user is admin
+    
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Only admins can bulk delete posts' });
     }
@@ -911,18 +911,18 @@ router.delete('/api/community/admin/posts/bulk', authenticateToken, async (req, 
       return res.status(400).json({ message: 'Post IDs array is required' });
     }
 
-    // PERMANENT DELETE: Remove all associated data for all posts
     
-    // 1. Delete all likes for these posts
+    
+    
     await CommunityLike.deleteMany({ post: { $in: postIds } });
 
-    // 2. Delete all comments and replies for these posts
+    
     await CommunityComment.deleteMany({ post: { $in: postIds } });
 
-    // 3. Delete all shares for these posts
+    
     await CommunityShare.deleteMany({ post: { $in: postIds } });
 
-    // 4. Finally delete the posts themselves
+    
     const result = await CommunityPost.deleteMany({ _id: { $in: postIds } });
 
     res.json({ 
@@ -935,7 +935,7 @@ router.delete('/api/community/admin/posts/bulk', authenticateToken, async (req, 
   }
 });
 
-// FIXED: Like a comment - Check if comment is active
+
 router.post('/api/community/comments/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
@@ -945,24 +945,24 @@ router.post('/api/community/comments/:id/like', async (req, res) => {
       return res.status(400).json({ message: 'User email and name are required' });
     }
 
-    const comment = await CommunityComment.findOne({ _id: id, isActive: true }); // FIXED: Only allow liking active comments
+    const comment = await CommunityComment.findOne({ _id: id, isActive: true }); 
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
 
-    // Check if user already liked the comment
+    
     const existingLikeIndex = comment.likes.findIndex(
       like => like.userEmail === userEmail
     );
 
     if (existingLikeIndex > -1) {
-      // Unlike the comment
+      
       comment.likes.splice(existingLikeIndex, 1);
       await comment.save();
             
       res.json({ message: 'Comment unliked successfully', liked: false });
     } else {
-      // Like the comment
+      
       comment.likes.push({
         userEmail,
         userName,
@@ -977,53 +977,53 @@ router.post('/api/community/comments/:id/like', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// FIXED: Get user's activity - Filter out deleted items
+
 router.get('/api/community/user/:userEmail/activity', async (req, res) => {
   try {
     const { userEmail } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    // Get user's likes (only for active posts)
+    
     const likes = await CommunityLike.find({ userEmail })
       .populate({
         path: 'post',
-        match: { isActive: true }, // FIXED: Only populate active posts
+        match: { isActive: true }, 
         select: 'description postType createdAt'
       })
       .sort({ likedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Filter out likes where post is null (deleted posts)
+    
     const activeLikes = likes.filter(like => like.post !== null);
 
-    // Get user's comments (only active comments on active posts)
+    
     const comments = await CommunityComment.find({ userEmail, isActive: true })
       .populate({
         path: 'post',
-        match: { isActive: true }, // FIXED: Only populate active posts
+        match: { isActive: true }, 
         select: 'description postType createdAt'
       })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Filter out comments where post is null (deleted posts)
+    
     const activeComments = comments.filter(comment => comment.post !== null);
 
-    // Get user's shares (only for active posts)
+    
     const shares = await CommunityShare.find({ userEmail })
       .populate({
         path: 'post',
-        match: { isActive: true }, // FIXED: Only populate active posts
+        match: { isActive: true }, 
         select: 'description postType createdAt'
       })
       .sort({ sharedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Filter out shares where post is null (deleted posts)
+    
     const activeShares = shares.filter(share => share.post !== null);
 
     res.json({

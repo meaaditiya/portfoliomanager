@@ -1,4 +1,4 @@
-// routes/embeddingRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const Blog = require('../models/blog');
@@ -22,7 +22,7 @@ router.post('/api/ai/blogs/:id/generate-embedding', async (req, res) => {
       return res.status(404).json({ message: 'Blog post not found' });
     }
     
-    // Check if embedding already exists and is up-to-date
+    
     if (!force && blog.embedding && blog.embeddingMetadata) {
       return res.json({
         message: 'Embedding already exists',
@@ -33,7 +33,7 @@ router.post('/api/ai/blogs/:id/generate-embedding', async (req, res) => {
       });
     }
     
-    // Generate embedding
+    
     await generateBlogEmbedding(blog);
     await blog.save();
     
@@ -54,10 +54,6 @@ router.post('/api/ai/blogs/:id/generate-embedding', async (req, res) => {
   }
 });
 
-/**
- * Batch generate embeddings for all blogs (Migration endpoint)
- * POST /api/ai/blogs/batch-generate-embeddings
- */
 router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
   try {
     const { 
@@ -66,7 +62,7 @@ router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
       limit = null
     } = req.body;
     
-    // Build query
+    
     const query = {};
     
     if (status) {
@@ -74,7 +70,7 @@ router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
     }
     
     if (!force) {
-      // Only process blogs without embeddings or with outdated embeddings
+      
       query.$or = [
         { embedding: { $exists: false } },
         { embedding: null },
@@ -82,7 +78,7 @@ router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
       ];
     }
     
-    // Fetch blogs
+    
     let blogsQuery = Blog.find(query).sort({ createdAt: -1 });
     
     if (limit) {
@@ -102,7 +98,7 @@ router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
     
     console.log(`Starting batch embedding generation for ${blogs.length} blogs...`);
     
-    // Generate embeddings with progress tracking
+    
     const results = await batchGenerateEmbeddings(blogs, (progress) => {
       console.log(`Progress: ${progress.processed}/${progress.total} (${progress.percentage}%)`);
     });
@@ -133,10 +129,7 @@ router.post('/api/ai/blogs/batch-generate-embeddings', async (req, res) => {
   }
 });
 
-/**
- * Check embedding status for all blogs
- * GET /api/ai/blogs/embedding-status
- */
+
 router.get('/api/ai/blogs/embedding-status', async (req, res) => {
   try {
     const totalBlogs = await Blog.countDocuments();
@@ -155,7 +148,7 @@ router.get('/api/ai/blogs/embedding-status', async (req, res) => {
     const blogsWithoutEmbeddings = totalBlogs - blogsWithEmbeddings;
     const publishedWithoutEmbeddings = publishedBlogs - publishedWithEmbeddings;
     
-    // Get sample of blogs without embeddings
+    
     const blogsNeedingEmbeddings = await Blog.find({
       $or: [
         { embedding: { $exists: false } },
@@ -200,9 +193,6 @@ router.get('/api/ai/blogs/embedding-status', async (req, res) => {
   }
 });
 
-/**
- * Get recommendations based on embedding status
- */
 function getRecommendations(blogsWithoutEmbeddings, totalBlogs) {
   const recommendations = [];
   
@@ -220,15 +210,11 @@ function getRecommendations(blogsWithoutEmbeddings, totalBlogs) {
   return recommendations;
 }
 
-/**
- * Regenerate embedding for blogs with outdated content
- * POST /api/ai/blogs/regenerate-outdated-embeddings
- */
 router.post('/api/ai/blogs/regenerate-outdated-embeddings', async (req, res) => {
   try {
     const { limit = 50 } = req.body;
     
-    // Find blogs where content hash doesn't match
+    
     const blogs = await Blog.find({
       embedding: { $exists: true, $ne: null },
       'embeddingMetadata.contentHash': { $exists: true }
@@ -257,7 +243,7 @@ router.post('/api/ai/blogs/regenerate-outdated-embeddings', async (req, res) => 
       });
     }
     
-    // Regenerate embeddings for outdated blogs
+    
     const results = await batchGenerateEmbeddings(outdatedBlogs);
     
     const successCount = results.filter(r => r.success).length;
@@ -284,10 +270,7 @@ router.post('/api/ai/blogs/regenerate-outdated-embeddings', async (req, res) => 
   }
 });
 
-/**
- * Delete all embeddings (for testing/reset)
- * DELETE /api/ai/blogs/embeddings
- */
+
 router.delete('/api/ai/blogs/embeddings', async (req, res) => {
   try {
     const { confirm = false } = req.body;
