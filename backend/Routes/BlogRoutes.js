@@ -1548,24 +1548,43 @@ router.get('/api/gemini/health', async (req, res) => {
     });
   }
 });
- router.get('/api/blogs/:blogId/comments', async (req, res) => {
+router.get('/api/blogs/:blogId/comments', async (req, res) => {
   try {
     const { blogId } = req.params;
     
-    // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Get only top-level approved comments (not replies)
-    const comments = await Comment.find({ 
+    let comments = await Comment.find({ 
       blog: blogId,
       status: 'approved',
-      parentComment: null // Only top-level comments
+      parentComment: null
     })
     .sort({ createdAt: -1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();  // ✅ Use lean() for performance
+    
+    // ✅ POPULATE USER DATA FROM USER COLLECTION
+    for (let comment of comments) {
+      if (comment.user.userId) {
+        const userData = await User.findById(comment.user.userId)
+          .select('name email profilePicture googleId')
+          .lean();
+        
+        if (userData) {
+          comment.user.profilePicture = userData.profilePicture;
+          comment.user.googleId = userData.googleId;
+        }
+      }
+      
+      // Count replies
+      comment.repliesCount = await Comment.countDocuments({
+        parentComment: comment._id,
+        status: 'approved'
+      });
+    }
     
     const total = await Comment.countDocuments({
       blog: blogId,
@@ -1586,7 +1605,6 @@ router.get('/api/gemini/health', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
- 
 router.post(
   '/api/blogs/:blogId/comments',
   [
@@ -1605,19 +1623,24 @@ router.post(
       const { blogId } = req.params;
       let { name, email, content } = req.body;
 
-      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      // ✅ EXTRACT USER FROM JWT IF PRESENT
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      let userId = null;
       
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          const user = await User.findById(decoded.userId);
+          // ✅ FIXED: Use user_id not userId
+          userId = decoded.user_id;
+          
+          // Get user data to override name/email
+          const user = await User.findById(userId);
           if (user) {
             name = user.name;
             email = user.email;
           }
         } catch (err) {
-          console.log('Invalid token, using form data');
+          console.log('Invalid token, treating as guest');
         }
       }
 
@@ -1635,7 +1658,7 @@ router.post(
         console.log(`✅ Content moderation blocked comment from ${name} - Reason: ${moderation.reason}`);
         
         return res.status(422).json({
-          message: 'Your comment cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
+          message: 'Your comment cannot be posted as it strongly violates our community guidelines.',
           code: 'CONTENT_POLICY_VIOLATION',
           severity: moderation.severity,
           moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1647,9 +1670,14 @@ router.post(
 
       console.log(`✅ Content approved for ${name}`);
 
+      // ✅ UPDATED: Store userId in comment
       const newComment = new Comment({
         blog: blogId,
-        user: { name, email },
+        user: { 
+          name, 
+          email,
+          userId: userId || null  // ✅ Store userId if authenticated
+        },
         content,
         fingerprint
       });
@@ -2021,19 +2049,22 @@ router.post(
       const { commentId } = req.params;
       let { name, email, content } = req.body;
 
-      // ✅ CHECK IF USER IS LOGGED IN VIA JWT
+      // ✅ EXTRACT USER FROM JWT IF PRESENT
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      let userId = null;
       
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          const user = await User.findById(decoded.userId);
+          userId = decoded.user_id;  // ✅ FIXED: user_id not userId
+          
+          const user = await User.findById(userId);
           if (user) {
             name = user.name;
             email = user.email;
           }
         } catch (err) {
-          console.log('Invalid token, using form data');
+          console.log('Invalid token, treating as guest');
         }
       }
 
@@ -2055,24 +2086,20 @@ router.post(
       const moderation = await moderateContent(content, name);
       
       if (!moderation.approved) {
-        console.log(`✅ Content moderation blocked reply from ${name} - Reason: ${moderation.reason}`);
-        
         return res.status(422).json({
-          message: 'Your reply cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
-          code: 'CONTENT_POLICY_VIOLATION',
-          severity: moderation.severity,
-          moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          hint: moderation.systemError 
-            ? 'Your reply is under review. Please try again later.' 
-            : 'Please review our community guidelines and post respectful, constructive content.'
+          message: 'Your reply cannot be posted as it violates community guidelines.',
+          code: 'CONTENT_POLICY_VIOLATION'
         });
       }
 
-      console.log(`✅ Content approved for ${name}`);
-
+      // ✅ UPDATED: Store userId in reply
       const newReply = new Comment({
         blog: parentComment.blog,
-        user: { name, email },
+        user: { 
+          name, 
+          email,
+          userId: userId || null  // ✅ Store userId
+        },
         content,
         parentComment: commentId,
         fingerprint
@@ -2090,8 +2117,7 @@ router.post(
       console.error('Error adding reply:', error);
       res.status(500).json({ 
         message: 'Server error', 
-        error: error.message,
-        code: 'INTERNAL_SERVER_ERROR'
+        error: error.message
       });
     }
   }
@@ -2101,19 +2127,32 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
     
-    // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Get approved replies
-    const replies = await Comment.find({ 
+    let replies = await Comment.find({ 
       parentComment: commentId,
       status: 'approved'
     })
-    .sort({ createdAt: 1 }) // Replies in chronological order
+    .sort({ createdAt: 1 })
     .skip(skip)
-    .limit(limit);
+    .limit(limit)
+    .lean();
+    
+    // ✅ POPULATE USER DATA FOR REPLIES
+    for (let reply of replies) {
+      if (reply.user.userId) {
+        const userData = await User.findById(reply.user.userId)
+          .select('name email profilePicture googleId')
+          .lean();
+        
+        if (userData) {
+          reply.user.profilePicture = userData.profilePicture;
+          reply.user.googleId = userData.googleId;
+        }
+      }
+    }
     
     const total = await Comment.countDocuments({
       parentComment: commentId,
