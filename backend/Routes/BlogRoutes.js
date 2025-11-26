@@ -2372,7 +2372,59 @@ router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-  
+
+router.get('/api/blogs/:blogId/reactions/users', async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    const { type } = req.query; 
+    
+    const query = { blog: blogId };
+    if (type) query.type = type;
+    
+    const reactions = await Reaction.find(query)
+      .populate('user.userId', 'name profilePicture')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    const users = reactions.map(r => ({
+      name: r.user.userId?.name || r.user.name,
+      profilePicture: r.user.userId?.profilePicture || null,
+      type: r.type,
+      createdAt: r.createdAt
+    }));
+    
+    res.json({ users, total: users.length });
+  } catch (err) {
+    console.error('Error fetching blog reaction users:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+router.get('/api/comments/:commentId/reactions/users', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { type } = req.query;
+    
+    const query = { comment: commentId };
+    if (type) query.type = type;
+    
+    const reactions = await CommentReaction.find(query)
+      .populate('user.userId', 'name profilePicture')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    const users = reactions.map(r => ({
+      name: r.user.userId?.name || r.user.name,
+      profilePicture: r.user.userId?.profilePicture || null,
+      type: r.type,
+      createdAt: r.createdAt
+    }));
+    
+    res.json({ users, total: users.length });
+  } catch (err) {
+    console.error('Error fetching comment reaction users:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 router.post(
   '/api/blogs/:blogId/author-comment',
   authenticateToken, 
