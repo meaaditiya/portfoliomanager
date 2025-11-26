@@ -2195,18 +2195,20 @@ router.post(
       
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          const user = await User.findById(decoded.userId);
-          if (user) {
-            name = user.name;
-            email = user.email;
-          }
-        } catch (err) {
-          console.log('Invalid token, using form data');
-        }
-      }
+     if (token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    userId = decoded.user_id;
+    
+    const user = await User.findById(userId);
+    if (user) {
+      name = user.name;
+      email = user.email;
+    }
+  } catch (err) {
+    console.log('Invalid token, using form data');
+  }
+}
 
       const comment = await Comment.findOne({ 
         _id: commentId, 
@@ -2271,7 +2273,7 @@ router.post(
         const newReaction = new CommentReaction({
           comment: commentId,
           type,
-          user: { name, email },
+          user: { name, email,userId: userId || null  },
           fingerprint
         });
         
@@ -2532,18 +2534,19 @@ router.post(
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
       if (token) {
-        try {
-          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          const user = await User.findById(decoded.userId);
-          if (user) {
-            name = user.name;
-            email = user.email;
-          }
-        } catch (err) {
-          console.log('Invalid token, using form data');
-        }
-      }
-
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    userId = decoded.user_id;
+    
+    const user = await User.findById(userId);
+    if (user) {
+      name = user.name;
+      email = user.email;
+    }
+  } catch (err) {
+    console.log('Invalid token, using form data');
+  }
+}
       const blog = await Blog.findById(blogId).session(session);
       if (!blog) {
         await session.abortTransaction();
@@ -2599,7 +2602,7 @@ router.post(
         const newReaction = new Reaction({
           blog: blogId,
           type,
-          user: { name, email },
+          user: { name, email, userId: userId || null},
           fingerprint
         });
         

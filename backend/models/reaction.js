@@ -19,6 +19,11 @@ const ReactionSchema = new mongoose.Schema({
     email: {
       type: String,
       required: true
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
   },
   // NEW: Fingerprint for tracking unique users
