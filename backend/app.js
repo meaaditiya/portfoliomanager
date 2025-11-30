@@ -3,6 +3,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const path = require('path');
+const fs = require("fs");
 const http = require('http');                
 const { Server } = require('socket.io');    
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
@@ -26,6 +27,7 @@ const AudioMessageRoutes = require("./Routes/AudioMessage.js");
 const StreamRoutes = require("./Routes/Streams.js")
 const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
+const DocumentRoutes = require("./Routes/documents.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const passport = require('./Config/passport');
 const app = express();
@@ -39,6 +41,11 @@ const io = new Server(server, {
   pingTimeout: 60000,
   pingInterval: 25000
 });
+if (!fs.existsSync("./keys")) {
+  fs.mkdirSync("./keys");
+}
+
+fs.writeFileSync("./keys/gcs.json", process.env.GCS_JSON);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -78,6 +85,7 @@ app.use(ImageRoutes);
 app.use(SocialMediaEmbed);
 app.use(CommunityPostRoutes)
 app.use('/api/visitors', visitorRoutes);
+app.use(DocumentRoutes);
 
 
 app.use('/public', express.static(path.join(__dirname, 'public')));

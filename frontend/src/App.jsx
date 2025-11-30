@@ -20,6 +20,7 @@ import Announcement from './Components/Announcement';
 import Query from './Components/Query';
 import Admins from './Components/Admins';
 import BlogSubmissions from './Components/BlogSubmissions';
+import Document from './Components/Document';
 function AppContent() {
   const [activeSection, setActiveSection] = useState('/adminpost'); // Initialize with default path
   const [redirectMessage, setRedirectMessage] = useState(null);
@@ -89,6 +90,7 @@ function AppContent() {
           <Route path="/query" element={<Query/>}/>
           <Route path="/admins" element={<Admins/>}/>
           <Route path="/blogsubmissions" element={<BlogSubmissions/>}/>
+          <Route path="/document" element={<Document/>}/>
         </Routes>
       </main>
     </div>
