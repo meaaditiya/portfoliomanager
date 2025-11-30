@@ -56,7 +56,7 @@ const AnnouncementAdmin = () => {
     removeExpiry: false
   });
 
-  const API_BASE = 'https://connectwithaaditiyamg.onrender.com/api';
+  const API_BASE = 'https://connectwithaaditiyamg2.onrender.com/api';
   const token = localStorage.getItem('token');
 
   useEffect(() => {

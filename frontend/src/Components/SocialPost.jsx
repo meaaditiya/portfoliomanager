@@ -22,7 +22,7 @@ const SocialMediaAdmin = () => {
     isActive: true
   });
 
-  const API_BASE_URL = 'https://connectwithaaditiyamg.onrender.com';
+  const API_BASE_URL = 'https://connectwithaaditiyamg2.onrender.com';
 
   // Get auth token from localStorage or context
   const getAuthToken = () => {

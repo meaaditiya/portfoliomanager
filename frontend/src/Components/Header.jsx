@@ -52,7 +52,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     try {
       // Call logout API
       await axios.post(
-        'https://connectwithaaditiyamg.onrender.com/api/admin/logout',
+        'https://connectwithaaditiyamg2.onrender.com/api/admin/logout',
         {},
         { withCredentials: true }
       );

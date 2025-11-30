@@ -30,7 +30,7 @@ const AdminProjectRequests = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('https://connectwithaaditiyamg.onrender.com/api/admin/project/requests', {
+      const response = await axios.get('https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -47,7 +47,7 @@ const AdminProjectRequests = () => {
   const fetchRequestDetails = async (id) => {
     setLoading(true);
     try {
-      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/admin/project/requests/${id}`, {
+      const response = await axios.get(`https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests/${id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -81,7 +81,7 @@ const AdminProjectRequests = () => {
   const fetchFilePreview = async (requestId, fileIndex, mimetype) => {
     try {
       const response = await axios.get(
-        `https://connectwithaaditiyamg.onrender.com/api/admin/project/requests/${requestId}/files/${fileIndex}`,
+        `https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests/${requestId}/files/${fileIndex}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -100,7 +100,7 @@ const AdminProjectRequests = () => {
   const handleAcknowledge = async (id) => {
     setActionLoading(true);
     try {
-      const response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/admin/project/requests/${id}/acknowledge`, {}, {
+      const response = await axios.put(`https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests/${id}/acknowledge`, {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -125,7 +125,7 @@ const AdminProjectRequests = () => {
     
     setActionLoading(true);
     try {
-      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/admin/project/requests/${id}`, {
+      await axios.delete(`https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests/${id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -150,7 +150,7 @@ const AdminProjectRequests = () => {
     
     setActionLoading(true);
     try {
-      const response = await axios.delete('https://connectwithaaditiyamg.onrender.com/api/admin/project/requests', {
+      const response = await axios.delete('https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -169,7 +169,7 @@ const AdminProjectRequests = () => {
   const handleDownloadFile = async (requestId, fileIndex, fileName) => {
     try {
       const response = await axios.get(
-        `https://connectwithaaditiyamg.onrender.com/api/admin/project/requests/${requestId}/files/${fileIndex}`,
+        `https://connectwithaaditiyamg2.onrender.com/api/admin/project/requests/${requestId}/files/${fileIndex}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`

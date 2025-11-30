@@ -81,7 +81,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
         ...filters
       });
 
-      const response = await axios.get(`https://connectwithaaditiyamg.onrender.com/api/blogs?${params.toString()}`, {
+      const response = await axios.get(`https://connectwithaaditiyamg2.onrender.com/api/blogs?${params.toString()}`, {
         withCredentials: true
       });
 
@@ -301,12 +301,12 @@ const [updatingImage, setUpdatingImage] = useState(false);
     let response;
     
     if (selectedBlog) {
-      response = await axios.put(`https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
+      response = await axios.put(`https://connectwithaaditiyamg2.onrender.com/api/blogs/${selectedBlog._id}`, blogData, {
         withCredentials: true
       });
       setSuccessMessage('Blog post updated successfully!');
     } else {
-      response = await axios.post('https://connectwithaaditiyamg.onrender.com/api/blogs', blogData, {
+      response = await axios.post('https://connectwithaaditiyamg2.onrender.com/api/blogs', blogData, {
         withCredentials: true
       });
       setSuccessMessage('Blog post created successfully!');
@@ -337,7 +337,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
     
     try {
       setLoading(true);
-      await axios.delete(`https://connectwithaaditiyamg.onrender.com/api/blogs/${blogId}`, {
+      await axios.delete(`https://connectwithaaditiyamg2.onrender.com/api/blogs/${blogId}`, {
         withCredentials: true
       });
       
@@ -560,7 +560,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
       // If we're editing an existing blog, add video via API
       if (selectedBlog) {
         const response = await axios.post(
-          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/videos`,
+          `https://connectwithaaditiyamg2.onrender.com/api/blogs/${selectedBlog._id}/videos`,
           {
             url: videoModal.url,
             title: videoModal.title,
@@ -669,7 +669,7 @@ const handleUpdateImage = async () => {
     // If we're editing an existing blog, update image via API
     if (selectedBlog) {
       const response = await axios.put(
-        `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images/${editImageModal.imageId}`,
+        `https://connectwithaaditiyamg2.onrender.com/api/blogs/${selectedBlog._id}/images/${editImageModal.imageId}`,
         {
           url: editImageModal.url,
           alt: editImageModal.alt,
@@ -920,7 +920,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
       // If we're editing an existing blog, add image via API
       if (selectedBlog) {
         const response = await axios.post(
-          `https://connectwithaaditiyamg.onrender.com/api/blogs/${selectedBlog._id}/images`,
+          `https://connectwithaaditiyamg2.onrender.com/api/blogs/${selectedBlog._id}/images`,
           {
             url: imageModal.url,
             alt: imageModal.alt,

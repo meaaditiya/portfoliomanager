@@ -20,7 +20,7 @@ const AdminBlogSubmissions = () => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [showModal, setShowModal] = useState(false);
 
-  const API_URL = 'https://connectwithaaditiyamg.onrender.com';
+  const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
 
   // Get token from localStorage
   const getToken = () => localStorage.getItem('token');

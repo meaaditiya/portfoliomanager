@@ -19,7 +19,7 @@ const StreamAdmin = () => {
     password: ''
   });
 
-  const BASE_URL = 'https://connectwithaaditiyamg.onrender.com';
+  const BASE_URL = 'https://connectwithaaditiyamg2.onrender.com';
 
   useEffect(() => {
     if (token) {
