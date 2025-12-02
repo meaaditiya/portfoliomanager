@@ -2194,7 +2194,7 @@ router.post(
 
       
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-      
+      let userId = null;
      if (token) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
@@ -2584,7 +2584,7 @@ router.post(
 
       
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-      
+      let userId = null;
       if (token) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');

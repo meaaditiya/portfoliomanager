@@ -8,23 +8,23 @@ const { generateQueryEmbedding, cosineSimilarity } = require("../services/embedd
 const router = express.Router();
 
 
-// ===============================
-// 1. CREATE FOLDER
-// ===============================
+
+
+
 router.post("/api/admin/folder/create", authenticateToken, async (req, res) => {
   try {
     const { name, parentId } = req.body;
     
     if (!name) return res.status(400).json({ message: "Folder name required" });
 
-    // Validate parent exists if provided
+    
     if (parentId) {
       const parent = await Document.findById(parentId);
       if (!parent) return res.status(404).json({ message: "Parent folder not found" });
       if (parent.type !== "folder") return res.status(400).json({ message: "Parent must be a folder" });
     }
 
-    // Check for duplicate name in same parent
+    
     const existing = await Document.findOne({
       name,
       parent: parentId || null,
@@ -48,9 +48,9 @@ router.post("/api/admin/folder/create", authenticateToken, async (req, res) => {
 });
 
 
-// ===============================
-// 2. UPLOAD DOCUMENT TO FOLDER
-// ===============================
+
+
+
 router.post("/api/admin/document/upload", authenticateToken, multer.single("file"), async (req, res) => {
   try {
     const file = req.file;
@@ -58,7 +58,7 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
     
     if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-    // Validate parent exists if provided
+    
     if (parentId) {
       const parent = await Document.findById(parentId);
       if (!parent) return res.status(404).json({ message: "Parent folder not found" });
@@ -68,13 +68,13 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
     const storedName = Date.now() + "-" + file.originalname;
     const gcsFile = bucket.file(storedName);
 
-    // Upload to GCS
+    
     await gcsFile.save(file.buffer, { resumable: false });
 
-    // Generate embedding from filename
+    
     const embedding = await generateQueryEmbedding(file.originalname);
 
-    // Save metadata
+    
     const doc = await Document.create({
       name: file.originalname,
       type: "file",
@@ -96,19 +96,19 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
 });
 
 
-// ===============================
-// 3. LIST FOLDER CONTENTS
-// ===============================
+
+
+
 router.get("/api/folder/contents", async (req, res) => {
   try {
     const { parentId } = req.query;
 
-    // Get all items in this folder (or root if no parentId)
+    
     const items = await Document.find({
       parent: parentId || null
-    }).select("-embedding").sort({ type: 1, name: 1 }); // folders first, then files
+    }).select("-embedding").sort({ type: 1, name: 1 }); 
 
-    // Get current folder info if parentId provided
+    
     let currentFolder = null;
     if (parentId) {
       currentFolder = await Document.findById(parentId).select("-embedding");
@@ -127,9 +127,9 @@ router.get("/api/folder/contents", async (req, res) => {
 });
 
 
-// ===============================
-// 4. GET FILE/FOLDER METADATA
-// ===============================
+
+
+
 router.get("/api/item/:id", async (req, res) => {
   try {
     const item = await Document.findById(req.params.id)
@@ -146,9 +146,9 @@ router.get("/api/item/:id", async (req, res) => {
 });
 
 
-// ===============================
-// 5. GET BREADCRUMB PATH
-// ===============================
+
+
+
 router.get("/api/item/:id/breadcrumb", async (req, res) => {
   try {
     const item = await Document.findById(req.params.id);
@@ -179,23 +179,23 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
 });
 
 
-// ===============================
-// 6. SEARCH DOCUMENTS AND FOLDERS
-// ===============================
+
+
+
 router.get("/api/search", async (req, res) => {
   try {
-    const { q, type } = req.query; // type can be "file", "folder", or empty for both
+    const { q, type } = req.query; 
     
     if (!q) return res.status(400).json({ message: "Query missing" });
 
-    // Text search for folders (by name)
+    
     const folderQuery = { type: "folder", name: { $regex: q, $options: "i" } };
     const folders = type === "file" ? [] : await Document.find(folderQuery)
       .populate("parent", "name type")
       .select("-embedding")
       .limit(5);
 
-    // Embedding search for files
+    
     let files = [];
     if (type !== "folder") {
       const queryEmbedding = await generateQueryEmbedding(q);
@@ -226,9 +226,9 @@ router.get("/api/search", async (req, res) => {
 });
 
 
-// ===============================
-// 7. SECURE DOWNLOAD (Signed URL)
-// ===============================
+
+
+
 router.get("/api/download/:id", async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id);
@@ -239,7 +239,7 @@ router.get("/api/download/:id", async (req, res) => {
 
     const [url] = await file.getSignedUrl({
       action: "read",
-      expires: Date.now() + 30 * 60 * 1000  // 30 mins
+      expires: Date.now() + 30 * 60 * 1000  
     });
 
     res.json({ downloadUrl: url, filename: doc.originalName });
@@ -250,9 +250,9 @@ router.get("/api/download/:id", async (req, res) => {
 });
 
 
-// ===============================
-// 8. MOVE FILE/FOLDER
-// ===============================
+
+
+
 router.patch("/api/admin/item/:id/move", authenticateToken, async (req, res) => {
   try {
     const { newParentId } = req.body;
@@ -260,13 +260,13 @@ router.patch("/api/admin/item/:id/move", authenticateToken, async (req, res) => 
     
     if (!item) return res.status(404).json({ message: "Item not found" });
 
-    // Validate new parent
+    
     if (newParentId) {
       const newParent = await Document.findById(newParentId);
       if (!newParent) return res.status(404).json({ message: "New parent folder not found" });
       if (newParent.type !== "folder") return res.status(400).json({ message: "New parent must be a folder" });
       
-      // Prevent moving folder into itself or its children
+      
       if (item.type === "folder") {
         let checkParent = newParent;
         while (checkParent) {
@@ -281,7 +281,7 @@ router.patch("/api/admin/item/:id/move", authenticateToken, async (req, res) => 
     item.parent = newParentId || null;
     await item.save();
 
-    // Update paths for all children if it's a folder
+    
     if (item.type === "folder") {
       await updateChildrenPaths(item._id);
     }
@@ -293,11 +293,11 @@ router.patch("/api/admin/item/:id/move", authenticateToken, async (req, res) => 
   }
 });
 
-// Helper function to update paths of all children recursively
+
 async function updateChildrenPaths(folderId) {
   const children = await Document.find({ parent: folderId });
   for (const child of children) {
-    await child.save(); // This triggers the pre-save hook to update path
+    await child.save(); 
     if (child.type === "folder") {
       await updateChildrenPaths(child._id);
     }
@@ -305,9 +305,9 @@ async function updateChildrenPaths(folderId) {
 }
 
 
-// ===============================
-// 9. RENAME FILE/FOLDER
-// ===============================
+
+
+
 router.patch("/api/admin/item/:id/rename", authenticateToken, async (req, res) => {
   try {
     const { newName } = req.body;
@@ -317,7 +317,7 @@ router.patch("/api/admin/item/:id/rename", authenticateToken, async (req, res) =
     const item = await Document.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
-    // Check for duplicate name in same parent
+    
     const existing = await Document.findOne({
       name: newName,
       parent: item.parent,
@@ -330,7 +330,7 @@ router.patch("/api/admin/item/:id/rename", authenticateToken, async (req, res) =
     item.name = newName;
     await item.save();
 
-    // Update paths for all children if it's a folder
+    
     if (item.type === "folder") {
       await updateChildrenPaths(item._id);
     }
@@ -343,16 +343,16 @@ router.patch("/api/admin/item/:id/rename", authenticateToken, async (req, res) =
 });
 
 
-// ===============================
-// 10. DELETE FILE/FOLDER
-// ===============================
+
+
+
 router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
   try {
     const item = await Document.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Not found" });
 
     if (item.type === "folder") {
-      // Check if folder has children
+      
       const children = await Document.countDocuments({ parent: item._id });
       if (children > 0) {
         return res.status(400).json({ 
@@ -360,16 +360,16 @@ router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
         });
       }
     } else {
-      // Delete file from GCS
+      
       try {
         await bucket.file(item.gcsPath).delete();
       } catch (gcsErr) {
         console.error("GCS deletion error:", gcsErr);
-        // Continue even if GCS deletion fails
+        
       }
     }
 
-    // Delete from DB
+    
     await Document.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Deleted successfully" });
@@ -380,16 +380,16 @@ router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
 });
 
 
-// ===============================
-// 11. DELETE FOLDER RECURSIVELY
-// ===============================
+
+
+
 router.delete("/api/admin/folder/:id/recursive", authenticateToken, async (req, res) => {
   try {
     const folder = await Document.findById(req.params.id);
     if (!folder) return res.status(404).json({ message: "Folder not found" });
     if (folder.type !== "folder") return res.status(400).json({ message: "Not a folder" });
 
-    // Delete all children recursively
+    
     await deleteRecursive(folder._id);
 
     res.json({ message: "Folder and all contents deleted successfully" });
@@ -399,7 +399,7 @@ router.delete("/api/admin/folder/:id/recursive", authenticateToken, async (req, 
   }
 });
 
-// Helper function to delete folder and all its contents recursively
+
 async function deleteRecursive(folderId) {
   const children = await Document.find({ parent: folderId });
   
@@ -407,7 +407,7 @@ async function deleteRecursive(folderId) {
     if (child.type === "folder") {
       await deleteRecursive(child._id);
     } else {
-      // Delete file from GCS
+      
       try {
         await bucket.file(child.gcsPath).delete();
       } catch (gcsErr) {
@@ -417,14 +417,14 @@ async function deleteRecursive(folderId) {
     await Document.findByIdAndDelete(child._id);
   }
   
-  // Delete the folder itself
+  
   await Document.findByIdAndDelete(folderId);
 }
 
 
-// ===============================
-// 12. GET FOLDER TREE
-// ===============================
+
+
+
 router.get("/api/folder/tree", async (req, res) => {
   try {
     const { rootId } = req.query;
