@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder,LinkIcon, File,ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move } from 'lucide-react';
+import { Folder, LinkIcon, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft } from 'lucide-react';
 
 export default function FileManager() {
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -19,6 +19,9 @@ export default function FileManager() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [message, setMessage] = useState('');
   const [showNewLinkModal, setShowNewLinkModal] = useState(false);
+  const [excelData, setExcelData] = useState(null);
+const [viewingExcel, setViewingExcel] = useState(null);
+const [selectedSheet, setSelectedSheet] = useState(null);
 const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
   const token = localStorage.getItem('token');
@@ -46,6 +49,8 @@ const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
       }
       
       setSearchResults(null);
+       setViewingExcel(null);
+       setExcelData(null);
     } catch (err) {
       console.error('Error loading folder:', err);
     }
@@ -316,7 +321,213 @@ const createLink = async () => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
+const uploadExcelFile = async (file) => {
+  if (!file) return;
 
+  const validTypes = [
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv'
+  ];
+
+  if (!validTypes.includes(file.type)) {
+    showMessage('Please upload only Excel (.xlsx, .xls) or CSV files', 'error');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  if (currentFolder?._id) {
+    formData.append('parentId', currentFolder._id);
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    
+    if (res.ok) {
+      showMessage('Excel file uploaded successfully');
+      loadFolder(currentFolder?._id);
+    } else {
+      showMessage(data.message || 'Error uploading Excel file', 'error');
+    }
+  } catch (err) {
+    showMessage('Error uploading Excel file', 'error');
+  }
+};
+const loadExcelData = async (excelItem) => {
+  try {
+    const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`);
+    const data = await res.json();
+    
+    setExcelData(data);
+    setViewingExcel(excelItem);
+    setSelectedSheet(data.sheetNames?.[0] || null);
+  } catch (err) {
+    showMessage('Error loading Excel data', 'error');
+  }
+};
+
+const closeExcelView = () => {
+  setExcelData(null);
+  setViewingExcel(null);
+  setSelectedSheet(null);
+};
+const isURL = (value) => {
+  if (typeof value !== 'string') return false;
+  if (!value || value.trim() === '') return false;
+  
+  const stringValue = value.trim();
+  
+  // Check for common URL patterns with protocol
+  const urlPattern = /^(https?:\/\/)/i;
+  if (urlPattern.test(stringValue)) {
+    try {
+      new URL(stringValue);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  
+  // Check if it looks like a URL without protocol (has domain pattern)
+  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}(\/.*)?$/;
+  if (domainPattern.test(stringValue)) {
+    try {
+      new URL('https://' + stringValue);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  
+  return false;
+};
+
+const renderCellValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-';
+  
+  const stringValue = String(value).trim();
+  
+  if (isURL(stringValue)) {
+    // Ensure URL has protocol
+    let fullUrl = stringValue;
+    if (!stringValue.startsWith('http://') && !stringValue.startsWith('https://')) {
+      fullUrl = 'https://' + stringValue;
+    }
+    
+    // Extract shorter display text
+    let displayText = stringValue;
+    try {
+      const urlObj = new URL(fullUrl);
+      // Show just hostname + first part of path
+      displayText = urlObj.hostname;
+      if (urlObj.pathname && urlObj.pathname !== '/') {
+        const pathPart = urlObj.pathname.substring(0, 15);
+        displayText += pathPart + (urlObj.pathname.length > 15 ? '...' : '');
+      }
+    } catch (e) {
+      // Fallback to truncated string
+      displayText = stringValue.substring(0, 35) + (stringValue.length > 35 ? '...' : '');
+    }
+    
+    return (
+      <a 
+        href={fullUrl} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style={styles.tableLink}
+        onClick={(e) => e.stopPropagation()}
+        title={fullUrl}
+      >
+        <ExternalLink size={14} style={{ marginRight: '4px', flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayText}</span>
+      </a>
+    );
+  }
+  
+  // Not a URL, return as regular text
+  return stringValue;
+};
+const renderExcelTable = () => {
+  if (!excelData || !selectedSheet) return null;
+
+  const sheetData = excelData.data[selectedSheet];
+  if (!sheetData || sheetData.length === 0) {
+    return <div style={styles.emptyState}>No data in this sheet</div>;
+  }
+
+  const headers = Object.keys(sheetData[0]);
+
+  return (
+    <div style={styles.excelViewContainer}>
+      <div style={styles.excelHeader}>
+        <button onClick={closeExcelView} style={styles.backBtn}>
+          <ArrowLeft size={20} />
+          <span>Back to Files</span>
+        </button>
+        <h2 style={styles.excelTitle}>
+          <FileSpreadsheet size={24} style={{ marginRight: '10px' }} />
+          {viewingExcel.name}
+        </h2>
+      </div>
+
+      {excelData.sheetNames && excelData.sheetNames.length > 1 && (
+        <div style={styles.sheetTabs}>
+          {excelData.sheetNames.map(sheetName => (
+            <button
+              key={sheetName}
+              onClick={() => setSelectedSheet(sheetName)}
+              style={{
+                ...styles.sheetTab,
+                ...(selectedSheet === sheetName ? styles.activeSheetTab : {})
+              }}
+            >
+              {sheetName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={styles.excelInfo}>
+        <span>Total Rows: {sheetData.length}</span>
+        <span>Columns: {headers.length}</span>
+      </div>
+
+      <div style={styles.tableWrapper}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.tableHeader}>#</th>
+              {headers.map(header => (
+                <th key={header} style={styles.tableHeader}>{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sheetData.map((row, rowIndex) => (
+              <tr key={rowIndex} style={styles.tableRow}>
+                <td style={styles.tableCell}>{rowIndex + 1}</td>
+                {headers.map(header => (
+                  <td key={header} style={styles.tableCell}>
+                    {renderCellValue(row[header])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
   // Render folder tree for move modal
   const renderFolderTree = (folders, level = 0) => {
     return folders.filter(f => f.type === 'folder').map(folder => (
@@ -336,9 +547,18 @@ const createLink = async () => {
       </div>
     ));
   };
-
+if (viewingExcel && excelData) {
   return (
     <div style={styles.container}>
+      {message && <div style={styles.message}>{message}</div>}
+      {renderExcelTable()}
+    </div>
+  );
+}
+  return (
+    
+    <div style={styles.container}>
+      
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
@@ -424,6 +644,21 @@ const createLink = async () => {
   <LinkIcon size={16} />
   <span>Add Link</span>
 </button>
+<input
+  type="file"
+  id="excelInput"
+  accept=".xlsx,.xls,.csv"
+  style={{ display: 'none' }}
+  onChange={(e) => uploadExcelFile(e.target.files[0])}
+/>
+
+<button
+  onClick={() => document.getElementById('excelInput').click()}
+  style={styles.toolBtn}
+>
+  <FileSpreadsheet size={16} />
+  <span>Upload Excel</span>
+</button>
       </div>
 
       {/* File Grid */}
@@ -444,6 +679,19 @@ const createLink = async () => {
         style={styles.iconBtn}
         title="Open Link"
       >
+        <ExternalLink size={16} />
+      </button>
+    </div>
+  </div>
+))}
+<h3 style={styles.sectionTitle}>Excel Files ({searchResults.excels?.length || 0})</h3>
+{searchResults.excels?.map(item => (
+  <div key={item._id} style={styles.fileItem}>
+    <FileSpreadsheet size={40} color="#10B981" />
+    <div style={styles.fileName}>{item.name}</div>
+    <div style={styles.filePath}>{item.path}</div>
+    <div style={styles.fileActions}>
+      <button onClick={() => loadExcelData(item)} style={styles.iconBtn}>
         <ExternalLink size={16} />
       </button>
     </div>
@@ -485,21 +733,26 @@ const createLink = async () => {
     onDragStart={(e) => handleDragStart(e, item)}
     onDragOver={item.type === 'folder' ? handleDragOver : undefined}
     onDrop={item.type === 'folder' ? (e) => handleDrop(e, item) : undefined}
-    onDoubleClick={() => {
-      if (item.type === 'folder') {
-        loadFolder(item._id);
-      } else if (item.type === 'link') {
-        window.open(item.url, '_blank', 'noopener,noreferrer');
-      }
-    }}
+   onDoubleClick={() => {
+  if (item.type === 'folder') {
+    loadFolder(item._id);
+  } else if (item.type === 'link') {
+    window.open(item.url, '_blank', 'noopener,noreferrer');
+  } else if (item.type === 'excel') {  // ADD THIS
+    loadExcelData(item);
+  }
+}}
   >
-    {item.type === 'folder' ? (
-      <Folder size={40} color="#FFC107" />
-    ) : item.type === 'link' ? (
-      <LinkIcon size={40} color="#9C27B0" />
-    ) : (
-      <File size={40} color="#2196F3" />
-    )}
+   {item.type === 'folder' ? (
+  <Folder size={40} color="#FFC107" />
+) : item.type === 'link' ? (
+  <LinkIcon size={40} color="#9C27B0" />
+) : item.type === 'excel' ? (  // ADD THIS
+  <FileSpreadsheet size={40} color="#10B981" />
+) : (
+  <File size={40} color="#2196F3" />
+)}
+
     
     <div style={styles.fileName}>{item.name}</div>
     
@@ -512,7 +765,11 @@ const createLink = async () => {
     {item.type === 'link' && (
       <div style={styles.linkUrl}>{item.url}</div>
     )}
-
+{item.type === 'excel' && (
+  <div style={styles.fileSize}>
+    {item.rowCount} rows • {item.columnCount} cols
+  </div>
+)}
     <div style={styles.fileActions}>
       {item.type === 'file' && (
         <button onClick={() => downloadFile(item)} style={styles.iconBtn} title="Download">
@@ -529,7 +786,15 @@ const createLink = async () => {
           <ExternalLink size={16} />
         </button>
       )}
-      
+      {item.type === 'excel' && (
+  <button 
+    onClick={() => loadExcelData(item)} 
+    style={styles.iconBtn} 
+    title="View Data"
+  >
+    <ExternalLink size={16} />
+  </button>
+)}
       <button
         onClick={() => {
           setRenameItem(item);
@@ -927,5 +1192,113 @@ const styles = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap'
+},
+excelViewContainer: {
+  background: 'white',
+  borderRadius: '8px',
+  padding: '20px',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+},
+excelHeader: {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '20px',
+  marginBottom: '20px',
+  paddingBottom: '15px',
+  borderBottom: '2px solid #f0f0f0'
+},
+backBtn: {
+  padding: '8px 16px',
+  background: '#f5f5f5',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  fontSize: '14px',
+  fontWeight: '500',
+  transition: 'all 0.2s'
+},
+excelTitle: {
+  margin: 0,
+  fontSize: '20px',
+  fontWeight: '600',
+  display: 'flex',
+  alignItems: 'center'
+},
+sheetTabs: {
+  display: 'flex',
+  gap: '8px',
+  marginBottom: '15px',
+  borderBottom: '1px solid #e0e0e0',
+  paddingBottom: '10px'
+},
+sheetTab: {
+  padding: '8px 16px',
+  background: 'transparent',
+  border: 'none',
+  borderBottom: '2px solid transparent',
+  cursor: 'pointer',
+  fontSize: '14px',
+  fontWeight: '500',
+  color: '#666',
+  transition: 'all 0.2s'
+},
+activeSheetTab: {
+  color: '#2196F3',
+  borderBottomColor: '#2196F3'
+},
+excelInfo: {
+  display: 'flex',
+  gap: '20px',
+  padding: '12px',
+  background: '#f8f9fa',
+  borderRadius: '6px',
+  marginBottom: '15px',
+  fontSize: '14px',
+  color: '#666'
+},
+tableWrapper: {
+  overflowX: 'auto',
+  overflowY: 'auto',
+  maxHeight: '600px',
+  border: '1px solid #e0e0e0',
+  borderRadius: '6px'
+},
+table: {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: '14px'
+},
+tableHeader: {
+  background: '#f8f9fa',
+  padding: '12px',
+  textAlign: 'left',
+  fontWeight: '600',
+  borderBottom: '2px solid #e0e0e0',
+  position: 'sticky',
+  top: 0,
+  zIndex: 10,
+  whiteSpace: 'nowrap'
+},
+tableRow: {
+  borderBottom: '1px solid #f0f0f0',
+  transition: 'background 0.2s'
+},
+tableCell: {
+  padding: '12px',
+  borderRight: '1px solid #f0f0f0',
+  whiteSpace: 'nowrap',
+  maxWidth: '300px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+},
+tableLink: {
+  color: '#2196F3',
+  textDecoration: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px'
 }
 };

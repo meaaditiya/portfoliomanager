@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const DocumentSchema = new mongoose.Schema({
   
   name: { type: String, required: true },  
-  type: { type: String, enum: ["file", "folder", "link"], required: true },
+  type: { type: String, enum: ["file", "folder", "link", "excel"], required: true },
   
   
   originalName: String,        
@@ -13,8 +13,14 @@ const DocumentSchema = new mongoose.Schema({
   gcsPath: String,
   embedding: { type: [Number], default: [] },
   
-  // Link-specific fields
-  url: String,  // The actual URL for link type
+  
+  url: String,  
+  
+  
+  jsonData: { type: mongoose.Schema.Types.Mixed, default: null },  
+  sheetNames: [String],  
+  rowCount: Number,      
+  columnCount: Number,   
   
   
   parent: { type: mongoose.Schema.Types.ObjectId, ref: "Document", default: null },
