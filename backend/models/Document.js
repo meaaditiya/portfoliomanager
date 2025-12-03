@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const DocumentSchema = new mongoose.Schema({
   
   name: { type: String, required: true },  
-  type: { type: String, enum: ["file", "folder"], required: true },
+  type: { type: String, enum: ["file", "folder", "link"], required: true },
   
   
   originalName: String,        
@@ -12,6 +12,9 @@ const DocumentSchema = new mongoose.Schema({
   size: Number,
   gcsPath: String,
   embedding: { type: [Number], default: [] },
+  
+  // Link-specific fields
+  url: String,  // The actual URL for link type
   
   
   parent: { type: mongoose.Schema.Types.ObjectId, ref: "Document", default: null },

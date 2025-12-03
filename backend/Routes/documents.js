@@ -190,14 +190,14 @@ router.get("/api/search", async (req, res) => {
 
     
     const folderQuery = { type: "folder", name: { $regex: q, $options: "i" } };
-    const folders = type === "file" ? [] : await Document.find(folderQuery)
+    const folders = type === "file" || type === "link" ? [] : await Document.find(folderQuery)
       .populate("parent", "name type")
       .select("-embedding")
       .limit(5);
 
     
     let files = [];
-    if (type !== "folder") {
+    if (type !== "folder" && type !== "link") {
       const queryEmbedding = await generateQueryEmbedding(q);
       const allFiles = await Document.find({ type: "file" }).populate("parent", "name type");
 
@@ -214,17 +214,36 @@ router.get("/api/search", async (req, res) => {
         });
     }
 
+    
+    let links = [];
+    if (type !== "folder" && type !== "file") {
+      const queryEmbedding = await generateQueryEmbedding(q);
+      const allLinks = await Document.find({ type: "link" }).populate("parent", "name type");
+
+      links = allLinks
+        .map(l => ({
+          ...l.toObject(),
+          score: cosineSimilarity(queryEmbedding, l.embedding || [])
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+        .map(l => {
+          delete l.embedding;
+          return l;
+        });
+    }
+
     res.json({
       folders,
       files,
+      links,
       query: q
     });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
+}); 
 
 
 
@@ -359,15 +378,15 @@ router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
           message: "Cannot delete folder with contents. Delete or move contents first." 
         });
       }
-    } else {
+    } else if (item.type === "file") {
       
       try {
         await bucket.file(item.gcsPath).delete();
       } catch (gcsErr) {
         console.error("GCS deletion error:", gcsErr);
-        
       }
     }
+    
 
     
     await Document.findByIdAndDelete(req.params.id);
@@ -378,7 +397,6 @@ router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 
 
@@ -406,7 +424,7 @@ async function deleteRecursive(folderId) {
   for (const child of children) {
     if (child.type === "folder") {
       await deleteRecursive(child._id);
-    } else {
+    } else if (child.type === "file") {
       
       try {
         await bucket.file(child.gcsPath).delete();
@@ -414,13 +432,13 @@ async function deleteRecursive(folderId) {
         console.error("GCS deletion error:", gcsErr);
       }
     }
+    
     await Document.findByIdAndDelete(child._id);
   }
   
   
   await Document.findByIdAndDelete(folderId);
 }
-
 
 
 
@@ -452,6 +470,56 @@ router.get("/api/folder/tree", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.post("/api/admin/link/create", authenticateToken, async (req, res) => {
+  try {
+    const { name, url, parentId } = req.body;
+    
+    if (!name) return res.status(400).json({ message: "Link name required" });
+    if (!url) return res.status(400).json({ message: "URL required" });
 
+    
+    try {
+      new URL(url);
+    } catch (e) {
+      return res.status(400).json({ message: "Invalid URL format" });
+    }
+
+    
+    if (parentId) {
+      const parent = await Document.findById(parentId);
+      if (!parent) return res.status(404).json({ message: "Parent folder not found" });
+      if (parent.type !== "folder") return res.status(400).json({ message: "Parent must be a folder" });
+    }
+
+    
+    const existing = await Document.findOne({
+      name,
+      parent: parentId || null,
+      type: "link"
+    });
+    
+    if (existing) return res.status(400).json({ message: "Link with this name already exists" });
+
+    
+    const embedding = await generateQueryEmbedding(name + " " + url);
+
+    
+    const link = await Document.create({
+      name,
+      type: "link",
+      url,
+      mimeType: "link",
+      storedName: name,
+      embedding,
+      parent: parentId || null,
+      createdBy: req.user.id
+    });
+
+    res.json({ message: "Link created", link });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;

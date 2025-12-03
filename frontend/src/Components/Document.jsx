@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, File, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move } from 'lucide-react';
+import { Folder,LinkIcon, File,ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move } from 'lucide-react';
 
 export default function FileManager() {
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -18,7 +18,8 @@ export default function FileManager() {
   const [searchResults, setSearchResults] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
   const [message, setMessage] = useState('');
-
+  const [showNewLinkModal, setShowNewLinkModal] = useState(false);
+const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
   const token = localStorage.getItem('token');
 
@@ -96,7 +97,48 @@ export default function FileManager() {
       showMessage('Error creating folder', 'error');
     }
   };
+// Create link
+const createLink = async () => {
+  if (!linkFormData.name.trim() || !linkFormData.url.trim()) {
+    showMessage('Link name and URL are required', 'error');
+    return;
+  }
 
+  try {
+    new URL(linkFormData.url);
+  } catch (e) {
+    showMessage('Invalid URL format', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/link/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: linkFormData.name,
+        url: linkFormData.url,
+        parentId: currentFolder?._id || null
+      })
+    });
+
+    const data = await res.json();
+    
+    if (res.ok) {
+      showMessage('Link created successfully');
+      setLinkFormData({ name: '', url: '' });
+      setShowNewLinkModal(false);
+      loadFolder(currentFolder?._id);
+    } else {
+      showMessage(data.message || 'Error creating link', 'error');
+    }
+  } catch (err) {
+    showMessage('Error creating link', 'error');
+  }
+};
   // Upload file
   const uploadFile = async (file) => {
     if (!file) return;
@@ -375,6 +417,13 @@ export default function FileManager() {
           <FolderPlus size={16} />
           <span>New Folder</span>
         </button>
+        <button
+  onClick={() => setShowNewLinkModal(true)}
+  style={styles.toolBtn}
+>
+  <LinkIcon size={16} />
+  <span>Add Link</span>
+</button>
       </div>
 
       {/* File Grid */}
@@ -382,21 +431,24 @@ export default function FileManager() {
         {searchResults ? (
           <>
             {/* Search Results */}
-            <h3 style={styles.sectionTitle}>Folders ({searchResults.folders?.length || 0})</h3>
-            {searchResults.folders?.map(item => (
-              <div
-                key={item._id}
-                style={styles.fileItem}
-                onClick={() => {
-                  setSearchResults(null);
-                  loadFolder(item._id);
-                }}
-              >
-                <Folder size={40} color="#FFC107" />
-                <div style={styles.fileName}>{item.name}</div>
-                <div style={styles.filePath}>{item.path}</div>
-              </div>
-            ))}
+           <h3 style={styles.sectionTitle}>Links ({searchResults.links?.length || 0})</h3>
+{searchResults.links?.map(item => (
+  <div key={item._id} style={styles.fileItem}>
+    <LinkIcon size={40} color="#9C27B0" />
+    <div style={styles.fileName}>{item.name}</div>
+    <div style={styles.linkUrl}>{item.url}</div>
+    <div style={styles.filePath}>{item.path}</div>
+    <div style={styles.fileActions}>
+      <button 
+        onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
+        style={styles.iconBtn}
+        title="Open Link"
+      >
+        <ExternalLink size={16} />
+      </button>
+    </div>
+  </div>
+))}
 
             <h3 style={styles.sectionTitle}>Files ({searchResults.files?.length || 0})</h3>
             {searchResults.files?.map(item => (
@@ -422,74 +474,96 @@ export default function FileManager() {
                 <p style={styles.emptyHint}>Upload files or create folders to get started</p>
               </div>
             ) : (
-              items.map(item => (
-                <div
-                  key={item._id}
-                  style={{
-                    ...styles.fileItem,
-                    opacity: draggedItem?._id === item._id ? 0.5 : 1
-                  }}
-                  draggable={true}
-                  onDragStart={(e) => handleDragStart(e, item)}
-                  onDragOver={item.type === 'folder' ? handleDragOver : undefined}
-                  onDrop={item.type === 'folder' ? (e) => handleDrop(e, item) : undefined}
-                  onDoubleClick={() => item.type === 'folder' && loadFolder(item._id)}
-                >
-                  {item.type === 'folder' ? (
-                    <Folder size={40} color="#FFC107" />
-                  ) : (
-                    <File size={40} color="#2196F3" />
-                  )}
-                  
-                  <div style={styles.fileName}>{item.name}</div>
-                  
-                  {item.type === 'file' && (
-                    <div style={styles.fileSize}>
-                      {(item.size / 1024).toFixed(2)} KB
-                    </div>
-                  )}
+           items.map(item => (
+  <div
+    key={item._id}
+    style={{
+      ...styles.fileItem,
+      opacity: draggedItem?._id === item._id ? 0.5 : 1
+    }}
+    draggable={true}
+    onDragStart={(e) => handleDragStart(e, item)}
+    onDragOver={item.type === 'folder' ? handleDragOver : undefined}
+    onDrop={item.type === 'folder' ? (e) => handleDrop(e, item) : undefined}
+    onDoubleClick={() => {
+      if (item.type === 'folder') {
+        loadFolder(item._id);
+      } else if (item.type === 'link') {
+        window.open(item.url, '_blank', 'noopener,noreferrer');
+      }
+    }}
+  >
+    {item.type === 'folder' ? (
+      <Folder size={40} color="#FFC107" />
+    ) : item.type === 'link' ? (
+      <LinkIcon size={40} color="#9C27B0" />
+    ) : (
+      <File size={40} color="#2196F3" />
+    )}
+    
+    <div style={styles.fileName}>{item.name}</div>
+    
+    {item.type === 'file' && (
+      <div style={styles.fileSize}>
+        {(item.size / 1024).toFixed(2)} KB
+      </div>
+    )}
 
-                  <div style={styles.fileActions}>
-                    {item.type === 'file' && (
-                      <button onClick={() => downloadFile(item)} style={styles.iconBtn} title="Download">
-                        <Download size={16} />
-                      </button>
-                    )}
-                    
-                    <button
-                      onClick={() => {
-                        setRenameItem(item);
-                        setRenameName(item.name);
-                        setShowRenameModal(true);
-                      }}
-                      style={styles.iconBtn}
-                      title="Rename"
-                    >
-                      <Edit2 size={16} />
-                    </button>
+    {item.type === 'link' && (
+      <div style={styles.linkUrl}>{item.url}</div>
+    )}
 
-                    <button
-                      onClick={() => {
-                        setMoveItem(item);
-                        loadFolderTree();
-                        setShowMoveModal(true);
-                      }}
-                      style={styles.iconBtn}
-                      title="Move"
-                    >
-                      <Move size={16} />
-                    </button>
+    <div style={styles.fileActions}>
+      {item.type === 'file' && (
+        <button onClick={() => downloadFile(item)} style={styles.iconBtn} title="Download">
+          <Download size={16} />
+        </button>
+      )}
+      
+      {item.type === 'link' && (
+        <button 
+          onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
+          style={styles.iconBtn} 
+          title="Open Link"
+        >
+          <ExternalLink size={16} />
+        </button>
+      )}
+      
+      <button
+        onClick={() => {
+          setRenameItem(item);
+          setRenameName(item.name);
+          setShowRenameModal(true);
+        }}
+        style={styles.iconBtn}
+        title="Rename"
+      >
+        <Edit2 size={16} />
+      </button>
 
-                    <button
-                      onClick={() => deleteItem(item)}
-                      style={{...styles.iconBtn, color: '#f44336'}}
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))
+      <button
+        onClick={() => {
+          setMoveItem(item);
+          loadFolderTree();
+          setShowMoveModal(true);
+        }}
+        style={styles.iconBtn}
+        title="Move"
+      >
+        <Move size={16} />
+      </button>
+
+      <button
+        onClick={() => deleteItem(item)}
+        style={{...styles.iconBtn, color: '#f44336'}}
+        title="Delete"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  </div>
+))
             )}
           </>
         )}
@@ -569,6 +643,38 @@ export default function FileManager() {
           </div>
         </div>
       )}
+      {/* New Link Modal */}
+{showNewLinkModal && (
+  <div style={styles.modal} onClick={() => setShowNewLinkModal(false)}>
+    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <h3>Add New Link</h3>
+      <input
+        type="text"
+        placeholder="Link name"
+        value={linkFormData.name}
+        onChange={(e) => setLinkFormData({...linkFormData, name: e.target.value})}
+        style={styles.input}
+        autoFocus
+      />
+      <input
+        type="url"
+        placeholder="https://example.com"
+        value={linkFormData.url}
+        onChange={(e) => setLinkFormData({...linkFormData, url: e.target.value})}
+        onKeyPress={(e) => e.key === 'Enter' && createLink()}
+        style={styles.input}
+      />
+      <div style={styles.modalActions}>
+        <button onClick={() => setShowNewLinkModal(false)} style={styles.cancelBtn}>
+          Cancel
+        </button>
+        <button onClick={createLink} style={styles.submitBtn}>
+          Add Link
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
@@ -812,5 +918,14 @@ const styles = {
     alignItems: 'center',
     borderRadius: '4px',
     transition: 'background 0.2s'
-  }
+  },
+  linkUrl: {
+  fontSize: '11px',
+  color: '#9C27B0',
+  marginTop: '4px',
+  wordBreak: 'break-all',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+}
 };
