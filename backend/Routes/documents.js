@@ -1237,7 +1237,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
 
     switch (action) {
       case 'UPDATE_CELL':
-        // Update a single cell value
+        
         if (!doc.jsonData[sheetName] || doc.jsonData[sheetName][rowIndex] === undefined) {
           return res.status(400).json({ message: "Invalid sheet or row" });
         }
@@ -1245,7 +1245,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
         break;
 
       case 'UPDATE_HEADER':
-        // Rename a column header
+        
         if (!doc.jsonData[sheetName]) {
           return res.status(400).json({ message: "Invalid sheet" });
         }
@@ -1259,7 +1259,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
         break;
 
       case 'DELETE_ROW':
-        // Delete a row
+        
         if (!doc.jsonData[sheetName]) {
           return res.status(400).json({ message: "Invalid sheet" });
         }
@@ -1268,7 +1268,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
         break;
 
       case 'DELETE_COLUMN':
-        // Delete a column
+        
         if (!doc.jsonData[sheetName]) {
           return res.status(400).json({ message: "Invalid sheet" });
         }
@@ -1277,14 +1277,14 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
           delete newRow[columnName];
           return newRow;
         });
-        // Recalculate column count
+        
         if (doc.jsonData[sheetName].length > 0) {
           doc.columnCount = Object.keys(doc.jsonData[sheetName][0]).length;
         }
         break;
 
       case 'ADD_ROW':
-        // Add a new row
+        
         if (!doc.jsonData[sheetName]) {
           return res.status(400).json({ message: "Invalid sheet" });
         }
@@ -1298,7 +1298,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
         break;
 
       case 'ADD_COLUMN':
-        // Add a new column
+        
         if (!doc.jsonData[sheetName]) {
           return res.status(400).json({ message: "Invalid sheet" });
         }
@@ -1311,7 +1311,7 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
         break;
 
       case 'UPDATE_SHEET':
-        // Replace entire sheet data
+        
         if (!data.sheetData) {
           return res.status(400).json({ message: "Sheet data required" });
         }

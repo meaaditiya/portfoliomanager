@@ -29,6 +29,7 @@ const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
 const DocumentRoutes = require("./Routes/documents.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
+const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const passport = require('./Config/passport');
 const app = express();
 const server = http.createServer(app); 
@@ -86,8 +87,7 @@ app.use(SocialMediaEmbed);
 app.use(CommunityPostRoutes)
 app.use('/api/visitors', visitorRoutes);
 app.use(DocumentRoutes);
-
-
+app.use(FeaturedProjects);
 app.use('/public', express.static(path.join(__dirname, 'public')));
 const visitorSocket = require('./socket/visitorSocket');
 visitorSocket(io);
