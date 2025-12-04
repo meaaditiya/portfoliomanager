@@ -1,15 +1,38 @@
 const express = require("express");
 const multer = require("multer")();
 const XLSX = require("xlsx"); 
+const jwt = require('jsonwebtoken');
 const authenticateToken = require("../middlewares/authMiddleware");
 const bucket = require("../services/gcs");
 const Document = require("../models/Document");
 const { generateQueryEmbedding, cosineSimilarity } = require("../services/embeddingService");
-
+const User = require("../models/userSchema"); 
 const router = express.Router();
 
 
-
+const optionalAuth = (req, res, next) => {
+  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      
+      
+      const userId = decoded.user_id;
+      
+      if (userId) {
+        
+        req.user = { 
+          id: String(userId),
+          _id: String(userId)
+        };
+      }
+    } catch (err) {
+      
+      console.error('Token verification failed:', err.message);
+    }
+  }
+  next();
+};
 
 router.post("/api/admin/excel/upload", authenticateToken, multer.single("file"), async (req, res) => {
   try {
@@ -162,14 +185,20 @@ router.post("/api/admin/excel/upload", authenticateToken, multer.single("file"),
 
 
 
-router.get("/api/excel/:id/data", async (req, res) => {
+
+router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id);
     
     if (!doc) return res.status(404).json({ message: "Excel file not found" });
-    if (doc.type !== "excel") return res.status(400).json({ message: "This is not an Excel file" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
 
-    res.json({
+    
+    const userIdString = req.user ? String(req.user.id) : null;
+
+    const response = {
       id: doc._id,
       name: doc.name,
       sheetNames: doc.sheetNames,
@@ -177,14 +206,19 @@ router.get("/api/excel/:id/data", async (req, res) => {
       columnCount: doc.columnCount,
       data: doc.jsonData,
       createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt
-    });
+      updatedAt: doc.updatedAt,
+      checkmarkFields: doc.excelCheckmarkFields || [],
+      userCheckmarks: userIdString ? (doc.rowCheckmarks?.[userIdString] || {}) : {},
+      isAuthenticated: !!req.user
+    };
+
+    res.json(response);
 
   } catch (err) {
+    console.error("Excel data error:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 
 
@@ -287,30 +321,51 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
 
 
 
-router.get("/api/folder/contents", async (req, res) => {
+
+router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
     const { parentId } = req.query;
 
-    
     const items = await Document.find({
       parent: parentId || null
     })
-    .select("-embedding -jsonData")  
+    .select("-embedding -jsonData -rowCheckmarks")
     .sort({ type: 1, name: 1 });
 
     let currentFolder = null;
     if (parentId) {
-      currentFolder = await Document.findById(parentId).select("-embedding -jsonData");
-      if (!currentFolder) return res.status(404).json({ message: "Folder not found" });
+      currentFolder = await Document.findById(parentId)
+        .select("-embedding -jsonData -rowCheckmarks");
+      if (!currentFolder) {
+        return res.status(404).json({ message: "Folder not found" });
+      }
     }
+const itemsWithBookmarkStatus = items.map(item => {
+  const itemObj = item.toObject();
+  
+  
+  const isBookmarked = req.user 
+    ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
+    : false;
+
+  return {
+    ...itemObj,
+    isBookmarked,
+    bookmarkEnabled: item.bookmarkEnabled || false,
+    isAuthenticated: !!req.user,
+    bookmarks: undefined 
+  };
+});
 
     res.json({
       currentFolder,
-      items,
-      path: currentFolder ? currentFolder.path : "/"
+      items: itemsWithBookmarkStatus,
+      path: currentFolder ? currentFolder.path : "/",
+      isAuthenticated: !!req.user
     });
 
   } catch (err) {
+    console.error("Folder contents error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -318,22 +373,40 @@ router.get("/api/folder/contents", async (req, res) => {
 
 
 
-router.get("/api/item/:id", async (req, res) => {
+
+router.get("/api/item/:id", optionalAuth, async (req, res) => {
   try {
     const item = await Document.findById(req.params.id)
       .populate("parent", "name type path")
-      .select("-embedding -jsonData");  
+      .select("-embedding -jsonData -rowCheckmarks");
       
     if (!item) return res.status(404).json({ message: "Not found" });
 
-    res.json(item);
+    const itemObj = item.toObject();
+    const isBookmarked = req.user 
+      ? item.bookmarks.some(b => b.userId === req.user._id)
+      : false;
+
+    const response = {
+      ...itemObj,
+      isBookmarked,
+      bookmarkEnabled: item.bookmarkEnabled || false,
+      bookmarkCount: item.bookmarks.length,
+      isAuthenticated: !!req.user,
+      bookmarks: undefined 
+    };
+
+    if (item.type === "excel") {
+      response.checkmarkFields = item.excelCheckmarkFields || [];
+    }
+
+    res.json(response);
 
   } catch (err) {
+    console.error("Get item error:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
-
 
 
 router.get("/api/item/:id/breadcrumb", async (req, res) => {
@@ -374,7 +447,6 @@ router.get("/api/search", async (req, res) => {
     
     if (!q) return res.status(400).json({ message: "Query missing" });
 
-    
     const folderQuery = { type: "folder", name: { $regex: q, $options: "i" } };
     const folders = type === "file" || type === "link" || type === "excel" 
       ? [] 
@@ -383,7 +455,6 @@ router.get("/api/search", async (req, res) => {
           .select("-embedding -jsonData")
           .limit(5);
 
-    
     let files = [];
     if (type !== "folder" && type !== "link" && type !== "excel") {
       const queryEmbedding = await generateQueryEmbedding(q);
@@ -398,11 +469,13 @@ router.get("/api/search", async (req, res) => {
         .slice(0, 10)
         .map(f => {
           delete f.embedding;
-          return f;
+          return {
+            ...f,
+            bookmarkEnabled: f.bookmarkEnabled || false
+          };
         });
     }
 
-    
     let links = [];
     if (type !== "folder" && type !== "file" && type !== "excel") {
       const queryEmbedding = await generateQueryEmbedding(q);
@@ -417,16 +490,18 @@ router.get("/api/search", async (req, res) => {
         .slice(0, 10)
         .map(l => {
           delete l.embedding;
-          return l;
+          return {
+            ...l,
+            bookmarkEnabled: l.bookmarkEnabled || false
+          };
         });
     }
 
-    
     let excels = [];
     if (type !== "folder" && type !== "file" && type !== "link") {
       const queryEmbedding = await generateQueryEmbedding(q);
       const allExcels = await Document.find({ type: "excel" })
-        .select("-jsonData")  
+        .select("-jsonData")
         .populate("parent", "name type");
 
       excels = allExcels
@@ -438,19 +513,23 @@ router.get("/api/search", async (req, res) => {
         .slice(0, 10)
         .map(e => {
           delete e.embedding;
-          return e;
+          return {
+            ...e,
+            bookmarkEnabled: e.bookmarkEnabled || false
+          };
         });
     }
 
     res.json({
-      folders,
+      folders: folders.map(f => ({...f.toObject(), bookmarkEnabled: f.bookmarkEnabled || false})),
       files,
       links,
-      excels,  
+      excels,
       query: q
     });
 
   } catch (err) {
+    console.error("Search error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -710,6 +789,435 @@ router.post("/api/admin/link/create", authenticateToken, async (req, res) => {
     });
 
     res.json({ message: "Link created", link });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+router.patch("/api/admin/item/:id/bookmark-toggle", authenticateToken, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: "enabled field must be boolean" });
+    }
+
+    const item = await Document.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    item.bookmarkEnabled = enabled;
+    await item.save();
+
+    res.json({ 
+      message: `Bookmarking ${enabled ? 'enabled' : 'disabled'}`,
+      item: {
+        id: item._id,
+        name: item.name,
+        bookmarkEnabled: item.bookmarkEnabled
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+
+router.post("/api/admin/excel/:id/checkmark-fields", authenticateToken, async (req, res) => {
+  try {
+    const { fields } = req.body; 
+    
+    if (!Array.isArray(fields)) {
+      return res.status(400).json({ message: "fields must be an array" });
+    }
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
+
+    
+    for (const field of fields) {
+      if (!field.fieldName || !field.fieldId) {
+        return res.status(400).json({ 
+          message: "Each field must have fieldName and fieldId" 
+        });
+      }
+    
+
+    if (field.checkmarkType && !['checkbox', 'check', 'circle', 'star', 'heart'].includes(field.checkmarkType)) {
+    return res.status(400).json({
+      message: "Invalid checkmarkType. Must be one of: checkbox, check, circle, star, heart"
+    });
+  }
+    }
+    doc.excelCheckmarkFields = fields.map(f => ({
+      fieldName: f.fieldName,
+      fieldId: f.fieldId,
+      checkmarkType: f.checkmarkType || 'checkbox', 
+      createdAt: new Date()
+    }));
+
+    await doc.save();
+
+    res.json({ 
+      message: "Checkmark fields updated",
+      fields: doc.excelCheckmarkFields
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.delete("/api/admin/excel/:id/checkmark-field/:fieldId", authenticateToken, async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
+
+    const fieldId = req.params.fieldId;
+    doc.excelCheckmarkFields = doc.excelCheckmarkFields.filter(
+      f => f.fieldId !== fieldId
+    );
+
+    
+    if (doc.rowCheckmarks) {
+      Object.keys(doc.rowCheckmarks).forEach(userId => {
+        Object.keys(doc.rowCheckmarks[userId]).forEach(rowIndex => {
+          if (doc.rowCheckmarks[userId][rowIndex][fieldId]) {
+            delete doc.rowCheckmarks[userId][rowIndex][fieldId];
+          }
+        });
+      });
+    }
+
+    await doc.save();
+
+    res.json({ 
+      message: "Checkmark field removed",
+      fields: doc.excelCheckmarkFields
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+
+router.post("/api/user/bookmark/:id", async (req, res) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required. Please log in." });
+    }
+
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      userId = decoded.user_id; 
+
+      if (!userId) {
+        return res.status(403).json({ message: "Invalid user token" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    const item = await Document.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    if (!item.bookmarkEnabled) {
+      return res.status(403).json({ 
+        message: "Bookmarking is not enabled for this item" 
+      });
+    }
+
+    
+    const userIdString = String(userId);
+    const existingBookmark = item.bookmarks.find(
+      b => String(b.userId) === userIdString
+    );
+
+    if (existingBookmark) {
+      return res.status(400).json({ message: "Already bookmarked" });
+    }
+
+    item.bookmarks.push({
+      userId: userIdString, 
+      bookmarkedAt: new Date()
+    });
+
+    await item.save();
+
+    res.json({ 
+      message: "Bookmarked successfully",
+      bookmarked: true,
+      bookmarkCount: item.bookmarks.length
+    });
+
+  } catch (err) {
+    console.error("Bookmark error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/api/user/bookmark/:id", async (req, res) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required. Please log in." });
+    }
+
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      userId = decoded.user_id; 
+
+      if (!userId) {
+        return res.status(403).json({ message: "Invalid user token" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    const item = await Document.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    
+    const userIdString = String(userId);
+    const bookmarkIndex = item.bookmarks.findIndex(
+      b => String(b.userId) === userIdString
+    );
+
+    if (bookmarkIndex > -1) {
+      item.bookmarks.splice(bookmarkIndex, 1);
+      await item.save();
+    }
+
+    res.json({ 
+      message: "Bookmark removed",
+      bookmarked: false,
+      bookmarkCount: item.bookmarks.length
+    });
+
+  } catch (err) {
+    console.error("Unbookmark error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/api/user/bookmarks", async (req, res) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required. Please log in." });
+    }
+
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      userId = decoded.user_id; 
+
+      if (!userId) {
+        return res.status(403).json({ message: "Invalid user token" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    
+    const userIdString = String(userId);
+    const bookmarkedItems = await Document.find({
+      "bookmarks.userId": userIdString
+    })
+    .select("-embedding -jsonData -rowCheckmarks")
+    .populate("parent", "name type")
+    .sort({ updatedAt: -1 });
+
+    const itemsWithBookmarkDate = bookmarkedItems.map(item => {
+      const bookmark = item.bookmarks.find(b => String(b.userId) === userIdString);
+      return {
+        ...item.toObject(),
+        bookmarkedAt: bookmark?.bookmarkedAt,
+        bookmarks: undefined 
+      };
+    });
+
+    res.json({ 
+      bookmarks: itemsWithBookmarkDate,
+      count: itemsWithBookmarkDate.length
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.post("/api/user/excel/:id/row-checkmark", async (req, res) => {
+  try {
+    const { rowIndex, fieldId, checked } = req.body;
+
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required. Please log in." });
+    }
+
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      userId = decoded.user_id; 
+
+      if (!userId) {
+        return res.status(403).json({ message: "Invalid user token" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    if (typeof rowIndex !== 'number' || typeof checked !== 'boolean') {
+      return res.status(400).json({ 
+        message: "rowIndex (number) and checked (boolean) required" 
+      });
+    }
+
+    if (!fieldId) {
+      return res.status(400).json({ message: "fieldId is required" });
+    }
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
+
+    const fieldExists = doc.excelCheckmarkFields.some(f => f.fieldId === fieldId);
+    if (!fieldExists) {
+      return res.status(400).json({ 
+        message: "Invalid fieldId. Field does not exist." 
+      });
+    }
+
+    if (!doc.rowCheckmarks) doc.rowCheckmarks = {};
+    
+    
+    const userIdString = String(userId);
+    
+    if (!doc.rowCheckmarks[userIdString]) {
+      doc.rowCheckmarks[userIdString] = {};
+    }
+    if (!doc.rowCheckmarks[userIdString][rowIndex]) {
+      doc.rowCheckmarks[userIdString][rowIndex] = {};
+    }
+
+    doc.rowCheckmarks[userIdString][rowIndex][fieldId] = checked;
+
+    doc.markModified('rowCheckmarks');
+    await doc.save();
+
+    res.json({ 
+      message: "Checkmark updated",
+      rowIndex,
+      fieldId,
+      checked
+    });
+
+  } catch (err) {
+    console.error("Row checkmark error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router.get("/api/user/excel/:id/checkmarks", async (req, res) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required. Please log in." });
+    }
+
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+      userId = decoded.user_id; 
+
+      if (!userId) {
+        return res.status(403).json({ message: "Invalid user token" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    const doc = await Document.findById(req.params.id)
+      .select("excelCheckmarkFields rowCheckmarks name type");
+
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
+
+    
+    const userIdString = String(userId);
+    const userCheckmarks = doc.rowCheckmarks?.[userIdString] || {};
+
+    res.json({ 
+      checkmarkFields: doc.excelCheckmarkFields || [],
+      userCheckmarks
+    });
 
   } catch (err) {
     res.status(500).json({ error: err.message });

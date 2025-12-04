@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, LinkIcon, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft } from 'lucide-react';
+import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart } from 'lucide-react';
 
 export default function FileManager() {
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -23,6 +23,19 @@ export default function FileManager() {
 const [viewingExcel, setViewingExcel] = useState(null);
 const [selectedSheet, setSelectedSheet] = useState(null);
 const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
+// Add after existing useState declarations
+const [showBookmarkToggleModal, setShowBookmarkToggleModal] = useState(false);
+const [bookmarkToggleItem, setBookmarkToggleItem] = useState(null);
+const [showCheckmarkFieldsModal, setShowCheckmarkFieldsModal] = useState(false);
+const [checkmarkFieldsItem, setCheckmarkFieldsItem] = useState(null);
+const [checkmarkFields, setCheckmarkFields] = useState([]);
+const CHECKMARK_TYPES = [
+  { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
+  { id: 'check', label: 'Check', icon: Check },
+  { id: 'circle', label: 'Circle', icon: Circle },
+  { id: 'star', label: 'Star', icon: Star },
+  { id: 'heart', label: 'Heart', icon: Heart }
+];
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
   const token = localStorage.getItem('token');
 
@@ -321,6 +334,99 @@ const createLink = async () => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
+
+const toggleBookmarkAvailability = async (item, enabled) => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/item/${item._id}/bookmark-toggle`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ enabled })
+    });
+
+    if (res.ok) {
+      showMessage(`Bookmarking ${enabled ? 'enabled' : 'disabled'} for ${item.name}`);
+      setShowBookmarkToggleModal(false);
+      loadFolder(currentFolder?._id);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error updating bookmark setting', 'error');
+    }
+  } catch (err) {
+    showMessage('Error updating bookmark setting', 'error');
+  }
+};
+
+// ============================================================================
+// ADMIN: Manage Excel Checkmark Fields
+// ============================================================================
+
+const saveCheckmarkFields = async () => {
+  if (checkmarkFields.some(f => !f.fieldName || !f.fieldId)) {
+    showMessage('All fields must have a name and ID', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `${API_URL}/api/admin/excel/${checkmarkFieldsItem._id}/checkmark-fields`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ fields: checkmarkFields })
+      }
+    );
+
+    if (res.ok) {
+      showMessage('Checkmark fields updated successfully');
+      setShowCheckmarkFieldsModal(false);
+      setCheckmarkFieldsItem(null);
+      loadFolder(currentFolder?._id);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error updating fields', 'error');
+    }
+  } catch (err) {
+    showMessage('Error updating checkmark fields', 'error');
+  }
+};
+
+const addCheckmarkField = () => {
+  setCheckmarkFields([
+    ...checkmarkFields,
+    { 
+      fieldName: '', 
+      fieldId: `field_${Date.now()}`,
+      checkmarkType: 'checkbox' 
+    }
+  ]);
+};
+
+const updateCheckmarkField = (index, key, value) => {
+  const updated = [...checkmarkFields];
+  updated[index][key] = value;
+  setCheckmarkFields(updated);
+};
+
+const removeCheckmarkField = (index) => {
+  setCheckmarkFields(checkmarkFields.filter((_, i) => i !== index));
+};
+
+const loadExcelCheckmarkFields = async (excelId) => {
+  try {
+    const res = await fetch(`${API_URL}/api/excel/${excelId}/data`);
+    const data = await res.json();
+    setCheckmarkFields(data.checkmarkFields || []);
+  } catch (err) {
+    setCheckmarkFields([]);
+  }
+};
+
 const uploadExcelFile = async (file) => {
   if (!file) return;
 
@@ -826,6 +932,34 @@ if (viewingExcel && excelData) {
       >
         <Trash2 size={16} />
       </button>
+      <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setBookmarkToggleItem(item);
+      setShowBookmarkToggleModal(true);
+    }}
+    style={{
+      ...styles.iconBtn,
+      color: item.bookmarkEnabled ? '#4CAF50' : '#666'
+    }}
+    title={item.bookmarkEnabled ? 'Bookmarking Enabled' : 'Enable Bookmarking'}
+  >
+    <Star size={16} fill={item.bookmarkEnabled ? '#4CAF50' : 'none'} />
+  </button>
+   {item.type === 'excel' && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setCheckmarkFieldsItem(item);
+        loadExcelCheckmarkFields(item._id);
+        setShowCheckmarkFieldsModal(true);
+      }}
+      style={styles.iconBtn}
+      title="Manage Checkmark Fields"
+    >
+      <CheckSquare size={16} />
+    </button>
+  )}
     </div>
   </div>
 ))
@@ -935,6 +1069,133 @@ if (viewingExcel && excelData) {
         </button>
         <button onClick={createLink} style={styles.submitBtn}>
           Add Link
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* ADMIN: Bookmark Toggle Modal */}
+{showBookmarkToggleModal && bookmarkToggleItem && (
+  <div style={styles.modal} onClick={() => setShowBookmarkToggleModal(false)}>
+    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <h3>Bookmark Settings</h3>
+      <p style={{ marginTop: '15px', marginBottom: '20px' }}>
+        <strong>{bookmarkToggleItem.name}</strong>
+      </p>
+      <p>
+        Current Status: {bookmarkToggleItem.bookmarkEnabled ? (
+          <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>Enabled</span>
+        ) : (
+          <span style={{ color: '#999' }}>Disabled</span>
+        )}
+      </p>
+      <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+        When enabled, users can bookmark this item for quick access.
+      </p>
+      <div style={styles.modalActions}>
+        <button
+          onClick={() => {
+            toggleBookmarkAvailability(bookmarkToggleItem, false);
+          }}
+          style={styles.cancelBtn}
+        >
+          Disable Bookmarking
+        </button>
+        <button
+          onClick={() => {
+            toggleBookmarkAvailability(bookmarkToggleItem, true);
+          }}
+          style={styles.submitBtn}
+        >
+          Enable Bookmarking
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* ADMIN: Excel Checkmark Fields Modal */}
+{showCheckmarkFieldsModal && checkmarkFieldsItem && (
+  <div style={styles.modal} onClick={() => setShowCheckmarkFieldsModal(false)}>
+    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <h3>Manage Checkmark Fields</h3>
+      <p style={{ marginTop: '10px', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
+        <strong>{checkmarkFieldsItem.name}</strong>
+        <br />
+        Add custom checkmark columns that users can check/uncheck for each row.
+      </p>
+      
+      {checkmarkFields.length === 0 ? (
+        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+          No checkmark fields yet. Add one below.
+        </div>
+      ) : (
+        checkmarkFields.map((field, index) => (
+          <div key={index} style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            marginBottom: '10px',
+            alignItems: 'center'
+          }}>
+            <input
+              type="text"
+              placeholder="Field Name (e.g., Complete)"
+              value={field.fieldName}
+              onChange={(e) => updateCheckmarkField(index, 'fieldName', e.target.value)}
+              style={{...styles.input, marginTop: 0, flex: 1}}
+            />
+            <input
+              type="text"
+              placeholder="Field ID (e.g., complete)"
+              value={field.fieldId}
+              onChange={(e) => updateCheckmarkField(index, 'fieldId', e.target.value)}
+              style={{...styles.input, marginTop: 0, flex: 1}}
+              disabled
+            />
+            <select
+      value={field.checkmarkType || 'checkbox'}
+      onChange={(e) => updateCheckmarkField(index, 'checkmarkType', e.target.value)}
+      style={{...styles.input, marginTop: 0, width: '140px'}}
+    >
+      {CHECKMARK_TYPES.map(type => {
+        const IconComponent = type.icon;
+        return (
+          <option key={type.id} value={type.id}>
+            {type.label}
+          </option>
+        );
+      })}
+    </select>
+            <button
+              onClick={() => removeCheckmarkField(index)}
+              style={{...styles.iconBtn, color: '#f44336'}}
+              title="Remove Field"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))
+      )}
+      
+      <button
+        onClick={addCheckmarkField}
+        style={{...styles.toolBtn, marginTop: '15px', width: '100%', justifyContent: 'center'}}
+      >
+        <span>+ Add Checkmark Field</span>
+      </button>
+      
+      <div style={styles.modalActions}>
+        <button
+          onClick={() => {
+            setShowCheckmarkFieldsModal(false);
+            setCheckmarkFieldsItem(null);
+          }}
+          style={styles.cancelBtn}
+        >
+          Cancel
+        </button>
+        <button onClick={saveCheckmarkFields} style={styles.submitBtn}>
+          Save Fields
         </button>
       </div>
     </div>

@@ -20,11 +20,37 @@ const DocumentSchema = new mongoose.Schema({
   jsonData: { type: mongoose.Schema.Types.Mixed, default: null },  
   sheetNames: [String],  
   rowCount: Number,      
-  columnCount: Number,   
+  columnCount: Number,
+  
+  
+ excelCheckmarkFields: [{
+  fieldName: String,
+  fieldId: String,
+  checkmarkType: {
+    type: String,
+    enum: ['checkbox', 'check', 'circle', 'star', 'heart'],
+    default: 'checkbox'
+  },
+  createdAt: Date
+}],
+  
+  
+  
+  rowCheckmarks: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   
   
   parent: { type: mongoose.Schema.Types.ObjectId, ref: "Document", default: null },
   path: { type: String, default: "/" },  
+  
+  
+  bookmarkEnabled: { type: Boolean, default: false },  
+  bookmarks: [{
+    userId: { type: String, required: true },  
+    bookmarkedAt: { type: Date, default: Date.now }
+  }],
   
   
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
@@ -36,6 +62,9 @@ const DocumentSchema = new mongoose.Schema({
 DocumentSchema.index({ parent: 1 });
 DocumentSchema.index({ type: 1 });
 DocumentSchema.index({ path: 1 });
+
+
+DocumentSchema.index({ "bookmarks.userId": 1 });
 
 
 DocumentSchema.methods.getFullPath = async function() {
