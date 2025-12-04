@@ -29,6 +29,13 @@ const [bookmarkToggleItem, setBookmarkToggleItem] = useState(null);
 const [showCheckmarkFieldsModal, setShowCheckmarkFieldsModal] = useState(false);
 const [checkmarkFieldsItem, setCheckmarkFieldsItem] = useState(null);
 const [checkmarkFields, setCheckmarkFields] = useState([]);
+const [editingExcel, setEditingExcel] = useState(null);
+const [editMode, setEditMode] = useState(false);
+const [selectedCell, setSelectedCell] = useState(null);
+const [editingCell, setEditingCell] = useState(null);
+const [cellValue, setCellValue] = useState('');
+const [editingHeader, setEditingHeader] = useState(null);
+const [headerValue, setHeaderValue] = useState('');
 const CHECKMARK_TYPES = [
   { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
   { id: 'check', label: 'Check', icon: Check },
@@ -468,6 +475,316 @@ const uploadExcelFile = async (file) => {
     showMessage('Error uploading Excel file', 'error');
   }
 };
+const enterEditMode = (item) => {
+  setEditingExcel(item);
+  setEditMode(true);
+  loadExcelData(item);
+};
+
+const exitEditMode = () => {
+  setEditMode(false);
+  setEditingExcel(null);
+  setSelectedCell(null);
+  setEditingCell(null);
+  setCellValue('');
+};
+
+const updateCell = async (rowIndex, columnName, newValue) => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'UPDATE_CELL',
+        data: {
+          sheetName: selectedSheet,
+          rowIndex,
+          columnName,
+          newValue
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        }
+      });
+      showMessage('Cell updated');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error updating cell', 'error');
+    }
+  } catch (err) {
+    showMessage('Error updating cell', 'error');
+  }
+};
+
+const updateHeader = async (oldColumnName, newColumnName) => {
+  if (!newColumnName.trim() || oldColumnName === newColumnName) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'UPDATE_HEADER',
+        data: {
+          sheetName: selectedSheet,
+          columnName: oldColumnName,
+          newColumnName: newColumnName.trim()
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        }
+      });
+      showMessage('Column renamed');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error renaming column', 'error');
+    }
+  } catch (err) {
+    showMessage('Error renaming column', 'error');
+  }
+};
+
+const deleteRow = async (rowIndex) => {
+  if (!confirm('Delete this row?')) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'DELETE_ROW',
+        data: {
+          sheetName: selectedSheet,
+          rowIndex
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        },
+        rowCount: result.rowCount
+      });
+      showMessage('Row deleted');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error deleting row', 'error');
+    }
+  } catch (err) {
+    showMessage('Error deleting row', 'error');
+  }
+};
+
+const deleteColumn = async (columnName) => {
+  if (!confirm(`Delete column "${columnName}"?`)) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'DELETE_COLUMN',
+        data: {
+          sheetName: selectedSheet,
+          columnName
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        },
+        columnCount: result.columnCount
+      });
+      showMessage('Column deleted');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error deleting column', 'error');
+    }
+  } catch (err) {
+    showMessage('Error deleting column', 'error');
+  }
+};
+
+const addRow = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'ADD_ROW',
+        data: {
+          sheetName: selectedSheet
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        },
+        rowCount: result.rowCount
+      });
+      showMessage('Row added');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error adding row', 'error');
+    }
+  } catch (err) {
+    showMessage('Error adding row', 'error');
+  }
+};
+
+const addColumn = async () => {
+  const colName = prompt('Enter column name:');
+  if (!colName || !colName.trim()) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        action: 'ADD_COLUMN',
+        data: {
+          sheetName: selectedSheet,
+          newColumnName: colName.trim()
+        }
+      })
+    });
+
+    if (res.ok) {
+      const result = await res.json();
+      setExcelData({
+        ...excelData,
+        data: {
+          ...excelData.data,
+          [selectedSheet]: result.data
+        },
+        columnCount: result.columnCount
+      });
+      showMessage('Column added');
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error adding column', 'error');
+    }
+  } catch (err) {
+    showMessage('Error adding column', 'error');
+  }
+};
+
+// Keyboard navigation
+const handleCellKeyDown = (e, rowIndex, colIndex, headers) => {
+  if (editingCell) return; // Don't navigate while editing
+
+  const currentRow = rowIndex;
+  const currentCol = colIndex;
+
+  switch(e.key) {
+    case 'ArrowUp':
+      e.preventDefault();
+      if (currentRow > 0) {
+        setSelectedCell({ row: currentRow - 1, col: currentCol });
+      }
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      const sheetData = excelData.data[selectedSheet];
+      if (currentRow < sheetData.length - 1) {
+        setSelectedCell({ row: currentRow + 1, col: currentCol });
+      }
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      if (currentCol > 0) {
+        setSelectedCell({ row: currentRow, col: currentCol - 1 });
+      }
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      if (currentCol < headers.length - 1) {
+        setSelectedCell({ row: currentRow, col: currentCol + 1 });
+      }
+      break;
+    case 'Enter':
+      e.preventDefault();
+      setEditingCell({ row: currentRow, col: currentCol });
+      const cellVal = excelData.data[selectedSheet][currentRow][headers[currentCol]];
+      setCellValue(cellVal || '');
+      break;
+    case 'Delete':
+      e.preventDefault();
+      if (editMode) {
+        updateCell(currentRow, headers[currentCol], '');
+      }
+      break;
+  }
+};
+
+// Save cell edit
+const saveCellEdit = (rowIndex, columnName) => {
+  if (editingCell) {
+    updateCell(rowIndex, columnName, cellValue);
+    setEditingCell(null);
+    setCellValue('');
+  }
+};
+
+// Save header edit
+const saveHeaderEdit = (oldName) => {
+  if (editingHeader && headerValue.trim()) {
+    updateHeader(oldName, headerValue);
+    setEditingHeader(null);
+    setHeaderValue('');
+  }
+};
 const loadExcelData = async (excelItem) => {
   try {
     const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`);
@@ -583,6 +900,23 @@ const renderExcelTable = () => {
           <FileSpreadsheet size={24} style={{ marginRight: '10px' }} />
           {viewingExcel.name}
         </h2>
+        {!editMode ? (
+          <button
+            onClick={() => enterEditMode(viewingExcel)}
+            style={{...styles.toolBtn, marginLeft: 'auto'}}
+          >
+            <Edit2 size={16} />
+            <span>Edit File</span>
+          </button>
+        ) : (
+          <button
+            onClick={exitEditMode}
+            style={{...styles.toolBtn, marginLeft: 'auto', background: '#4CAF50', color: 'white'}}
+          >
+            <Check size={16} />
+            <span>Done Editing</span>
+          </button>
+        )}
       </div>
 
       {excelData.sheetNames && excelData.sheetNames.length > 1 && (
@@ -605,27 +939,147 @@ const renderExcelTable = () => {
       <div style={styles.excelInfo}>
         <span>Total Rows: {sheetData.length}</span>
         <span>Columns: {headers.length}</span>
+        {editMode && <span style={{color: '#4CAF50', fontWeight: 'bold'}}>● EDIT MODE</span>}
       </div>
+
+      {editMode && (
+        <div style={styles.editToolbar}>
+          <button onClick={addRow} style={styles.editBtn}>
+            + Add Row
+          </button>
+          <button onClick={addColumn} style={styles.editBtn}>
+            + Add Column
+          </button>
+          <div style={styles.editHint}>
+            <span>💡 Click cells to edit • Arrow keys to navigate • Enter to edit • Delete to clear</span>
+          </div>
+        </div>
+      )}
 
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.tableHeader}>#</th>
-              {headers.map(header => (
-                <th key={header} style={styles.tableHeader}>{header}</th>
+              {editMode && <th style={{...styles.tableHeader, width: '50px'}}>Actions</th>}
+              {headers.map((header, colIndex) => (
+                <th key={header} style={styles.tableHeader}>
+                  {editMode ? (
+                    <div style={styles.headerEditContainer}>
+                      {editingHeader === colIndex ? (
+                        <input
+                          type="text"
+                          value={headerValue}
+                          onChange={(e) => setHeaderValue(e.target.value)}
+                          onBlur={() => saveHeaderEdit(header)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') saveHeaderEdit(header);
+                          }}
+                          style={styles.headerInput}
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          <span 
+                            onClick={() => {
+                              setEditingHeader(colIndex);
+                              setHeaderValue(header);
+                            }}
+                            style={styles.editableHeader}
+                          >
+                            {header}
+                          </span>
+                          <button
+                            onClick={() => deleteColumn(header)}
+                            style={styles.miniDeleteBtn}
+                            title="Delete Column"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    header
+                  )}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {sheetData.map((row, rowIndex) => (
-              <tr key={rowIndex} style={styles.tableRow}>
+              <tr 
+                key={rowIndex} 
+                style={{
+                  ...styles.tableRow,
+                  background: selectedCell?.row === rowIndex ? '#e3f2fd' : 'transparent'
+                }}
+              >
                 <td style={styles.tableCell}>{rowIndex + 1}</td>
-                {headers.map(header => (
-                  <td key={header} style={styles.tableCell}>
-                    {renderCellValue(row[header])}
+                {editMode && (
+                  <td style={styles.tableCell}>
+                    <button
+                      onClick={() => deleteRow(rowIndex)}
+                      style={styles.rowDeleteBtn}
+                      title="Delete Row"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </td>
-                ))}
+                )}
+                {headers.map((header, colIndex) => {
+                  const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                  const isEditing = editingCell?.row === rowIndex && editingCell?.col === colIndex;
+                  
+                  return (
+                    <td
+                      key={header}
+                      style={{
+                        ...styles.tableCell,
+                        ...(isSelected ? styles.selectedCell : {}),
+                        ...(editMode ? { cursor: 'cell' } : {})
+                      }}
+                      onClick={() => {
+                        if (editMode) {
+                          setSelectedCell({ row: rowIndex, col: colIndex });
+                        }
+                      }}
+                      onDoubleClick={() => {
+                        if (editMode) {
+                          setEditingCell({ row: rowIndex, col: colIndex });
+                          setCellValue(row[header] || '');
+                        }
+                      }}
+                      onKeyDown={(e) => editMode && handleCellKeyDown(e, rowIndex, colIndex, headers)}
+                      tabIndex={editMode ? 0 : -1}
+                    >
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={cellValue}
+                          onChange={(e) => setCellValue(e.target.value)}
+                          onBlur={() => saveCellEdit(rowIndex, header)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              saveCellEdit(rowIndex, header);
+                              setSelectedCell({ row: rowIndex + 1, col: colIndex });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setEditingCell(null);
+                              setCellValue('');
+                            }
+                          }}
+                          style={styles.cellInput}
+                          autoFocus
+                        />
+                      ) : (
+                        renderCellValue(row[header])
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -1561,5 +2015,96 @@ tableLink: {
   display: 'flex',
   alignItems: 'center',
   gap: '4px'
+},
+// Add to existing styles object
+editToolbar: {
+  display: 'flex',
+  gap: '10px',
+  padding: '12px',
+  background: '#f8f9fa',
+  borderRadius: '6px',
+  marginBottom: '15px',
+  alignItems: 'center'
+},
+editBtn: {
+  padding: '8px 16px',
+  background: '#2196F3',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: '500',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  transition: 'background 0.2s'
+},
+editHint: {
+  marginLeft: 'auto',
+  fontSize: '12px',
+  color: '#666',
+  fontStyle: 'italic'
+},
+selectedCell: {
+  background: '#bbdefb',
+  outline: '2px solid #2196F3',
+  outlineOffset: '-2px'
+},
+cellInput: {
+  width: '100%',
+  padding: '6px 8px',
+  border: '2px solid #2196F3',
+  borderRadius: '3px',
+  fontSize: '14px',
+  background: 'white',
+  outline: 'none',
+  boxSizing: 'border-box'
+},
+headerEditContainer: {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px'
+},
+editableHeader: {
+  cursor: 'pointer',
+  padding: '4px',
+  borderRadius: '3px',
+  flex: 1,
+  transition: 'background 0.2s'
+},
+headerInput: {
+  width: '100%',
+  padding: '6px 8px',
+  border: '2px solid #2196F3',
+  borderRadius: '3px',
+  fontSize: '13px',
+  fontWeight: '600',
+  background: 'white',
+  outline: 'none'
+},
+miniDeleteBtn: {
+  padding: '3px',
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  color: '#f44336',
+  borderRadius: '3px',
+  display: 'flex',
+  alignItems: 'center',
+  transition: 'background 0.2s'
+},
+rowDeleteBtn: {
+  padding: '4px',
+  background: 'transparent',
+  border: '1px solid #f44336',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  color: '#f44336',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'all 0.2s'
 }
 };

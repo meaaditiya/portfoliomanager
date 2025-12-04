@@ -1223,5 +1223,122 @@ router.get("/api/user/excel/:id/checkmarks", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) => {
+  try {
+    const { action, data } = req.body;
+    const doc = await Document.findById(req.params.id);
+    
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
+
+    const { sheetName, rowIndex, columnName, newValue, newColumnName, newRowData } = data;
+
+    switch (action) {
+      case 'UPDATE_CELL':
+        // Update a single cell value
+        if (!doc.jsonData[sheetName] || doc.jsonData[sheetName][rowIndex] === undefined) {
+          return res.status(400).json({ message: "Invalid sheet or row" });
+        }
+        doc.jsonData[sheetName][rowIndex][columnName] = newValue;
+        break;
+
+      case 'UPDATE_HEADER':
+        // Rename a column header
+        if (!doc.jsonData[sheetName]) {
+          return res.status(400).json({ message: "Invalid sheet" });
+        }
+        doc.jsonData[sheetName] = doc.jsonData[sheetName].map(row => {
+          const newRow = {};
+          Object.keys(row).forEach(key => {
+            newRow[key === columnName ? newColumnName : key] = row[key];
+          });
+          return newRow;
+        });
+        break;
+
+      case 'DELETE_ROW':
+        // Delete a row
+        if (!doc.jsonData[sheetName]) {
+          return res.status(400).json({ message: "Invalid sheet" });
+        }
+        doc.jsonData[sheetName].splice(rowIndex, 1);
+        doc.rowCount = Math.max(0, (doc.rowCount || 0) - 1);
+        break;
+
+      case 'DELETE_COLUMN':
+        // Delete a column
+        if (!doc.jsonData[sheetName]) {
+          return res.status(400).json({ message: "Invalid sheet" });
+        }
+        doc.jsonData[sheetName] = doc.jsonData[sheetName].map(row => {
+          const newRow = { ...row };
+          delete newRow[columnName];
+          return newRow;
+        });
+        // Recalculate column count
+        if (doc.jsonData[sheetName].length > 0) {
+          doc.columnCount = Object.keys(doc.jsonData[sheetName][0]).length;
+        }
+        break;
+
+      case 'ADD_ROW':
+        // Add a new row
+        if (!doc.jsonData[sheetName]) {
+          return res.status(400).json({ message: "Invalid sheet" });
+        }
+        const headers = doc.jsonData[sheetName].length > 0 
+          ? Object.keys(doc.jsonData[sheetName][0])
+          : [];
+        const emptyRow = {};
+        headers.forEach(h => emptyRow[h] = '');
+        doc.jsonData[sheetName].push(newRowData || emptyRow);
+        doc.rowCount = (doc.rowCount || 0) + 1;
+        break;
+
+      case 'ADD_COLUMN':
+        // Add a new column
+        if (!doc.jsonData[sheetName]) {
+          return res.status(400).json({ message: "Invalid sheet" });
+        }
+        const colName = newColumnName || `Column_${Date.now()}`;
+        doc.jsonData[sheetName] = doc.jsonData[sheetName].map(row => ({
+          ...row,
+          [colName]: ''
+        }));
+        doc.columnCount = (doc.columnCount || 0) + 1;
+        break;
+
+      case 'UPDATE_SHEET':
+        // Replace entire sheet data
+        if (!data.sheetData) {
+          return res.status(400).json({ message: "Sheet data required" });
+        }
+        doc.jsonData[sheetName] = data.sheetData;
+        doc.rowCount = data.sheetData.length;
+        doc.columnCount = data.sheetData.length > 0 ? Object.keys(data.sheetData[0]).length : 0;
+        break;
+
+      default:
+        return res.status(400).json({ message: "Invalid action" });
+    }
+
+    doc.markModified('jsonData');
+    doc.updatedAt = new Date();
+    await doc.save();
+
+    res.json({ 
+      message: "Excel data updated successfully",
+      data: doc.jsonData[sheetName],
+      rowCount: doc.rowCount,
+      columnCount: doc.columnCount
+    });
+
+  } catch (err) {
+    console.error("Excel edit error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;
