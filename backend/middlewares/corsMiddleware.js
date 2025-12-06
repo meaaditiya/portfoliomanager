@@ -1,16 +1,11 @@
 const cors = require("cors");
-const allowedOrigins = '*';
 
 const corsMiddleware = cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (!allowedOrigins.includes(origin)) {
-      return callback(new Error('CORS: Origin not allowed.'), false);
-    }
-    return callback(null, true);
+  origin: (origin, callback) => {
+    return callback(null, true); // Allow all origins
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS','PATCH'],
+  credentials: true, // Allow cookies, tokens, authentication
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 });
 
