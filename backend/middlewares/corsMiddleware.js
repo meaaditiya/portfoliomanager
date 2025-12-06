@@ -1,14 +1,5 @@
 const cors = require("cors");
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'https://connectwithaaditiya.onrender.com',
-  'https://connectwithaaditiyamg.onrender.com',
-  'https://connectwithaaditiyaadmin.onrender.com',
-  'http://192.168.1.33:5174',
-  'http://192.168.1.33:5173',
-  'https://aaditiyatyagi.vercel.app'
-];
+const allowedOrigins = '*';
 
 const corsMiddleware = cors({
   origin: function(origin, callback) {
