@@ -444,6 +444,7 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
 
 router.get("/api/search", optionalAuth, async (req, res) => {
   try {
+    const startTime = Date.now();
     const { 
       q, 
       parentId,  
