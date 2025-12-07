@@ -168,17 +168,11 @@ const blogSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    
-    // ============================================
-    // NEW: VECTOR SEARCH FIELDS
-    // ============================================
-    
     embedding: {
       type: [Number],
       default: null,
       select: false
-    },
-    
+    },  
     embeddingMetadata: {
       model: {
         type: String,
@@ -197,7 +191,6 @@ const blogSchema = new mongoose.Schema({
         default: 768
       }
     },
-    
     searchableText: {
       type: String,
       select: false
@@ -212,24 +205,15 @@ const blogSchema = new mongoose.Schema({
   default: 0
 }
 });
-
-// Index for faster fingerprint lookups
 blogSchema.index({ 'readFingerprints.fingerprint': 1 });
-
-// Text index for hybrid search fallback
 blogSchema.index({ 
   title: 'text', 
   content: 'text', 
   summary: 'text', 
   tags: 'text' 
 });
-
-// Index for published blogs
 blogSchema.index({ status: 1, publishedAt: -1 });
-
-// Index for subscriber-only blogs query
 blogSchema.index({ isSubscriberOnly: 1 });
-
 blogSchema.pre('save', function(next) {
   if (this.isModified('title')) {
     this.slug = this.title
@@ -237,7 +221,6 @@ blogSchema.pre('save', function(next) {
       .replace(/[^\w\s]/g, '')
       .replace(/\s+/g, '-');
   }
-  
   if (this.isModified('contentImages')) {
     this.contentImages.forEach(image => {
       if (!image.imageId) {
@@ -245,7 +228,6 @@ blogSchema.pre('save', function(next) {
       }
     });
   }
-  
   if (this.isModified('contentVideos')) {
     this.contentVideos.forEach(video => {
       if (!video.embedId) {
@@ -253,20 +235,16 @@ blogSchema.pre('save', function(next) {
       }
     });
   }
-  
   if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
     this.publishedAt = new Date();
-  }
-  
+  }  
   if (this.isModified('reports')) {
     this.totalReports = this.reports.length;
-  }
-  
+  } 
   if (this.isModified('title') || this.isModified('content') || 
       this.isModified('summary') || this.isModified('tags')) {
     this.searchableText = `${this.title} ${this.summary} ${this.content} ${this.tags.join(' ')}`;
-  }
-  
+  } 
   this.updatedAt = new Date();
   next();
 });

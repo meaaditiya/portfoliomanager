@@ -441,91 +441,152 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
 
 
 
-router.get("/api/search", async (req, res) => {
+
+router.get("/api/search", optionalAuth, async (req, res) => {
   try {
-    const { q, type } = req.query;
+    const { 
+      q, 
+      parentId,  
+      limit = 10 
+    } = req.query;
     
-    if (!q) return res.status(400).json({ message: "Query missing" });
-
-    const folderQuery = { type: "folder", name: { $regex: q, $options: "i" } };
-    const folders = type === "file" || type === "link" || type === "excel" 
-      ? [] 
-      : await Document.find(folderQuery)
-          .populate("parent", "name type")
-          .select("-embedding -jsonData")
-          .limit(5);
-
-    let files = [];
-    if (type !== "folder" && type !== "link" && type !== "excel") {
-      const queryEmbedding = await generateQueryEmbedding(q);
-      const allFiles = await Document.find({ type: "file" }).populate("parent", "name type");
-
-      files = allFiles
-        .map(f => ({
-          ...f.toObject(),
-          score: cosineSimilarity(queryEmbedding, f.embedding || [])
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map(f => {
-          delete f.embedding;
-          return {
-            ...f,
-            bookmarkEnabled: f.bookmarkEnabled || false
-          };
-        });
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({ message: "Query missing" });
     }
 
-    let links = [];
-    if (type !== "folder" && type !== "file" && type !== "excel") {
-      const queryEmbedding = await generateQueryEmbedding(q);
-      const allLinks = await Document.find({ type: "link" }).populate("parent", "name type");
-
-      links = allLinks
-        .map(l => ({
-          ...l.toObject(),
-          score: cosineSimilarity(queryEmbedding, l.embedding || [])
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map(l => {
-          delete l.embedding;
-          return {
-            ...l,
-            bookmarkEnabled: l.bookmarkEnabled || false
-          };
-        });
+    const normalizedQuery = q.trim();
+    const limitNum = parseInt(limit) || 10;
+    
+    
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateQueryEmbedding(normalizedQuery);
+    } catch (err) {
+      console.error('Embedding generation failed:', err);
+      return res.status(500).json({ message: "Search failed" });
     }
 
-    let excels = [];
-    if (type !== "folder" && type !== "file" && type !== "link") {
-      const queryEmbedding = await generateQueryEmbedding(q);
-      const allExcels = await Document.find({ type: "excel" })
-        .select("-jsonData")
-        .populate("parent", "name type");
-
-      excels = allExcels
-        .map(e => ({
-          ...e.toObject(),
-          score: cosineSimilarity(queryEmbedding, e.embedding || [])
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map(e => {
-          delete e.embedding;
-          return {
-            ...e,
-            bookmarkEnabled: e.bookmarkEnabled || false
-          };
-        });
+    
+    let folderMatch = {};
+    if (parentId) {
+      
+      const descendants = await getAllDescendantIds(parentId);
+      folderMatch = { 
+        $or: [
+          { parent: parentId },
+          { parent: { $in: descendants } }
+        ]
+      };
     }
+
+    
+    const vectorCandidates = await Document.find({
+      ...folderMatch,
+      embedding: { $exists: true, $ne: [] }
+    })
+    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks")
+    .populate("parent", "name type")
+    .limit(200)
+    .lean();
+
+    
+    const textRegex = new RegExp(normalizedQuery.split(' ').map(escapeRegex).join('|'), 'i');
+    const textCandidates = await Document.find({
+      ...folderMatch,
+      $or: [
+        { name: textRegex },
+        { originalName: textRegex }
+      ]
+    })
+    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks")
+    .populate("parent", "name type")
+    .limit(100)
+    .lean();
+
+    
+    const idToDoc = new Map();
+    
+    
+    for (const doc of vectorCandidates) {
+      const id = doc._id.toString();
+      let vectorSim = 0;
+      if (doc.embedding && doc.embedding.length > 0) {
+        try {
+          vectorSim = cosineSimilarity(queryEmbedding, doc.embedding);
+        } catch (e) {
+          console.error('Cosine similarity error:', e);
+        }
+      }
+      idToDoc.set(id, { doc, vectorSim, textScore: 0 });
+    }
+
+    
+    for (const doc of textCandidates) {
+      const id = doc._id.toString();
+      const textScore = calculateTextScore(doc, normalizedQuery);
+      
+      if (idToDoc.has(id)) {
+        idToDoc.get(id).textScore = textScore;
+      } else {
+        idToDoc.set(id, { doc, vectorSim: 0, textScore });
+      }
+    }
+
+    
+    const merged = Array.from(idToDoc.values());
+    
+    const maxVec = Math.max(...merged.map(m => m.vectorSim), 0.001);
+    const maxText = Math.max(...merged.map(m => m.textScore), 0.001);
+
+    merged.forEach(m => {
+      m.vectorNorm = m.vectorSim / maxVec;
+      m.textNorm = m.textScore / maxText;
+      m.fusedScore = 0.7 * m.vectorNorm + 0.3 * m.textNorm; 
+    });
+
+    
+    merged.sort((a, b) => b.fusedScore - a.fusedScore);
+    const topResults = merged.slice(0, limitNum);
+
+    
+    const userIdString = req.user ? String(req.user.id) : null;
+    const results = topResults.map(item => {
+      const doc = item.doc;
+      const isBookmarked = userIdString 
+        ? doc.bookmarks?.some(b => String(b.userId) === userIdString)
+        : false;
+
+      return {
+        _id: doc._id,
+        name: doc.name,
+        originalName: doc.originalName,
+        type: doc.type,
+        url: doc.url,
+        mimeType: doc.mimeType,
+        size: doc.size,
+        rowCount: doc.rowCount,
+        parent: doc.parent,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        bookmarkEnabled: doc.bookmarkEnabled || false,
+        isBookmarked,
+        relevanceScore: item.fusedScore,
+        vectorScore: item.vectorSim,
+        textScore: item.textScore
+      };
+    });
+
+    const processingTime = Date.now() - startTime;
 
     res.json({
-      folders: folders.map(f => ({...f.toObject(), bookmarkEnabled: f.bookmarkEnabled || false})),
-      files,
-      links,
-      excels,
-      query: q
+      results,
+      searchMetadata: {
+        query: normalizedQuery,
+        totalResults: results.length,
+        processingTime: `${processingTime}ms`,
+        searchType: 'hybrid_vector_text',
+        inFolder: !!parentId
+      }
     });
 
   } catch (err) {
@@ -533,6 +594,63 @@ router.get("/api/search", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+async function getAllDescendantIds(parentId) {
+  const descendants = [];
+  const queue = [parentId];
+  
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    const children = await Document.find({ 
+      parent: currentId, 
+      type: 'folder' 
+    }).select('_id').lean();
+    
+    for (const child of children) {
+      descendants.push(child._id);
+      queue.push(child._id);
+    }
+  }
+  
+  return descendants;
+}
+
+
+function calculateTextScore(doc, query) {
+  const queryLower = query.toLowerCase();
+  const nameLower = (doc.name || '').toLowerCase();
+  const originalNameLower = (doc.originalName || '').toLowerCase();
+  
+  let score = 0;
+  
+  
+  if (nameLower === queryLower || originalNameLower === queryLower) {
+    score += 10;
+  }
+  
+  else if (nameLower.startsWith(queryLower) || originalNameLower.startsWith(queryLower)) {
+    score += 5;
+  }
+  
+  else if (nameLower.includes(queryLower) || originalNameLower.includes(queryLower)) {
+    score += 3;
+  }
+  
+  
+  const queryWords = queryLower.split(/\s+/);
+  queryWords.forEach(word => {
+    if (nameLower.includes(word)) score += 1;
+    if (originalNameLower.includes(word)) score += 1;
+  });
+  
+  return score;
+}
+
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 
 
