@@ -548,7 +548,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     merged.sort((a, b) => b.fusedScore - a.fusedScore);
     const topResults = merged.slice(0, limitNum);
 
-    
     const userIdString = req.user ? String(req.user.id) : null;
     const results = topResults.map(item => {
       const doc = item.doc;
@@ -578,8 +577,9 @@ router.get("/api/search", optionalAuth, async (req, res) => {
 
     const processingTime = Date.now() - startTime;
 
+    
     res.json({
-      results,
+      results,  
       searchMetadata: {
         query: normalizedQuery,
         totalResults: results.length,
@@ -594,7 +594,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 async function getAllDescendantIds(parentId) {
   const descendants = [];
