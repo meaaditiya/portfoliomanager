@@ -8,19 +8,20 @@ const AdminProjects = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [formData, setFormData] = useState({
-    title: '',
-    period: '',
-    teamSize: 1,
-    description: '',
-    detailedDescription: [''],
-    tech: [''],
-    outcomes: [''],
-    link: '',
-    githubUrl: '',
-    color: '',
-    imageUrl: '',
-    order: 0
-  });
+  title: '',
+  period: '',
+  teamSize: 1,
+  description: '',
+  detailedDescription: [''],
+  tech: [''],
+  outcomes: [''],
+  link: '',
+  githubUrl: '',
+  color: '',
+  imageUrl: '',        
+  galleryImages: [],   
+  order: 0
+});
 
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
 
@@ -96,6 +97,7 @@ const AdminProjects = () => {
         githubUrl: project.githubUrl || '',
         color: project.color || '',
         imageUrl: project.imageUrl || '',
+        galleryImages: project.galleryImages || [],
         order: project.order || 0
       });
     } else {
@@ -112,6 +114,7 @@ const AdminProjects = () => {
         githubUrl: '',
         color: '',
         imageUrl: '',
+        galleryImages: [], 
         order: 0
       });
     }

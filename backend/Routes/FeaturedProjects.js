@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const authenticateToken = require('../middlewares/authMiddleware');
 const Project = require('../models/Projects');
 
+
 router.post(
   '/api/projects',
   authenticateToken,
@@ -30,8 +31,11 @@ router.post(
       .withMessage('GitHub URL cannot exceed 500 characters'),
     body('color').optional().trim().isLength({ max: 50 })
       .withMessage('Color cannot exceed 50 characters'),
-    body('imageUrl').optional().trim().isLength({ max: 500 })
-      .withMessage('Image URL cannot exceed 500 characters'),
+    body('imageUrl').trim().notEmpty().withMessage('Image URL is required')
+      .isLength({ max: 500 }).withMessage('Image URL cannot exceed 500 characters'),
+    body('galleryImages').optional().isArray().withMessage('Gallery images must be an array'),
+    body('galleryImages.*').optional().trim().isLength({ max: 500 })
+      .withMessage('Each gallery image URL cannot exceed 500 characters'),
     body('order').optional().isInt().withMessage('Order must be a number')
   ],
   async (req, res) => {
@@ -41,7 +45,21 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { title, period, teamSize, description, detailedDescription, tech, outcomes, link, githubUrl, color, imageUrl, order } = req.body;
+      const { 
+        title, 
+        period, 
+        teamSize, 
+        description, 
+        detailedDescription, 
+        tech, 
+        outcomes, 
+        link, 
+        githubUrl, 
+        color, 
+        imageUrl, 
+        galleryImages,
+        order 
+      } = req.body;
 
       const newProject = new Project({
         title,
@@ -55,6 +73,7 @@ router.post(
         githubUrl,
         color,
         imageUrl,
+        galleryImages: galleryImages || [],
         order: order || 0,
         addedBy: {
           name: req.user.name || 'Aaditiya Tyagi',
@@ -76,6 +95,7 @@ router.post(
   }
 );
 
+
 router.get('/api/projects', async (req, res) => {
   try {
     const projects = await Project.find({ isActive: true })
@@ -92,6 +112,7 @@ router.get('/api/projects', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 router.get('/api/projects/:id', async (req, res) => {
   try {
@@ -113,6 +134,7 @@ router.get('/api/projects/:id', async (req, res) => {
   }
 });
 
+
 router.get('/api/admin/projects', authenticateToken, async (req, res) => {
   try {
     const projects = await Project.find()
@@ -128,6 +150,7 @@ router.get('/api/admin/projects', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 router.get('/api/admin/projects/:id', authenticateToken, async (req, res) => {
   try {
@@ -147,6 +170,7 @@ router.get('/api/admin/projects/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 router.put(
   '/api/projects/:id',
@@ -174,8 +198,11 @@ router.put(
       .withMessage('GitHub URL cannot exceed 500 characters'),
     body('color').optional().trim().isLength({ max: 50 })
       .withMessage('Color cannot exceed 50 characters'),
-    body('imageUrl').optional().trim().isLength({ max: 500 })
-      .withMessage('Image URL cannot exceed 500 characters'),
+    body('imageUrl').optional().trim().notEmpty().withMessage('Image URL cannot be empty')
+      .isLength({ max: 500 }).withMessage('Image URL cannot exceed 500 characters'),
+    body('galleryImages').optional().isArray().withMessage('Gallery images must be an array'),
+    body('galleryImages.*').optional().trim().isLength({ max: 500 })
+      .withMessage('Each gallery image URL cannot exceed 500 characters'),
     body('order').optional().isInt().withMessage('Order must be a number'),
     body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
   ],
@@ -210,23 +237,6 @@ router.put(
   }
 );
 
-router.delete('/api/projects/:id', authenticateToken, async (req, res) => {
-  try {
-    const deletedProject = await Project.findByIdAndDelete(req.params.id);
-    
-    if (!deletedProject) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    res.json({
-      message: 'Project deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
 
 router.patch('/api/projects/:id/toggle', authenticateToken, async (req, res) => {
   try {
@@ -247,6 +257,157 @@ router.patch('/api/projects/:id/toggle', authenticateToken, async (req, res) => 
 
   } catch (error) {
     console.error('Error toggling project status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+router.patch(
+  '/api/projects/:id/gallery/add',
+  authenticateToken,
+  [
+    body('imageUrl').trim().notEmpty().withMessage('Image URL is required')
+      .isLength({ max: 500 }).withMessage('Image URL cannot exceed 500 characters')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { imageUrl } = req.body;
+      const project = await Project.findById(req.params.id);
+      
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      
+      if (!project.galleryImages) {
+        project.galleryImages = [];
+      }
+
+      
+      if (project.galleryImages.includes(imageUrl)) {
+        return res.status(400).json({ message: 'Image already exists in gallery' });
+      }
+
+      project.galleryImages.push(imageUrl);
+      project.updatedAt = Date.now();
+      await project.save();
+
+      res.json({
+        message: 'Image added to gallery successfully',
+        project
+      });
+
+    } catch (error) {
+      console.error('Error adding gallery image:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+
+router.patch(
+  '/api/projects/:id/gallery/remove',
+  authenticateToken,
+  [
+    body('imageUrl').trim().notEmpty().withMessage('Image URL is required')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { imageUrl } = req.body;
+      const project = await Project.findById(req.params.id);
+      
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      if (!project.galleryImages || project.galleryImages.length === 0) {
+        return res.status(400).json({ message: 'Gallery is empty' });
+      }
+
+      const imageIndex = project.galleryImages.indexOf(imageUrl);
+      if (imageIndex === -1) {
+        return res.status(404).json({ message: 'Image not found in gallery' });
+      }
+
+      project.galleryImages.splice(imageIndex, 1);
+      project.updatedAt = Date.now();
+      await project.save();
+
+      res.json({
+        message: 'Image removed from gallery successfully',
+        project
+      });
+
+    } catch (error) {
+      console.error('Error removing gallery image:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+
+router.patch(
+  '/api/projects/:id/image',
+  authenticateToken,
+  [
+    body('imageUrl').trim().notEmpty().withMessage('Image URL is required')
+      .isLength({ max: 500 }).withMessage('Image URL cannot exceed 500 characters')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { imageUrl } = req.body;
+      const project = await Project.findById(req.params.id);
+      
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+
+      project.imageUrl = imageUrl;
+      project.updatedAt = Date.now();
+      await project.save();
+
+      res.json({
+        message: 'Main image updated successfully',
+        project
+      });
+
+    } catch (error) {
+      console.error('Error updating main image:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+
+router.delete('/api/projects/:id', authenticateToken, async (req, res) => {
+  try {
+    const deletedProject = await Project.findByIdAndDelete(req.params.id);
+    
+    if (!deletedProject) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    res.json({
+      message: 'Project deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting project:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

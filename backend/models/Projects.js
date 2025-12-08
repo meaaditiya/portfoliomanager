@@ -56,9 +56,15 @@ const projectSchema = new mongoose.Schema({
   },
   imageUrl: {
     type: String,
+    required: true,  
     trim: true,
     maxlength: 500
   },
+  galleryImages: [{
+    type: String,
+    trim: true,
+    maxlength: 500
+  }],
   order: {
     type: Number,
     default: 0
