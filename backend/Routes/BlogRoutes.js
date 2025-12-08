@@ -1625,6 +1625,7 @@ router.post(
       
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       let userId = null;
+      let isAuthenticated = false;
       
       if (token) {
         try {
@@ -1637,6 +1638,7 @@ router.post(
           if (user) {
             name = user.name;
             email = user.email;
+            isAuthenticated = true;
           }
         } catch (err) {
           console.log('Invalid token, treating as guest');
@@ -1670,6 +1672,9 @@ router.post(
       console.log(`✅ Content approved for ${name}`);
 
       
+      const commentStatus = isAuthenticated ? 'approved' : 'pending';
+
+      
       const newComment = new Comment({
         blog: blogId,
         user: { 
@@ -1678,16 +1683,23 @@ router.post(
           userId: userId || null  
         },
         content,
-        fingerprint
+        fingerprint,
+        status: commentStatus
       });
 
       await newComment.save();
       
-      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+      
+      if (commentStatus === 'approved') {
+        await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+      }
 
       res.status(201).json({ 
-        message: 'Comment added successfully',
-        comment: newComment
+        message: isAuthenticated 
+          ? 'Comment added successfully' 
+          : 'Comment submitted and is pending approval',
+        comment: newComment,
+        status: commentStatus
       });
     } catch (error) {
       console.error('Error adding comment:', error);
