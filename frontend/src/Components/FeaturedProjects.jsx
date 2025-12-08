@@ -132,12 +132,13 @@ const AdminProjects = () => {
     setError('');
     setSuccessMessage('');
 
-    const cleanedData = {
-      ...formData,
-      detailedDescription: formData.detailedDescription.filter(item => item.trim() !== ''),
-      tech: formData.tech.filter(item => item.trim() !== ''),
-      outcomes: formData.outcomes.filter(item => item.trim() !== '')
-    };
+ const cleanedData = {
+  ...formData,
+  detailedDescription: formData.detailedDescription.filter(item => item.trim() !== ''),
+  tech: formData.tech.filter(item => item.trim() !== ''),
+  outcomes: formData.outcomes.filter(item => item.trim() !== ''),
+  galleryImages: formData.galleryImages.filter(item => item.trim() !== '') 
+};
 
     try {
       const url = editingProject 
@@ -496,7 +497,36 @@ const AdminProjects = () => {
                   placeholder="https://..."
                 />
               </div>
-
+               <div style={styles.formGroup}>
+  <label style={styles.label}>Gallery Images</label>
+  {formData.galleryImages.map((item, index) => (
+    <div key={index} style={styles.arrayInputGroup}>
+      <input
+        type="url"
+        value={item}
+        onChange={(e) => handleArrayInputChange('galleryImages', index, e.target.value)}
+        style={styles.input}
+        placeholder={`Image URL ${index + 1}`}
+      />
+      {formData.galleryImages.length > 0 && (
+        <button
+          type="button"
+          onClick={() => removeArrayField('galleryImages', index)}
+          style={styles.removeButton}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  ))}
+  <button
+    type="button"
+    onClick={() => addArrayField('galleryImages')}
+    style={styles.addFieldButton}
+  >
+    + Add Gallery Image
+  </button>
+</div>
               <div style={styles.modalActions}>
                 <button type="button" onClick={closeModal} style={styles.cancelButton}>
                   Cancel
