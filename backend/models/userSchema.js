@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null
     },
-    // ADD THIS FIELD
+  
     profilePicture: {
       type: String,
       default: null
