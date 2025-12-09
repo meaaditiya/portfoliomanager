@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart ,Lock, Unlock, Shield, Link2} from 'lucide-react';
+import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart, Lock, Unlock, Shield, Link2, Copy } from 'lucide-react';
+import './FileManager.css';
 
 export default function FileManager() {
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -20,40 +21,42 @@ export default function FileManager() {
   const [message, setMessage] = useState('');
   const [showNewLinkModal, setShowNewLinkModal] = useState(false);
   const [excelData, setExcelData] = useState(null);
-const [viewingExcel, setViewingExcel] = useState(null);
-const [selectedSheet, setSelectedSheet] = useState(null);
-const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
-// Add after existing useState declarations
-const [showBookmarkToggleModal, setShowBookmarkToggleModal] = useState(false);
-const [bookmarkToggleItem, setBookmarkToggleItem] = useState(null);
-const [showCheckmarkFieldsModal, setShowCheckmarkFieldsModal] = useState(false);
-const [checkmarkFieldsItem, setCheckmarkFieldsItem] = useState(null);
-const [checkmarkFields, setCheckmarkFields] = useState([]);
-const [editingExcel, setEditingExcel] = useState(null);
-const [editMode, setEditMode] = useState(false);
-const [selectedCell, setSelectedCell] = useState(null);
-const [editingCell, setEditingCell] = useState(null);
-const [cellValue, setCellValue] = useState('');
-const [editingHeader, setEditingHeader] = useState(null);
-const [showAccessModal, setShowAccessModal] = useState(false);
-const [accessItem, setAccessItem] = useState(null);
-const [accessLevel, setAccessLevel] = useState('public');
-const [showGenerateLinkModal, setShowGenerateLinkModal] = useState(false);
-const [generateLinkItem, setGenerateLinkItem] = useState(null);
-const [linkExpiry, setLinkExpiry] = useState(24);
-const [maxAccessCount, setMaxAccessCount] = useState('');
-const [generatedLinks, setGeneratedLinks] = useState([]);
-const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
-const [accessRequests, setAccessRequests] = useState([]);
-const [selectedRequest, setSelectedRequest] = useState(null);
-const [headerValue, setHeaderValue] = useState('');
-const CHECKMARK_TYPES = [
-  { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
-  { id: 'check', label: 'Check', icon: Check },
-  { id: 'circle', label: 'Circle', icon: Circle },
-  { id: 'star', label: 'Star', icon: Star },
-  { id: 'heart', label: 'Heart', icon: Heart }
-];
+  const [viewingExcel, setViewingExcel] = useState(null);
+  const [selectedSheet, setSelectedSheet] = useState(null);
+  const [linkFormData, setLinkFormData] = useState({ name: '', url: '' });
+  const [showBookmarkToggleModal, setShowBookmarkToggleModal] = useState(false);
+  const [bookmarkToggleItem, setBookmarkToggleItem] = useState(null);
+  const [showCheckmarkFieldsModal, setShowCheckmarkFieldsModal] = useState(false);
+  const [checkmarkFieldsItem, setCheckmarkFieldsItem] = useState(null);
+  const [checkmarkFields, setCheckmarkFields] = useState([]);
+  const [editingExcel, setEditingExcel] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedCell, setSelectedCell] = useState(null);
+  const [editingCell, setEditingCell] = useState(null);
+  const [cellValue, setCellValue] = useState('');
+  const [editingHeader, setEditingHeader] = useState(null);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [accessItem, setAccessItem] = useState(null);
+  const [accessLevel, setAccessLevel] = useState('public');
+  const [showGenerateLinkModal, setShowGenerateLinkModal] = useState(false);
+  const [generateLinkItem, setGenerateLinkItem] = useState(null);
+  const [linkExpiry, setLinkExpiry] = useState(24);
+  const [maxAccessCount, setMaxAccessCount] = useState('');
+  const [generatedLinks, setGeneratedLinks] = useState([]);
+  const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [headerValue, setHeaderValue] = useState('');
+  const [copiedLinkId, setCopiedLinkId] = useState(null);
+
+  const CHECKMARK_TYPES = [
+    { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
+    { id: 'check', label: 'Check', icon: Check },
+    { id: 'circle', label: 'Circle', icon: Circle },
+    { id: 'star', label: 'Star', icon: Star },
+    { id: 'heart', label: 'Heart', icon: Heart }
+  ];
+
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
   const token = localStorage.getItem('token');
 
@@ -70,7 +73,6 @@ const CHECKMARK_TYPES = [
       setItems(data.items || []);
       setCurrentFolder(data.currentFolder);
       
-      // Update breadcrumb
       if (folderId) {
         const breadcrumbRes = await fetch(`${API_URL}/api/item/${folderId}/breadcrumb`);
         const breadcrumbData = await breadcrumbRes.json();
@@ -80,8 +82,8 @@ const CHECKMARK_TYPES = [
       }
       
       setSearchResults(null);
-       setViewingExcel(null);
-       setExcelData(null);
+      setViewingExcel(null);
+      setExcelData(null);
     } catch (err) {
       console.error('Error loading folder:', err);
     }
@@ -133,48 +135,50 @@ const CHECKMARK_TYPES = [
       showMessage('Error creating folder', 'error');
     }
   };
-// Create link
-const createLink = async () => {
-  if (!linkFormData.name.trim() || !linkFormData.url.trim()) {
-    showMessage('Link name and URL are required', 'error');
-    return;
-  }
 
-  try {
-    new URL(linkFormData.url);
-  } catch (e) {
-    showMessage('Invalid URL format', 'error');
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/link/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: linkFormData.name,
-        url: linkFormData.url,
-        parentId: currentFolder?._id || null
-      })
-    });
-
-    const data = await res.json();
-    
-    if (res.ok) {
-      showMessage('Link created successfully');
-      setLinkFormData({ name: '', url: '' });
-      setShowNewLinkModal(false);
-      loadFolder(currentFolder?._id);
-    } else {
-      showMessage(data.message || 'Error creating link', 'error');
+  // Create link
+  const createLink = async () => {
+    if (!linkFormData.name.trim() || !linkFormData.url.trim()) {
+      showMessage('Link name and URL are required', 'error');
+      return;
     }
-  } catch (err) {
-    showMessage('Error creating link', 'error');
-  }
-};
+
+    try {
+      new URL(linkFormData.url);
+    } catch (e) {
+      showMessage('Invalid URL format', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/link/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: linkFormData.name,
+          url: linkFormData.url,
+          parentId: currentFolder?._id || null
+        })
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        showMessage('Link created successfully');
+        setLinkFormData({ name: '', url: '' });
+        setShowNewLinkModal(false);
+        loadFolder(currentFolder?._id);
+      } else {
+        showMessage(data.message || 'Error creating link', 'error');
+      }
+    } catch (err) {
+      showMessage('Error creating link', 'error');
+    }
+  };
+
   // Upload file
   const uploadFile = async (file) => {
     if (!file) return;
@@ -353,2304 +357,1763 @@ const createLink = async () => {
     setTimeout(() => setMessage(''), 3000);
   };
 
+  // Set access level
+  const setDocumentAccessLevel = async (item, level, inheritParent = false) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access/${item._id}/level`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          accessLevel: level,
+          inheritParentAccess: inheritParent
+        })
+      });
 
-
-
-// Set access level for document/folder
-const setDocumentAccessLevel = async (item, level, inheritParent = false) => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access/${item._id}/level`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        accessLevel: level,
-        inheritParentAccess: inheritParent
-      })
-    });
-
-    if (res.ok) {
-      showMessage(`Access level set to ${level}`);
-      setShowAccessModal(false);
-      loadFolder(currentFolder?._id);
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error setting access level', 'error');
-    }
-  } catch (err) {
-    showMessage('Error setting access level', 'error');
-  }
-};
-
-// Generate private access link
-const generatePrivateLink = async () => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access/${generateLinkItem._id}/generate-link`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        expiryHours: parseInt(linkExpiry),
-        maxAccessCount: maxAccessCount ? parseInt(maxAccessCount) : null
-      })
-    });
-
-    const data = await res.json();
-    
-    if (res.ok) {
-      showMessage('Private link generated successfully');
-      setGeneratedLinks([...generatedLinks, data]);
-      loadAccessSettings(generateLinkItem._id);
-    } else {
-      showMessage(data.message || 'Error generating link', 'error');
-    }
-  } catch (err) {
-    showMessage('Error generating link', 'error');
-  }
-};
-
-// Load access settings for a document
-const loadAccessSettings = async (itemId) => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access/${itemId}/settings`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+      if (res.ok) {
+        showMessage(`Access level set to ${level}`);
+        setShowAccessModal(false);
+        loadFolder(currentFolder?._id);
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error setting access level', 'error');
       }
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
-      setGeneratedLinks(data.privateAccessLinks || []);
+    } catch (err) {
+      showMessage('Error setting access level', 'error');
     }
-  } catch (err) {
-    console.error('Error loading access settings:', err);
-  }
-};
+  };
 
-// Revoke private link
-const revokePrivateLink = async (itemId, linkId) => {
-  if (!confirm('Revoke this access link?')) return;
-  
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access/${itemId}/link/${linkId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (res.ok) {
-      showMessage('Link revoked successfully');
-      loadAccessSettings(itemId);
-    } else {
-      showMessage('Error revoking link', 'error');
-    }
-  } catch (err) {
-    showMessage('Error revoking link', 'error');
-  }
-};
-
-// Load access requests
-const loadAccessRequests = async (status = 'pending') => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access-requests?status=${status}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
-      setAccessRequests(data.requests || []);
-    }
-  } catch (err) {
-    showMessage('Error loading access requests', 'error');
-  }
-};
-
-// Approve access request
-const approveAccessRequest = async (requestId, expiryHours = 720, adminResponse = '') => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        expiryHours: parseInt(expiryHours),
-        adminResponse
-      })
-    });
-
-    if (res.ok) {
-      showMessage('Access request approved and email sent');
-      loadAccessRequests();
-      setSelectedRequest(null);
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error approving request', 'error');
-    }
-  } catch (err) {
-    showMessage('Error approving request', 'error');
-  }
-};
-
-// Reject access request
-const rejectAccessRequest = async (requestId, adminResponse = '') => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/reject`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        adminResponse
-      })
-    });
-
-    if (res.ok) {
-      showMessage('Access request rejected');
-      loadAccessRequests();
-      setSelectedRequest(null);
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error rejecting request', 'error');
-    }
-  } catch (err) {
-    showMessage('Error rejecting request', 'error');
-  }
-};
-
-
-
-
-const toggleBookmarkAvailability = async (item, enabled) => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/item/${item._id}/bookmark-toggle`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ enabled })
-    });
-
-    if (res.ok) {
-      showMessage(`Bookmarking ${enabled ? 'enabled' : 'disabled'} for ${item.name}`);
-      setShowBookmarkToggleModal(false);
-      loadFolder(currentFolder?._id);
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error updating bookmark setting', 'error');
-    }
-  } catch (err) {
-    showMessage('Error updating bookmark setting', 'error');
-  }
-};
-
-// ============================================================================
-// ADMIN: Manage Excel Checkmark Fields
-// ============================================================================
-
-const saveCheckmarkFields = async () => {
-  if (checkmarkFields.some(f => !f.fieldName || !f.fieldId)) {
-    showMessage('All fields must have a name and ID', 'error');
-    return;
-  }
-
-  try {
-    const res = await fetch(
-      `${API_URL}/api/admin/excel/${checkmarkFieldsItem._id}/checkmark-fields`,
-      {
+  // Generate private link
+  const generatePrivateLink = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access/${generateLinkItem._id}/generate-link`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ fields: checkmarkFields })
-      }
-    );
+        body: JSON.stringify({
+          expiryHours: parseInt(linkExpiry),
+          maxAccessCount: maxAccessCount ? parseInt(maxAccessCount) : null
+        })
+      });
 
-    if (res.ok) {
-      showMessage('Checkmark fields updated successfully');
-      setShowCheckmarkFieldsModal(false);
-      setCheckmarkFieldsItem(null);
-      loadFolder(currentFolder?._id);
-    } else {
       const data = await res.json();
-      showMessage(data.message || 'Error updating fields', 'error');
+      
+      if (res.ok) {
+        showMessage('Private link generated successfully');
+        setGeneratedLinks([...generatedLinks, data]);
+        loadAccessSettings(generateLinkItem._id);
+      } else {
+        showMessage(data.message || 'Error generating link', 'error');
+      }
+    } catch (err) {
+      showMessage('Error generating link', 'error');
     }
-  } catch (err) {
-    showMessage('Error updating checkmark fields', 'error');
-  }
-};
+  };
 
-const addCheckmarkField = () => {
-  setCheckmarkFields([
-    ...checkmarkFields,
-    { 
-      fieldName: '', 
-      fieldId: `field_${Date.now()}`,
-      checkmarkType: 'checkbox' 
+  // Load access settings
+  const loadAccessSettings = async (itemId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access/${itemId}/settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setGeneratedLinks(data.privateAccessLinks || []);
+      }
+    } catch (err) {
+      console.error('Error loading access settings:', err);
     }
-  ]);
-};
+  };
 
-const updateCheckmarkField = (index, key, value) => {
-  const updated = [...checkmarkFields];
-  updated[index][key] = value;
-  setCheckmarkFields(updated);
-};
-
-const removeCheckmarkField = (index) => {
-  setCheckmarkFields(checkmarkFields.filter((_, i) => i !== index));
-};
-
-const loadExcelCheckmarkFields = async (excelId) => {
-  try {
-    const res = await fetch(`${API_URL}/api/excel/${excelId}/data`);
-    const data = await res.json();
-    setCheckmarkFields(data.checkmarkFields || []);
-  } catch (err) {
-    setCheckmarkFields([]);
-  }
-};
-
-const uploadExcelFile = async (file) => {
-  if (!file) return;
-
-  const validTypes = [
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv'
-  ];
-
-  if (!validTypes.includes(file.type)) {
-    showMessage('Please upload only Excel (.xlsx, .xls) or CSV files', 'error');
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('file', file);
-  if (currentFolder?._id) {
-    formData.append('parentId', currentFolder._id);
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    });
-
-    const data = await res.json();
+  // Revoke private link
+  const revokePrivateLink = async (itemId, linkId) => {
+    if (!confirm('Revoke this access link?')) return;
     
-    if (res.ok) {
-      showMessage('Excel file uploaded successfully');
-      loadFolder(currentFolder?._id);
-    } else {
-      showMessage(data.message || 'Error uploading Excel file', 'error');
-    }
-  } catch (err) {
-    showMessage('Error uploading Excel file', 'error');
-  }
-};
-const enterEditMode = (item) => {
-  setEditingExcel(item);
-  setEditMode(true);
-  loadExcelData(item);
-};
-
-const exitEditMode = () => {
-  setEditMode(false);
-  setEditingExcel(null);
-  setSelectedCell(null);
-  setEditingCell(null);
-  setCellValue('');
-};
-
-const updateCell = async (rowIndex, columnName, newValue) => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'UPDATE_CELL',
-        data: {
-          sheetName: selectedSheet,
-          rowIndex,
-          columnName,
-          newValue
-        }
-      })
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access/${itemId}/link/${linkId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
       });
-      showMessage('Cell updated');
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error updating cell', 'error');
+
+      if (res.ok) {
+        showMessage('Link revoked successfully');
+        loadAccessSettings(itemId);
+      } else {
+        showMessage('Error revoking link', 'error');
+      }
+    } catch (err) {
+      showMessage('Error revoking link', 'error');
     }
-  } catch (err) {
-    showMessage('Error updating cell', 'error');
-  }
-};
+  };
 
-const updateHeader = async (oldColumnName, newColumnName) => {
-  if (!newColumnName.trim() || oldColumnName === newColumnName) return;
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'UPDATE_HEADER',
-        data: {
-          sheetName: selectedSheet,
-          columnName: oldColumnName,
-          newColumnName: newColumnName.trim()
-        }
-      })
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
+  // Load access requests
+  const loadAccessRequests = async (status = 'pending') => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access-requests?status=${status}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
       });
-      showMessage('Column renamed');
-    } else {
+      
       const data = await res.json();
-      showMessage(data.message || 'Error renaming column', 'error');
+      if (res.ok) {
+        setAccessRequests(data.requests || []);
+      }
+    } catch (err) {
+      showMessage('Error loading access requests', 'error');
     }
-  } catch (err) {
-    showMessage('Error renaming column', 'error');
-  }
-};
+  };
 
-const deleteRow = async (rowIndex) => {
-  if (!confirm('Delete this row?')) return;
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'DELETE_ROW',
-        data: {
-          sheetName: selectedSheet,
-          rowIndex
-        }
-      })
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
+  // Approve access request
+  const approveAccessRequest = async (requestId, expiryHours = 720, adminResponse = '') => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        rowCount: result.rowCount
+        body: JSON.stringify({
+          expiryHours: parseInt(expiryHours),
+          adminResponse
+        })
       });
-      showMessage('Row deleted');
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error deleting row', 'error');
+
+      if (res.ok) {
+        showMessage('Access request approved and email sent');
+        loadAccessRequests();
+        setSelectedRequest(null);
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error approving request', 'error');
+      }
+    } catch (err) {
+      showMessage('Error approving request', 'error');
     }
-  } catch (err) {
-    showMessage('Error deleting row', 'error');
-  }
-};
+  };
 
-const deleteColumn = async (columnName) => {
-  if (!confirm(`Delete column "${columnName}"?`)) return;
-
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'DELETE_COLUMN',
-        data: {
-          sheetName: selectedSheet,
-          columnName
-        }
-      })
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
+  // Reject access request
+  const rejectAccessRequest = async (requestId, adminResponse = '') => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        columnCount: result.columnCount
+        body: JSON.stringify({
+          adminResponse
+        })
       });
-      showMessage('Column deleted');
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error deleting column', 'error');
+
+      if (res.ok) {
+        showMessage('Access request rejected');
+        loadAccessRequests();
+        setSelectedRequest(null);
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error rejecting request', 'error');
+      }
+    } catch (err) {
+      showMessage('Error rejecting request', 'error');
     }
-  } catch (err) {
-    showMessage('Error deleting column', 'error');
-  }
-};
+  };
 
-const addRow = async () => {
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'ADD_ROW',
-        data: {
-          sheetName: selectedSheet
-        }
-      })
-    });
-
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
+  // Toggle bookmark
+  const toggleBookmarkAvailability = async (item, enabled) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/item/${item._id}/bookmark-toggle`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        rowCount: result.rowCount
+        body: JSON.stringify({ enabled })
       });
-      showMessage('Row added');
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error adding row', 'error');
+
+      if (res.ok) {
+        showMessage(`Bookmarking ${enabled ? 'enabled' : 'disabled'} for ${item.name}`);
+        setShowBookmarkToggleModal(false);
+        loadFolder(currentFolder?._id);
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error updating bookmark setting', 'error');
+      }
+    } catch (err) {
+      showMessage('Error updating bookmark setting', 'error');
     }
-  } catch (err) {
-    showMessage('Error adding row', 'error');
-  }
-};
+  };
 
-const addColumn = async () => {
-  const colName = prompt('Enter column name:');
-  if (!colName || !colName.trim()) return;
+  // Checkmark fields
+  const saveCheckmarkFields = async () => {
+    if (checkmarkFields.some(f => !f.fieldName || !f.fieldId)) {
+      showMessage('All fields must have a name and ID', 'error');
+      return;
+    }
 
-  try {
-    const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        action: 'ADD_COLUMN',
-        data: {
-          sheetName: selectedSheet,
-          newColumnName: colName.trim()
+    try {
+      const res = await fetch(
+        `${API_URL}/api/admin/excel/${checkmarkFieldsItem._id}/checkmark-fields`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ fields: checkmarkFields })
         }
-      })
-    });
+      );
 
-    if (res.ok) {
-      const result = await res.json();
-      setExcelData({
-        ...excelData,
-        data: {
-          ...excelData.data,
-          [selectedSheet]: result.data
-        },
-        columnCount: result.columnCount
-      });
-      showMessage('Column added');
-    } else {
-      const data = await res.json();
-      showMessage(data.message || 'Error adding column', 'error');
+      if (res.ok) {
+        showMessage('Checkmark fields updated successfully');
+        setShowCheckmarkFieldsModal(false);
+        setCheckmarkFieldsItem(null);
+        loadFolder(currentFolder?._id);
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error updating fields', 'error');
+      }
+    } catch (err) {
+      showMessage('Error updating checkmark fields', 'error');
     }
-  } catch (err) {
-    showMessage('Error adding column', 'error');
-  }
-};
+  };
 
-// Keyboard navigation
-const handleCellKeyDown = (e, rowIndex, colIndex, headers) => {
-  if (editingCell) return; // Don't navigate while editing
+  const addCheckmarkField = () => {
+    setCheckmarkFields([
+      ...checkmarkFields,
+      { 
+        fieldName: '', 
+        fieldId: `field_${Date.now()}`,
+        checkmarkType: 'checkbox' 
+      }
+    ]);
+  };
 
-  const currentRow = rowIndex;
-  const currentCol = colIndex;
+  const updateCheckmarkField = (index, key, value) => {
+    const updated = [...checkmarkFields];
+    updated[index][key] = value;
+    setCheckmarkFields(updated);
+  };
 
-  switch(e.key) {
-    case 'ArrowUp':
-      e.preventDefault();
-      if (currentRow > 0) {
-        setSelectedCell({ row: currentRow - 1, col: currentCol });
-      }
-      break;
-    case 'ArrowDown':
-      e.preventDefault();
-      const sheetData = excelData.data[selectedSheet];
-      if (currentRow < sheetData.length - 1) {
-        setSelectedCell({ row: currentRow + 1, col: currentCol });
-      }
-      break;
-    case 'ArrowLeft':
-      e.preventDefault();
-      if (currentCol > 0) {
-        setSelectedCell({ row: currentRow, col: currentCol - 1 });
-      }
-      break;
-    case 'ArrowRight':
-      e.preventDefault();
-      if (currentCol < headers.length - 1) {
-        setSelectedCell({ row: currentRow, col: currentCol + 1 });
-      }
-      break;
-    case 'Enter':
-      e.preventDefault();
-      setEditingCell({ row: currentRow, col: currentCol });
-      const cellVal = excelData.data[selectedSheet][currentRow][headers[currentCol]];
-      setCellValue(cellVal || '');
-      break;
-    case 'Delete':
-      e.preventDefault();
-      if (editMode) {
-        updateCell(currentRow, headers[currentCol], '');
-      }
-      break;
-  }
-};
+  const removeCheckmarkField = (index) => {
+    setCheckmarkFields(checkmarkFields.filter((_, i) => i !== index));
+  };
 
-// Save cell edit
-const saveCellEdit = (rowIndex, columnName) => {
-  if (editingCell) {
-    updateCell(rowIndex, columnName, cellValue);
+  const loadExcelCheckmarkFields = async (excelId) => {
+    try {
+      const res = await fetch(`${API_URL}/api/excel/${excelId}/data`);
+      const data = await res.json();
+      setCheckmarkFields(data.checkmarkFields || []);
+    } catch (err) {
+      setCheckmarkFields([]);
+    }
+  };
+
+  // Excel upload
+  const uploadExcelFile = async (file) => {
+    if (!file) return;
+
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+
+    if (!validTypes.includes(file.type)) {
+      showMessage('Please upload only Excel (.xlsx, .xls) or CSV files', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (currentFolder?._id) {
+      formData.append('parentId', currentFolder._id);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      
+      if (res.ok) {
+        showMessage('Excel file uploaded successfully');
+        loadFolder(currentFolder?._id);
+      } else {
+        showMessage(data.message || 'Error uploading Excel file', 'error');
+      }
+    } catch (err) {
+      showMessage('Error uploading Excel file', 'error');
+    }
+  };
+
+  // Excel editing
+  const enterEditMode = (item) => {
+    setEditingExcel(item);
+    setEditMode(true);
+    loadExcelData(item);
+  };
+
+  const exitEditMode = () => {
+    setEditMode(false);
+    setEditingExcel(null);
+    setSelectedCell(null);
     setEditingCell(null);
     setCellValue('');
-  }
-};
+  };
 
-// Save header edit
+  const updateCell = async (rowIndex, columnName, newValue) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_CELL',
+          data: {
+            sheetName: selectedSheet,
+            rowIndex,
+            columnName,
+            newValue
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          }
+        });
+        showMessage('Cell updated');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error updating cell', 'error');
+      }
+    } catch (err) {
+      showMessage('Error updating cell', 'error');
+    }
+  };
+
+  const updateHeader = async (oldColumnName, newColumnName) => {
+    if (!newColumnName.trim() || oldColumnName === newColumnName) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'UPDATE_HEADER',
+          data: {
+            sheetName: selectedSheet,
+            columnName: oldColumnName,
+            newColumnName: newColumnName.trim()
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          }
+        });
+        showMessage('Column renamed');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error renaming column', 'error');
+      }
+    } catch (err) {
+      showMessage('Error renaming column', 'error');
+    }
+  };
+
+  const deleteRow = async (rowIndex) => {
+    if (!confirm('Delete this row?')) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'DELETE_ROW',
+          data: {
+            sheetName: selectedSheet,
+            rowIndex
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          },
+          rowCount: result.rowCount
+        });
+        showMessage('Row deleted');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error deleting row', 'error');
+      }
+    } catch (err) {
+      showMessage('Error deleting row', 'error');
+    }
+  };
+
+  const deleteColumn = async (columnName) => {
+    if (!confirm(`Delete column "${columnName}"?`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'DELETE_COLUMN',
+          data: {
+            sheetName: selectedSheet,
+            columnName
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          },
+          columnCount: result.columnCount
+        });
+        showMessage('Column deleted');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error deleting column', 'error');
+      }
+    } catch (err) {
+      showMessage('Error deleting column', 'error');
+    }
+  };
+
+  const addRow = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'ADD_ROW',
+          data: {
+            sheetName: selectedSheet
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          },
+          rowCount: result.rowCount
+        });
+        showMessage('Row added');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error adding row', 'error');
+      }
+    } catch (err) {
+      showMessage('Error adding row', 'error');
+    }
+  };
+
+  const addColumn = async () => {
+    const colName = prompt('Enter column name:');
+    if (!colName || !colName.trim()) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/excel/${editingExcel._id}/edit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'ADD_COLUMN',
+          data: {
+            sheetName: selectedSheet,
+            newColumnName: colName.trim()
+          }
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setExcelData({
+          ...excelData,
+          data: {
+            ...excelData.data,
+            [selectedSheet]: result.data
+          },
+          columnCount: result.columnCount
+        });
+        showMessage('Column added');
+      } else {
+        const data = await res.json();
+        showMessage(data.message || 'Error adding column', 'error');
+}
+} catch (err) {
+showMessage('Error adding column', 'error');
+}
+};
+// Keyboard navigation
+const handleCellKeyDown = (e, rowIndex, colIndex, headers) => {
+if (editingCell) return;
+const currentRow = rowIndex;
+const currentCol = colIndex;
+
+switch(e.key) {
+  case 'ArrowUp':
+    e.preventDefault();
+    if (currentRow > 0) {
+      setSelectedCell({ row: currentRow - 1, col: currentCol });
+    }
+    break;
+  case 'ArrowDown':
+    e.preventDefault();
+    const sheetData = excelData.data[selectedSheet];
+    if (currentRow < sheetData.length - 1) {
+      setSelectedCell({ row: currentRow + 1, col: currentCol });
+    }
+    break;
+  case 'ArrowLeft':
+    e.preventDefault();
+    if (currentCol > 0) {
+      setSelectedCell({ row: currentRow, col: currentCol - 1 });
+    }
+    break;
+  case 'ArrowRight':
+    e.preventDefault();
+    if (currentCol < headers.length - 1) {
+      setSelectedCell({ row: currentRow, col: currentCol + 1 });
+    }
+    break;
+  case 'Enter':
+    e.preventDefault();
+    setEditingCell({ row: currentRow, col: currentCol });
+    const cellVal = excelData.data[selectedSheet][currentRow][headers[currentCol]];
+    setCellValue(cellVal || '');
+    break;
+  case 'Delete':
+    e.preventDefault();
+    if (editMode) {
+      updateCell(currentRow, headers[currentCol], '');
+    }
+    break;
+}
+};
+const saveCellEdit = (rowIndex, columnName) => {
+if (editingCell) {
+updateCell(rowIndex, columnName, cellValue);
+setEditingCell(null);
+setCellValue('');
+}
+};
 const saveHeaderEdit = (oldName) => {
-  if (editingHeader && headerValue.trim()) {
-    updateHeader(oldName, headerValue);
-    setEditingHeader(null);
-    setHeaderValue('');
-  }
+if (editingHeader && headerValue.trim()) {
+updateHeader(oldName, headerValue);
+setEditingHeader(null);
+setHeaderValue('');
+}
 };
 const loadExcelData = async (excelItem) => {
-  try {
-    const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`);
-    const data = await res.json();
-    
-    setExcelData(data);
-    setViewingExcel(excelItem);
-    setSelectedSheet(data.sheetNames?.[0] || null);
-  } catch (err) {
-    showMessage('Error loading Excel data', 'error');
-  }
+try {
+const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`);
+const data = await res.json();
+  setExcelData(data);
+  setViewingExcel(excelItem);
+  setSelectedSheet(data.sheetNames?.[0] || null);
+} catch (err) {
+  showMessage('Error loading Excel data', 'error');
+}
 };
-
 const closeExcelView = () => {
-  setExcelData(null);
-  setViewingExcel(null);
-  setSelectedSheet(null);
+setExcelData(null);
+setViewingExcel(null);
+setSelectedSheet(null);
 };
 const isURL = (value) => {
-  if (typeof value !== 'string') return false;
-  if (!value || value.trim() === '') return false;
-  
-  const stringValue = value.trim();
-  
-  // Check for common URL patterns with protocol
-  const urlPattern = /^(https?:\/\/)/i;
-  if (urlPattern.test(stringValue)) {
-    try {
-      new URL(stringValue);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  
-  // Check if it looks like a URL without protocol (has domain pattern)
-  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}(\/.*)?$/;
-  if (domainPattern.test(stringValue)) {
-    try {
-      new URL('https://' + stringValue);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  
-  return false;
-};
+if (typeof value !== 'string') return false;
+if (!value || value.trim() === '') return false;
+const stringValue = value.trim();
 
+const urlPattern = /^(https?:\/\/)/i;
+if (urlPattern.test(stringValue)) {
+  try {
+    new URL(stringValue);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}(\/.*)?$/;
+if (domainPattern.test(stringValue)) {
+  try {
+    new URL('https://' + stringValue);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+return false;
+};
 const renderCellValue = (value) => {
-  if (value === null || value === undefined || value === '') return '-';
-  
-  const stringValue = String(value).trim();
-  
-  if (isURL(stringValue)) {
-    // Ensure URL has protocol
-    let fullUrl = stringValue;
-    if (!stringValue.startsWith('http://') && !stringValue.startsWith('https://')) {
-      fullUrl = 'https://' + stringValue;
-    }
-    
-    // Extract shorter display text
-    let displayText = stringValue;
-    try {
-      const urlObj = new URL(fullUrl);
-      // Show just hostname + first part of path
-      displayText = urlObj.hostname;
-      if (urlObj.pathname && urlObj.pathname !== '/') {
-        const pathPart = urlObj.pathname.substring(0, 15);
-        displayText += pathPart + (urlObj.pathname.length > 15 ? '...' : '');
-      }
-    } catch (e) {
-      // Fallback to truncated string
-      displayText = stringValue.substring(0, 35) + (stringValue.length > 35 ? '...' : '');
-    }
-    
-    return (
-      <a 
-        href={fullUrl} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        style={styles.tableLink}
-        onClick={(e) => e.stopPropagation()}
-        title={fullUrl}
-      >
-        <ExternalLink size={14} style={{ marginRight: '4px', flexShrink: 0 }} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayText}</span>
-      </a>
-    );
+if (value === null || value === undefined || value === '') return '-';
+const stringValue = String(value).trim();
+
+if (isURL(stringValue)) {
+  let fullUrl = stringValue;
+  if (!stringValue.startsWith('http://') && !stringValue.startsWith('https://')) {
+    fullUrl = 'https://' + stringValue;
   }
   
-  // Not a URL, return as regular text
-  return stringValue;
-};
-const renderExcelTable = () => {
-  if (!excelData || !selectedSheet) return null;
-
-  const sheetData = excelData.data[selectedSheet];
-  if (!sheetData || sheetData.length === 0) {
-    return <div style={styles.emptyState}>No data in this sheet</div>;
+  let displayText = stringValue;
+  try {
+    const urlObj = new URL(fullUrl);
+    displayText = urlObj.hostname;
+    if (urlObj.pathname && urlObj.pathname !== '/') {
+      const pathPart = urlObj.pathname.substring(0, 15);
+      displayText += pathPart + (urlObj.pathname.length > 15 ? '...' : '');
+    }
+  } catch (e) {
+    displayText = stringValue.substring(0, 35) + (stringValue.length > 35 ? '...' : '');
   }
-
-  const headers = Object.keys(sheetData[0]);
-
+  
   return (
-    <div style={styles.excelViewContainer}>
-      <div style={styles.excelHeader}>
-        <button onClick={closeExcelView} style={styles.backBtn}>
-          <ArrowLeft size={20} />
-          <span>Back to Files</span>
-        </button>
-        <h2 style={styles.excelTitle}>
-          <FileSpreadsheet size={24} style={{ marginRight: '10px' }} />
-          {viewingExcel.name}
-        </h2>
-        {!editMode ? (
-          <button
-            onClick={() => enterEditMode(viewingExcel)}
-            style={{...styles.toolBtn, marginLeft: 'auto'}}
-          >
-            <Edit2 size={16} />
-            <span>Edit File</span>
-          </button>
-        ) : (
-          <button
-            onClick={exitEditMode}
-            style={{...styles.toolBtn, marginLeft: 'auto', background: '#4CAF50', color: 'white'}}
-          >
-            <Check size={16} />
-            <span>Done Editing</span>
-          </button>
-        )}
-      </div>
-
-      {excelData.sheetNames && excelData.sheetNames.length > 1 && (
-        <div style={styles.sheetTabs}>
-          {excelData.sheetNames.map(sheetName => (
-            <button
-              key={sheetName}
-              onClick={() => setSelectedSheet(sheetName)}
-              style={{
-                ...styles.sheetTab,
-                ...(selectedSheet === sheetName ? styles.activeSheetTab : {})
-              }}
-            >
-              {sheetName}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={styles.excelInfo}>
-        <span>Total Rows: {sheetData.length}</span>
-        <span>Columns: {headers.length}</span>
-        {editMode && <span style={{color: '#4CAF50', fontWeight: 'bold'}}>● EDIT MODE</span>}
-      </div>
-
-      {editMode && (
-        <div style={styles.editToolbar}>
-          <button onClick={addRow} style={styles.editBtn}>
-            + Add Row
-          </button>
-          <button onClick={addColumn} style={styles.editBtn}>
-            + Add Column
-          </button>
-          <div style={styles.editHint}>
-            <span>💡 Click cells to edit • Arrow keys to navigate • Enter to edit • Delete to clear</span>
-          </div>
-        </div>
-      )}
-
-      <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.tableHeader}>#</th>
-              {editMode && <th style={{...styles.tableHeader, width: '50px'}}>Actions</th>}
-              {headers.map((header, colIndex) => (
-                <th key={header} style={styles.tableHeader}>
-                  {editMode ? (
-                    <div style={styles.headerEditContainer}>
-                      {editingHeader === colIndex ? (
-                        <input
-                          type="text"
-                          value={headerValue}
-                          onChange={(e) => setHeaderValue(e.target.value)}
-                          onBlur={() => saveHeaderEdit(header)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') saveHeaderEdit(header);
-                          }}
-                          style={styles.headerInput}
-                          autoFocus
-                        />
-                      ) : (
-                        <>
-                          <span 
-                            onClick={() => {
-                              setEditingHeader(colIndex);
-                              setHeaderValue(header);
-                            }}
-                            style={styles.editableHeader}
-                          >
-                            {header}
-                          </span>
-                          <button
-                            onClick={() => deleteColumn(header)}
-                            style={styles.miniDeleteBtn}
-                            title="Delete Column"
-                          >
-                            <X size={12} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    header
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sheetData.map((row, rowIndex) => (
-              <tr 
-                key={rowIndex} 
-                style={{
-                  ...styles.tableRow,
-                  background: selectedCell?.row === rowIndex ? '#e3f2fd' : 'transparent'
-                }}
-              >
-                <td style={styles.tableCell}>{rowIndex + 1}</td>
-                {editMode && (
-                  <td style={styles.tableCell}>
-                    <button
-                      onClick={() => deleteRow(rowIndex)}
-                      style={styles.rowDeleteBtn}
-                      title="Delete Row"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                )}
-                {headers.map((header, colIndex) => {
-                  const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
-                  const isEditing = editingCell?.row === rowIndex && editingCell?.col === colIndex;
-                  
-                  return (
-                    <td
-                      key={header}
-                      style={{
-                        ...styles.tableCell,
-                        ...(isSelected ? styles.selectedCell : {}),
-                        ...(editMode ? { cursor: 'cell' } : {})
-                      }}
-                      onClick={() => {
-                        if (editMode) {
-                          setSelectedCell({ row: rowIndex, col: colIndex });
-                        }
-                      }}
-                      onDoubleClick={() => {
-                        if (editMode) {
-                          setEditingCell({ row: rowIndex, col: colIndex });
-                          setCellValue(row[header] || '');
-                        }
-                      }}
-                      onKeyDown={(e) => editMode && handleCellKeyDown(e, rowIndex, colIndex, headers)}
-                      tabIndex={editMode ? 0 : -1}
-                    >
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={cellValue}
-                          onChange={(e) => setCellValue(e.target.value)}
-                          onBlur={() => saveCellEdit(rowIndex, header)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              saveCellEdit(rowIndex, header);
-                              setSelectedCell({ row: rowIndex + 1, col: colIndex });
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              setEditingCell(null);
-                              setCellValue('');
-                            }
-                          }}
-                          style={styles.cellInput}
-                          autoFocus
-                        />
-                      ) : (
-                        renderCellValue(row[header])
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-  // Render folder tree for move modal
-  const renderFolderTree = (folders, level = 0) => {
-    return folders.filter(f => f.type === 'folder').map(folder => (
-      <div key={folder._id}>
-        <div
-          style={{
-            ...styles.treeItem,
-            paddingLeft: `${level * 20 + 10}px`,
-            background: folder._id === moveItem?._id ? '#e0e0e0' : 'transparent'
-          }}
-          onClick={() => folder._id !== moveItem?._id && moveItemFunc(folder._id)}
-        >
-          <Folder size={16} />
-          <span style={{ marginLeft: '8px' }}>{folder.name}</span>
-        </div>
-        {folder.children && renderFolderTree(folder.children, level + 1)}
-      </div>
-    ));
-  };
-if (viewingExcel && excelData) {
-  return (
-    <div style={styles.container}>
-      {message && <div style={styles.message}>{message}</div>}
-      {renderExcelTable()}
-    </div>
+    <a 
+      href={fullUrl} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="fm-table__link"
+      onClick={(e) => e.stopPropagation()}
+      title={fullUrl}
+    >
+      <ExternalLink size={14} className="fm-table__link-icon" />
+      <span className="fm-table__link-text">{displayText}</span>
+    </a>
   );
 }
-  return (
-    
-    <div style={styles.container}>
-      
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <Folder size={24} color="#4CAF50" />
-          <h2 style={styles.title}>File Manager</h2>
-        </div>
 
-        <div style={styles.searchBar}>
-          <input
-            type="text"
-            placeholder="Search files and folders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && performSearch()}
-            style={styles.searchInput}
-          />
-          <button onClick={performSearch} style={styles.searchBtn}>
-            <Search size={16} />
+return stringValue;
+};
+const renderExcelTable = () => {
+if (!excelData || !selectedSheet) return null;
+const sheetData = excelData.data[selectedSheet];
+if (!sheetData || sheetData.length === 0) {
+  return <div className="fm-empty-state">No data in this sheet</div>;
+}
+
+const headers = Object.keys(sheetData[0]);
+
+return (
+  <div className="fm-excel-view">
+    <div className="fm-excel-header">
+      <button onClick={closeExcelView} className="fm-back-btn">
+        <ArrowLeft size={20} />
+        <span>Back to Files</span>
+      </button>
+      <h2 className="fm-excel-title">
+        <FileSpreadsheet size={24} className="fm-excel-title__icon" />
+        {viewingExcel.name}
+      </h2>
+      {!editMode ? (
+        <button
+          onClick={() => enterEditMode(viewingExcel)}
+          className="fm-tool-btn fm-excel-header__edit"
+        >
+          <Edit2 size={16} />
+          <span>Edit File</span>
+        </button>
+      ) : (
+        <button
+          onClick={exitEditMode}
+          className="fm-tool-btn fm-excel-header__done"
+        >
+          <Check size={16} />
+          <span>Done Editing</span>
+        </button>
+      )}
+    </div>
+
+    {excelData.sheetNames && excelData.sheetNames.length > 1 && (
+      <div className="fm-sheet-tabs">
+        {excelData.sheetNames.map(sheetName => (
+          <button
+            key={sheetName}
+            onClick={() => setSelectedSheet(sheetName)}
+            className={`fm-sheet-tab ${selectedSheet === sheetName ? 'fm-sheet-tab--active' : ''}`}
+          >
+            {sheetName}
           </button>
-          {searchResults && (
-            <button onClick={() => setSearchResults(null)} style={styles.clearBtn}>
-              <X size={16} />
-            </button>
-          )}
+        ))}
+      </div>
+    )}
+
+    <div className="fm-excel-info">
+      <span>Total Rows: {sheetData.length}</span>
+      <span>Columns: {headers.length}</span>
+      {editMode && <span className="fm-excel-info__edit-mode">● EDIT MODE</span>}
+    </div>
+
+    {editMode && (
+      <div className="fm-edit-toolbar">
+        <button onClick={addRow} className="fm-edit-btn">
+          + Add Row
+        </button>
+        <button onClick={addColumn} className="fm-edit-btn">
+          + Add Column
+        </button>
+        <div className="fm-edit-hint">
+          <span>💡 Click cells to edit • Arrow keys to navigate • Enter to edit • Delete to clear</span>
         </div>
       </div>
+    )}
 
-      {/* Message */}
-      {message && (
-        <div style={styles.message}>
-          {message}
-        </div>
-      )}
-
-      {/* Breadcrumb */}
-      {!searchResults && (
-        <div style={styles.breadcrumb}>
-          {breadcrumb.map((crumb, idx) => (
-            <React.Fragment key={crumb.id || 'root'}>
-              <span
-                style={{
-                  ...styles.crumbItem,
-                  fontWeight: idx === breadcrumb.length - 1 ? 'bold' : 'normal'
-                }}
-                onClick={() => loadFolder(crumb.id)}
-              >
-                {idx === 0 ? <Home size={16} /> : crumb.name}
-              </span>
-              {idx < breadcrumb.length - 1 && <ChevronRight size={16} style={styles.chevron} />}
-            </React.Fragment>
-          ))}
-        </div>
-      )}
-
-      {/* Toolbar */}
-      <div style={styles.toolbar}>
-        <input
-          type="file"
-          id="fileInput"
-          style={{ display: 'none' }}
-          onChange={(e) => uploadFile(e.target.files[0])}
-        />
-        
-        <button
-          onClick={() => document.getElementById('fileInput').click()}
-          style={styles.toolBtn}
-        >
-          <Upload size={16} />
-          <span>Upload File</span>
-        </button>
-
-        <button
-          onClick={() => setShowNewFolderModal(true)}
-          style={styles.toolBtn}
-        >
-          <FolderPlus size={16} />
-          <span>New Folder</span>
-        </button>
-        <button
-  onClick={() => setShowNewLinkModal(true)}
-  style={styles.toolBtn}
->
-  <LinkIcon size={16} />
-  <span>Add Link</span>
-</button>
-<input
-  type="file"
-  id="excelInput"
-  accept=".xlsx,.xls,.csv"
-  style={{ display: 'none' }}
-  onChange={(e) => uploadExcelFile(e.target.files[0])}
-/>
-
-<button
-  onClick={() => document.getElementById('excelInput').click()}
-  style={styles.toolBtn}
->
-  <FileSpreadsheet size={16} />
-  <span>Upload Excel</span>
-</button>
-<button
-  onClick={() => {
-    loadAccessRequests();
-    setShowAccessRequestsModal(true);
-  }}
-  style={{...styles.toolBtn, background: '#FF9800', color: 'white'}}
->
-  <Shield size={16} />
-  <span>Access Requests</span>
-</button>
-      </div>
-
-      {/* File Grid */}
-      <div style={styles.fileGrid}>
-        {searchResults ? (
-          <>
-            {/* Search Results */}
-           <h3 style={styles.sectionTitle}>Links ({searchResults.links?.length || 0})</h3>
-{searchResults.links?.map(item => (
-  <div key={item._id} style={styles.fileItem}>
-    <LinkIcon size={40} color="#9C27B0" />
-    <div style={styles.fileName}>{item.name}</div>
-    <div style={styles.linkUrl}>{item.url}</div>
-    <div style={styles.filePath}>{item.path}</div>
-    <div style={styles.fileActions}>
-      <button 
-        onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
-        style={styles.iconBtn}
-        title="Open Link"
-      >
-        <ExternalLink size={16} />
-      </button>
-    </div>
-  </div>
-))}
-<h3 style={styles.sectionTitle}>Excel Files ({searchResults.excels?.length || 0})</h3>
-{searchResults.excels?.map(item => (
-  <div key={item._id} style={styles.fileItem}>
-    <FileSpreadsheet size={40} color="#10B981" />
-    <div style={styles.fileName}>{item.name}</div>
-    <div style={styles.filePath}>{item.path}</div>
-    <div style={styles.fileActions}>
-      <button onClick={() => loadExcelData(item)} style={styles.iconBtn}>
-        <ExternalLink size={16} />
-      </button>
-    </div>
-  </div>
-))}
-
-            <h3 style={styles.sectionTitle}>Files ({searchResults.files?.length || 0})</h3>
-            {searchResults.files?.map(item => (
-              <div key={item._id} style={styles.fileItem}>
-                <File size={40} color="#2196F3" />
-                <div style={styles.fileName}>{item.name}</div>
-                <div style={styles.filePath}>{item.path}</div>
-                <div style={styles.fileActions}>
-                  <button onClick={() => downloadFile(item)} style={styles.iconBtn}>
-                    <Download size={16} />
-                  </button>
-                </div>
-              </div>
+    <div className="fm-table-wrapper">
+      <table className="fm-table">
+        <thead>
+          <tr>
+            <th className="fm-table__header">#</th>
+            {editMode && <th className="fm-table__header fm-table__header--actions">Actions</th>}
+            {headers.map((header, colIndex) => (
+              <th key={header} className="fm-table__header">
+                {editMode ? (
+                  <div className="fm-header-edit-container">
+                    {editingHeader === colIndex ? (
+                      <input
+                        type="text"
+                        value={headerValue}
+                        onChange={(e) => setHeaderValue(e.target.value)}
+                        onBlur={() => saveHeaderEdit(header)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') saveHeaderEdit(header);
+                        }}
+                        className="fm-header-input"
+                        autoFocus
+                      />
+                    ) : (
+                      <>
+                        <span 
+                          onClick={() => {
+                            setEditingHeader(colIndex);
+                            setHeaderValue(header);
+                          }}
+                          className="fm-editable-header"
+                        >
+                          {header}
+                        </span>
+                        <button
+                          onClick={() => deleteColumn(header)}
+                          className="fm-mini-delete-btn"
+                          title="Delete Column"
+                        >
+                          <X size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  header
+                )}
+              </th>
             ))}
-          </>
-        ) : (
-          <>
-            {/* Current Folder Contents */}
-            {items.length === 0 ? (
-              <div style={styles.emptyState}>
-                <Folder size={64} color="#ccc" />
-                <p>This folder is empty</p>
-                <p style={styles.emptyHint}>Upload files or create folders to get started</p>
-              </div>
-            ) : (
-           items.map(item => (
-  <div
-    key={item._id}
-    style={{
-      ...styles.fileItem,
-      opacity: draggedItem?._id === item._id ? 0.5 : 1
-    }}
-    draggable={true}
-    onDragStart={(e) => handleDragStart(e, item)}
-    onDragOver={item.type === 'folder' ? handleDragOver : undefined}
-    onDrop={item.type === 'folder' ? (e) => handleDrop(e, item) : undefined}
-   onDoubleClick={() => {
-  if (item.type === 'folder') {
-    loadFolder(item._id);
-  } else if (item.type === 'link') {
-    window.open(item.url, '_blank', 'noopener,noreferrer');
-  } else if (item.type === 'excel') {  // ADD THIS
-    loadExcelData(item);
-  }
-}}
-  >
-   {item.type === 'folder' ? (
-  <Folder size={40} color="#FFC107" />
-) : item.type === 'link' ? (
-  <LinkIcon size={40} color="#9C27B0" />
-) : item.type === 'excel' ? (  // ADD THIS
-  <FileSpreadsheet size={40} color="#10B981" />
-) : (
-  <File size={40} color="#2196F3" />
-)}
-
-    
-    <div style={styles.fileName}>{item.name}</div>
-    
-    {item.type === 'file' && (
-      <div style={styles.fileSize}>
-        {(item.size / 1024).toFixed(2)} KB
-      </div>
-    )}
-
-    {item.type === 'link' && (
-      <div style={styles.linkUrl}>{item.url}</div>
-    )}
-{item.type === 'excel' && (
-  <div style={styles.fileSize}>
-    {item.rowCount} rows • {item.columnCount} cols
-  </div>
-)}
-    <div style={styles.fileActions}>
-      {item.type === 'file' && (
-        <button onClick={() => downloadFile(item)} style={styles.iconBtn} title="Download">
-          <Download size={16} />
-        </button>
-      )}
-      
-      {item.type === 'link' && (
-        <button 
-          onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
-          style={styles.iconBtn} 
-          title="Open Link"
-        >
-          <ExternalLink size={16} />
-        </button>
-      )}
-      {item.type === 'excel' && (
-  <button 
-    onClick={() => loadExcelData(item)} 
-    style={styles.iconBtn} 
-    title="View Data"
-  >
-    <ExternalLink size={16} />
-  </button>
-  
-)}
-      <button
-        onClick={() => {
-          setRenameItem(item);
-          setRenameName(item.name);
-          setShowRenameModal(true);
-        }}
-        style={styles.iconBtn}
-        title="Rename"
-      >
-        <Edit2 size={16} />
-      </button>
-
-      <button
-        onClick={() => {
-          setMoveItem(item);
-          loadFolderTree();
-          setShowMoveModal(true);
-        }}
-        style={styles.iconBtn}
-        title="Move"
-      >
-        <Move size={16} />
-      </button>
-
-      <button
-        onClick={() => deleteItem(item)}
-        style={{...styles.iconBtn, color: '#f44336'}}
-        title="Delete"
-      >
-        <Trash2 size={16} />
-      </button>
-      <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setBookmarkToggleItem(item);
-      setShowBookmarkToggleModal(true);
-    }}
-    style={{
-      ...styles.iconBtn,
-      color: item.bookmarkEnabled ? '#4CAF50' : '#666'
-    }}
-    title={item.bookmarkEnabled ? 'Bookmarking Enabled' : 'Enable Bookmarking'}
-  >
-    <Star size={16} fill={item.bookmarkEnabled ? '#4CAF50' : 'none'} />
-  </button>
-   {item.type === 'excel' && (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        setCheckmarkFieldsItem(item);
-        loadExcelCheckmarkFields(item._id);
-        setShowCheckmarkFieldsModal(true);
-      }}
-      style={styles.iconBtn}
-      title="Manage Checkmark Fields"
-    >
-      <CheckSquare size={16} />
-    </button>
-  )}
-  <button
-  onClick={(e) => {
-    e.stopPropagation();
-    setAccessItem(item);
-    setAccessLevel(item.accessLevel || 'public');
-    loadAccessSettings(item._id);
-    setShowAccessModal(true);
-  }}
-  style={{
-    ...styles.iconBtn,
-    color: item.accessLevel === 'locked' ? '#f44336' : 
-           item.accessLevel === 'private' ? '#FF9800' : '#4CAF50'
-  }}
-  title={`Access: ${item.accessLevel || 'public'}`}
->
-  {item.accessLevel === 'locked' ? <Lock size={16} /> : 
-   item.accessLevel === 'private' ? <Shield size={16} /> : 
-   <Unlock size={16} />}
-</button>
+          </tr>
+        </thead>
+        <tbody>
+          {sheetData.map((row, rowIndex) => (
+            <tr 
+              key={rowIndex} 
+              className={`fm-table__row ${selectedCell?.row === rowIndex ? 'fm-table__row--selected' : ''}`}
+            >
+              <td className="fm-table__cell">{rowIndex + 1}</td>
+              {editMode && (
+                <td className="fm-table__cell">
+                  <button
+                    onClick={() => deleteRow(rowIndex)}
+                    className="fm-row-delete-btn"
+                    title="Delete Row"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
+              )}
+              {headers.map((header, colIndex) => {
+                const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                const isEditing = editingCell?.row === rowIndex && editingCell?.col === colIndex;
+                
+                return (
+                  <td
+                    key={header}
+                    className={`fm-table__cell ${isSelected ? 'fm-table__cell--selected' : ''} ${editMode ? 'fm-table__cell--editable' : ''}`}
+                    onClick={() => {
+                      if (editMode) {
+                        setSelectedCell({ row: rowIndex, col: colIndex });
+                      }
+                    }}
+                    onDoubleClick={() => {
+                      if (editMode) {
+                        setEditingCell({ row: rowIndex, col: colIndex });
+                        setCellValue(row[header] || '');
+                      }
+                    }}
+                    onKeyDown={(e) => editMode && handleCellKeyDown(e, rowIndex, colIndex, headers)}
+                    tabIndex={editMode ? 0 : -1}
+                  >
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={cellValue}
+                        onChange={(e) => setCellValue(e.target.value)}
+                        onBlur={() => saveCellEdit(rowIndex, header)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            saveCellEdit(rowIndex, header);
+                            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setEditingCell(null);
+                            setCellValue('');
+                          }
+                        }}
+                        className="fm-cell-input"
+                        autoFocus
+                      />
+                    ) : (
+                      renderCellValue(row[header])
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   </div>
-))
-            )}
-          </>
-        )}
-      </div>
+);
+};
+const renderFolderTree = (folders, level = 0) => {
+return folders.filter(f => f.type === 'folder').map(folder => (
+<div key={folder._id}>
+<div
+className="fm-tree-item"
 
-      {/* New Folder Modal */}
-      {showNewFolderModal && (
-        <div style={styles.modal} onClick={() => setShowNewFolderModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3>Create New Folder</h3>
-            <input
-              type="text"
-              placeholder="Folder name"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && createFolder()}
-              style={styles.input}
-              autoFocus
-            />
-            <div style={styles.modalActions}>
-              <button onClick={() => setShowNewFolderModal(false)} style={styles.cancelBtn}>
-                Cancel
-              </button>
-              <button onClick={createFolder} style={styles.submitBtn}>
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rename Modal */}
-      {showRenameModal && (
-        <div style={styles.modal} onClick={() => setShowRenameModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3>Rename {renameItem?.type}</h3>
-            <input
-              type="text"
-              value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && renameItemFunc()}
-              style={styles.input}
-              autoFocus
-            />
-            <div style={styles.modalActions}>
-              <button onClick={() => setShowRenameModal(false)} style={styles.cancelBtn}>
-                Cancel
-              </button>
-              <button onClick={renameItemFunc} style={styles.submitBtn}>
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Move Modal */}
-      {showMoveModal && (
-        <div style={styles.modal} onClick={() => setShowMoveModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3>Move {moveItem?.name}</h3>
-            <div style={styles.treeContainer}>
-              <div
-                style={styles.treeItem}
-                onClick={() => moveItemFunc(null)}
-              >
-                <Home size={16} />
-                <span style={{ marginLeft: '8px' }}>Root</span>
-              </div>
-              {renderFolderTree(folderTree)}
-            </div>
-            <div style={styles.modalActions}>
-              <button onClick={() => setShowMoveModal(false)} style={styles.cancelBtn}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* New Link Modal */}
-{showNewLinkModal && (
-  <div style={styles.modal} onClick={() => setShowNewLinkModal(false)}>
-    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      <h3>Add New Link</h3>
+onClick={() => folder._id !== moveItem?._id && moveItemFunc(folder._id)}
+>
+<Folder size={16} />
+<span className="fm-tree-item__name">{folder.name}</span>
+</div>
+{folder.children && renderFolderTree(folder.children, level + 1)}
+</div>
+));
+};
+// Copy to clipboard function
+const copyToClipboard = (text, linkId) => {
+navigator.clipboard.writeText(text).then(() => {
+setCopiedLinkId(linkId);
+showMessage('Link copied to clipboard');
+setTimeout(() => setCopiedLinkId(null), 2000);
+}).catch(() => {
+showMessage('Failed to copy link', 'error');
+});
+};
+if (viewingExcel && excelData) {
+return (
+<div className="fm-container">
+{message && <div className="fm-message">{message}</div>}
+{renderExcelTable()}
+</div>
+);
+}
+return (
+<div className="fm-container">
+{/* Header */}
+<div className="fm-header">
+<div className="fm-header__left">
+<Folder size={24} className="fm-header__icon" />
+<h2 className="fm-header__title">File Manager</h2>
+</div>
+    <div className="fm-search-bar">
       <input
         type="text"
-        placeholder="Link name"
-        value={linkFormData.name}
-        onChange={(e) => setLinkFormData({...linkFormData, name: e.target.value})}
-        style={styles.input}
-        autoFocus
+        placeholder="Search files and folders..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyPress={(e) => e.key === 'Enter' && performSearch()}
+        className="fm-search-input"
       />
-      <input
-        type="url"
-        placeholder="https://example.com"
-        value={linkFormData.url}
-        onChange={(e) => setLinkFormData({...linkFormData, url: e.target.value})}
-        onKeyPress={(e) => e.key === 'Enter' && createLink()}
-        style={styles.input}
-      />
-      <div style={styles.modalActions}>
-        <button onClick={() => setShowNewLinkModal(false)} style={styles.cancelBtn}>
-          Cancel
-        </button>
-        <button onClick={createLink} style={styles.submitBtn}>
-          Add Link
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{/* ADMIN: Bookmark Toggle Modal */}
-{showBookmarkToggleModal && bookmarkToggleItem && (
-  <div style={styles.modal} onClick={() => setShowBookmarkToggleModal(false)}>
-    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      <h3>Bookmark Settings</h3>
-      <p style={{ marginTop: '15px', marginBottom: '20px' }}>
-        <strong>{bookmarkToggleItem.name}</strong>
-      </p>
-      <p>
-        Current Status: {bookmarkToggleItem.bookmarkEnabled ? (
-          <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>Enabled</span>
-        ) : (
-          <span style={{ color: '#999' }}>Disabled</span>
-        )}
-      </p>
-      <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-        When enabled, users can bookmark this item for quick access.
-      </p>
-      <div style={styles.modalActions}>
-        <button
-          onClick={() => {
-            toggleBookmarkAvailability(bookmarkToggleItem, false);
-          }}
-          style={styles.cancelBtn}
-        >
-          Disable Bookmarking
-        </button>
-        <button
-          onClick={() => {
-            toggleBookmarkAvailability(bookmarkToggleItem, true);
-          }}
-          style={styles.submitBtn}
-        >
-          Enable Bookmarking
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* ADMIN: Excel Checkmark Fields Modal */}
-{showCheckmarkFieldsModal && checkmarkFieldsItem && (
-  <div style={styles.modal} onClick={() => setShowCheckmarkFieldsModal(false)}>
-    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      <h3>Manage Checkmark Fields</h3>
-      <p style={{ marginTop: '10px', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-        <strong>{checkmarkFieldsItem.name}</strong>
-        <br />
-        Add custom checkmark columns that users can check/uncheck for each row.
-      </p>
-      
-      {checkmarkFields.length === 0 ? (
-        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-          No checkmark fields yet. Add one below.
-        </div>
-      ) : (
-        checkmarkFields.map((field, index) => (
-          <div key={index} style={{ 
-            display: 'flex', 
-            gap: '10px', 
-            marginBottom: '10px',
-            alignItems: 'center'
-          }}>
-            <input
-              type="text"
-              placeholder="Field Name (e.g., Complete)"
-              value={field.fieldName}
-              onChange={(e) => updateCheckmarkField(index, 'fieldName', e.target.value)}
-              style={{...styles.input, marginTop: 0, flex: 1}}
-            />
-            <input
-              type="text"
-              placeholder="Field ID (e.g., complete)"
-              value={field.fieldId}
-              onChange={(e) => updateCheckmarkField(index, 'fieldId', e.target.value)}
-              style={{...styles.input, marginTop: 0, flex: 1}}
-              disabled
-            />
-            <select
-      value={field.checkmarkType || 'checkbox'}
-      onChange={(e) => updateCheckmarkField(index, 'checkmarkType', e.target.value)}
-      style={{...styles.input, marginTop: 0, width: '140px'}}
-    >
-      {CHECKMARK_TYPES.map(type => {
-        const IconComponent = type.icon;
-        return (
-          <option key={type.id} value={type.id}>
-            {type.label}
-          </option>
-        );
-      })}
-    </select>
-            <button
-              onClick={() => removeCheckmarkField(index)}
-              style={{...styles.iconBtn, color: '#f44336'}}
-              title="Remove Field"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))
-      )}
-      
-      <button
-        onClick={addCheckmarkField}
-        style={{...styles.toolBtn, marginTop: '15px', width: '100%', justifyContent: 'center'}}
-      >
-        <span>+ Add Checkmark Field</span>
+      <button onClick={performSearch} className="fm-search-btn">
+        <Search size={16} />
       </button>
-      
-      <div style={styles.modalActions}>
-        <button
-          onClick={() => {
-            setShowCheckmarkFieldsModal(false);
-            setCheckmarkFieldsItem(null);
-          }}
-          style={styles.cancelBtn}
-        >
-          Cancel
+      {searchResults && (
+        <button onClick={() => setSearchResults(null)} className="fm-clear-btn">
+          <X size={16} />
         </button>
-        <button onClick={saveCheckmarkFields} style={styles.submitBtn}>
-          Save Fields
-        </button>
-      </div>
+      )}
     </div>
   </div>
-)}
-{showAccessModal && accessItem && (
-  <div style={styles.modal} onClick={() => setShowAccessModal(false)}>
-    <div style={{...styles.modalContent, minWidth: '600px'}} onClick={(e) => e.stopPropagation()}>
-      <h3>Access Control: {accessItem.name}</h3>
-      
-      <div style={{ marginTop: '20px' }}>
-        <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>
-          Access Level:
-        </label>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <label style={styles.radioLabel}>
-            <input
-              type="radio"
-              name="accessLevel"
-              value="public"
-              checked={accessLevel === 'public'}
-              onChange={(e) => setAccessLevel(e.target.value)}
-            />
-            <Unlock size={16} style={{ marginLeft: '8px', marginRight: '8px' }} />
-            <div>
-              <strong>Public</strong>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
-                Anyone can view and access this item
-              </p>
+
+  {/* Message */}
+  {message && (
+    <div className="fm-message">
+      {message}
+    </div>
+  )}
+
+  {/* Breadcrumb */}
+  {!searchResults && (
+    <div className="fm-breadcrumb">
+      {breadcrumb.map((crumb, idx) => (
+        <React.Fragment key={crumb.id || 'root'}>
+          <span
+            className={`fm-breadcrumb__item ${idx === breadcrumb.length - 1 ? 'fm-breadcrumb__item--active' : ''}`}
+            onClick={() => loadFolder(crumb.id)}
+          >
+            {idx === 0 ? <Home size={16} /> : crumb.name}
+          </span>
+          {idx < breadcrumb.length - 1 && <ChevronRight size={16} className="fm-breadcrumb__chevron" />}
+        </React.Fragment>
+      ))}
+    </div>
+  )}
+
+  {/* Toolbar */}
+  <div className="fm-toolbar">
+    <input
+      type="file"
+      id="fileInput"
+      className="fm-file-input"
+      onChange={(e) => uploadFile(e.target.files[0])}
+    />
+    
+    <button
+      onClick={() => document.getElementById('fileInput').click()}
+      className="fm-tool-btn"
+    >
+      <Upload size={16} />
+      <span>Upload File</span>
+    </button>
+
+    <button
+      onClick={() => setShowNewFolderModal(true)}
+      className="fm-tool-btn"
+    >
+      <FolderPlus size={16} />
+      <span>New Folder</span>
+    </button>
+
+    <button
+      onClick={() => setShowNewLinkModal(true)}
+      className="fm-tool-btn"
+    >
+      <LinkIcon size={16} />
+      <span>Add Link</span>
+    </button>
+
+    <input
+      type="file"
+      id="excelInput"
+      accept=".xlsx,.xls,.csv"
+      className="fm-file-input"
+      onChange={(e) => uploadExcelFile(e.target.files[0])}
+    />
+
+    <button
+      onClick={() => document.getElementById('excelInput').click()}
+      className="fm-tool-btn"
+    >
+      <FileSpreadsheet size={16} />
+      <span>Upload Excel</span>
+    </button>
+
+    <button
+      onClick={() => {
+        loadAccessRequests();
+        setShowAccessRequestsModal(true);
+      }}
+      className="fm-tool-btn fm-tool-btn--access"
+    >
+      <Shield size={16} />
+      <span>Access Requests</span>
+    </button>
+  </div>
+
+  {/* File Grid */}
+  <div className="fm-file-grid">
+    {searchResults ? (
+      <>
+        <h3 className="fm-section-title">Links ({searchResults.links?.length || 0})</h3>
+        {searchResults.links?.map(item => (
+          <div key={item._id} className="fm-file-item">
+            <LinkIcon size={40} className="fm-file-item__icon fm-file-item__icon--link" />
+            <div className="fm-file-item__name">{item.name}</div>
+            <div className="fm-file-item__link-url">{item.url}</div>
+            <div className="fm-file-item__path">{item.path}</div>
+            <div className="fm-file-item__actions">
+              <button 
+                onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
+                className="fm-icon-btn"
+                title="Open Link"
+              >
+                <ExternalLink size={16} />
+              </button>
             </div>
-          </label>
-          
-          <label style={styles.radioLabel}>
-            <input
-              type="radio"
-              name="accessLevel"
-              value="private"
-              checked={accessLevel === 'private'}
-              onChange={(e) => setAccessLevel(e.target.value)}
-            />
-            <Shield size={16} style={{ marginLeft: '8px', marginRight: '8px', color: '#FF9800' }} />
-            <div>
-              <strong>Private</strong>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
-                Requires authentication or special access link
-              </p>
+          </div>
+        ))}
+
+        <h3 className="fm-section-title">Excel Files ({searchResults.excels?.length || 0})</h3>
+        {searchResults.excels?.map(item => (
+          <div key={item._id} className="fm-file-item">
+            <FileSpreadsheet size={40} className="fm-file-item__icon fm-file-item__icon--excel" />
+            <div className="fm-file-item__name">{item.name}</div>
+            <div className="fm-file-item__path">{item.path}</div>
+            <div className="fm-file-item__actions">
+              <button onClick={() => loadExcelData(item)} className="fm-icon-btn">
+                <ExternalLink size={16} />
+              </button>
             </div>
-          </label>
-          
-          <label style={styles.radioLabel}>
-            <input
-              type="radio"
-              name="accessLevel"
-              value="locked"
-              checked={accessLevel === 'locked'}
-              onChange={(e) => setAccessLevel(e.target.value)}
-            />
-            <Lock size={16} style={{ marginLeft: '8px', marginRight: '8px', color: '#f44336' }} />
-            <div>
-              <strong>Locked</strong>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
-                Only metadata visible, no content access
-              </p>
+          </div>
+        ))}
+
+        <h3 className="fm-section-title">Files ({searchResults.files?.length || 0})</h3>
+        {searchResults.files?.map(item => (
+          <div key={item._id} className="fm-file-item">
+            <File size={40} className="fm-file-item__icon fm-file-item__icon--file" />
+            <div className="fm-file-item__name">{item.name}</div>
+            <div className="fm-file-item__path">{item.path}</div>
+            <div className="fm-file-item__actions">
+              <button onClick={() => downloadFile(item)} className="fm-icon-btn">
+                <Download size={16} />
+              </button>
             </div>
-          </label>
+          </div>
+        ))}
+      </>
+    ) : (
+      <>
+        {items.length === 0 ? (
+          <div className="fm-empty-state">
+            <Folder size={64} className="fm-empty-state__icon" />
+            <p>This folder is empty</p>
+            <p className="fm-empty-state__hint">Upload files or create folders to get started</p>
+          </div>
+        ) : (
+          items.map(item => (
+            <div
+              key={item._id}
+              className={`fm-file-item ${draggedItem?._id === item._id ? 'fm-file-item--dragging' : ''}`}
+              draggable={true}
+              onDragStart={(e) => handleDragStart(e, item)}
+              onDragOver={item.type === 'folder' ? handleDragOver : undefined}
+              onDrop={item.type === 'folder' ? (e) => handleDrop(e, item) : undefined}
+              onDoubleClick={() => {
+                if (item.type === 'folder') {
+                  loadFolder(item._id);
+                } else if (item.type === 'link') {
+                  window.open(item.url, '_blank', 'noopener,noreferrer');
+                } else if (item.type === 'excel') {
+                  loadExcelData(item);
+                }
+              }}
+            >
+              {item.type === 'folder' ? (
+                <Folder size={40} className="fm-file-item__icon fm-file-item__icon--folder" />
+              ) : item.type === 'link' ? (
+                <LinkIcon size={40} className="fm-file-item__icon fm-file-item__icon--link" />
+              ) : item.type === 'excel' ? (
+                <FileSpreadsheet size={40} className="fm-file-item__icon fm-file-item__icon--excel" />
+              ) : (
+                <File size={40} className="fm-file-item__icon fm-file-item__icon--file" />
+              )}
+
+              <div className="fm-file-item__name">{item.name}</div>
+              
+              {item.type === 'file' && (
+                <div className="fm-file-item__size">
+                  {(item.size / 1024).toFixed(2)} KB
+                </div>
+              )}
+
+              {item.type === 'link' && (
+                <div className="fm-file-item__link-url">{item.url}</div>
+              )}
+
+              {item.type === 'excel' && (
+                <div className="fm-file-item__size">
+                  {item.rowCount} rows • {item.columnCount} cols
+                </div>
+              )}
+
+              <div className="fm-file-item__actions">
+                {item.type === 'file' && (
+                  <button onClick={() => downloadFile(item)} className="fm-icon-btn" title="Download">
+                    <Download size={16} />
+                  </button>
+                )}
+                
+                {item.type === 'link' && (
+                  <button 
+                    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} 
+                    className="fm-icon-btn" 
+                    title="Open Link"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                )}
+
+                {item.type === 'excel' && (
+                  <button 
+                    onClick={() => loadExcelData(item)} 
+                    className="fm-icon-btn" 
+                    title="View Data"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setRenameItem(item);
+                    setRenameName(item.name);
+                    setShowRenameModal(true);
+                  }}
+                  className="fm-icon-btn"
+                  title="Rename"
+                >
+                  <Edit2 size={16} />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMoveItem(item);
+                    loadFolderTree();
+                    setShowMoveModal(true);
+                  }}
+                  className="fm-icon-btn"
+                  title="Move"
+                >
+                  <Move size={16} />
+                </button>
+
+                <button
+                  onClick={() => deleteItem(item)}
+                  className="fm-icon-btn fm-icon-btn--delete"
+                  title="Delete"
+                >
+                  <Trash2 size={16} />
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBookmarkToggleItem(item);
+                    setShowBookmarkToggleModal(true);
+                  }}
+                  className={`fm-icon-btn ${item.bookmarkEnabled ? 'fm-icon-btn--active' : ''}`}
+                  title={item.bookmarkEnabled ? 'Bookmarking Enabled' : 'Enable Bookmarking'}
+                >
+                  <Star size={16} fill={item.bookmarkEnabled ? 'currentColor' : 'none'} />
+                </button>
+
+                {item.type === 'excel' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCheckmarkFieldsItem(item);
+                      loadExcelCheckmarkFields(item._id);
+                      setShowCheckmarkFieldsModal(true);
+                    }}
+                    className="fm-icon-btn"
+                    title="Manage Checkmark Fields"
+                  >
+                    <CheckSquare size={16} />
+                  </button>
+                )}
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAccessItem(item);
+                    setAccessLevel(item.accessLevel || 'public');
+                    loadAccessSettings(item._id);
+                    setShowAccessModal(true);
+                  }}
+                  className={`fm-icon-btn fm-icon-btn--access ${item.accessLevel === 'locked' ? 'fm-icon-btn--locked' : item.accessLevel === 'private' ? 'fm-icon-btn--private' : ''}`}
+                  title={`Access: ${item.accessLevel || 'public'}`}
+                >
+                  {item.accessLevel === 'locked' ? <Lock size={16} /> : 
+                   item.accessLevel === 'private' ? <Shield size={16} /> : 
+                   <Unlock size={16} />}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </>
+    )}
+  </div>
+
+  {/* Modals */}
+  {showNewFolderModal && (
+    <div className="fm-modal" onClick={() => setShowNewFolderModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Create New Folder</h3>
+        <input
+          type="text"
+          placeholder="Folder name"
+          value={newFolderName}
+          onChange={(e) => setNewFolderName(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && createFolder()}
+          className="fm-input"
+          autoFocus
+        />
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowNewFolderModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+          <button onClick={createFolder} className="fm-submit-btn">
+            Create
+          </button>
         </div>
       </div>
+    </div>
+  )}
 
-      {accessLevel === 'private' && (
-        <div style={{ marginTop: '20px', padding: '15px', background: '#fff3cd', borderRadius: '6px' }}>
-          <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Private Access Links</h4>
+  {showRenameModal && (
+    <div className="fm-modal" onClick={() => setShowRenameModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Rename {renameItem?.type}</h3>
+        <input
+          type="text"
+          value={renameName}
+          onChange={(e) => setRenameName(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && renameItemFunc()}
+          className="fm-input"
+          autoFocus
+        />
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowRenameModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+          <button onClick={renameItemFunc} className="fm-submit-btn">
+            Rename
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {showMoveModal && (
+    <div className="fm-modal" onClick={() => setShowMoveModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Move {moveItem?.name}</h3>
+        <div className="fm-tree-container">
+          <div
+            className="fm-tree-item"
+            onClick={() => moveItemFunc(null)}
+          >
+            <Home size={16} />
+            <span className="fm-tree-item__name">Root</span>
+          </div>
+          {renderFolderTree(folderTree)}
+        </div>
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowMoveModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {showNewLinkModal && (
+    <div className="fm-modal" onClick={() => setShowNewLinkModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Add New Link</h3>
+        <input
+          type="text"
+          placeholder="Link name"
+          value={linkFormData.name}
+          onChange={(e) => setLinkFormData({...linkFormData, name: e.target.value})}
+          className="fm-input"
+          autoFocus
+        />
+        <input
+          type="url"
+          placeholder="https://example.com"
+          value={linkFormData.url}
+          onChange={(e) => setLinkFormData({...linkFormData, url: e.target.value})}
+          onKeyPress={(e) => e.key === 'Enter' && createLink()}
+          className="fm-input"
+        />
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowNewLinkModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+          <button onClick={createLink} className="fm-submit-btn">
+            Add Link
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {showBookmarkToggleModal && bookmarkToggleItem && (
+    <div className="fm-modal" onClick={() => setShowBookmarkToggleModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Bookmark Settings</h3>
+        <p className="fm-modal__item-name"><strong>{bookmarkToggleItem.name}</strong></p>
+        <p>
+          Current Status: {bookmarkToggleItem.bookmarkEnabled ? (
+            <span className="fm-status fm-status--enabled">Enabled</span>
+) : (
+<span className="fm-status fm-status--disabled">Disabled</span>
+)}
+</p>
+<p className="fm-modal__description">
+When enabled, users can bookmark this item for quick access.
+</p>
+<div className="fm-modal__actions">
+<button
+onClick={() => {
+toggleBookmarkAvailability(bookmarkToggleItem, false);
+}}
+className="fm-cancel-btn"
+>
+Disable Bookmarking
+</button>
+<button
+onClick={() => {
+toggleBookmarkAvailability(bookmarkToggleItem, true);
+}}
+className="fm-submit-btn"
+>
+Enable Bookmarking
+</button>
+</div>
+</div>
+</div>
+)}
+  {showCheckmarkFieldsModal && checkmarkFieldsItem && (
+    <div className="fm-modal" onClick={() => setShowCheckmarkFieldsModal(false)}>
+      <div className="fm-modal__content fm-modal__content--wide" onClick={(e) => e.stopPropagation()}>
+        <h3>Manage Checkmark Fields</h3>
+        <p className="fm-modal__description">
+          <strong>{checkmarkFieldsItem.name}</strong>
+          <br />
+          Add custom checkmark columns that users can check/uncheck for each row.
+        </p>
+        
+        {checkmarkFields.length === 0 ? (
+          <div className="fm-empty-fields">
+            No checkmark fields yet. Add one below.
+          </div>
+        ) : (
+          checkmarkFields.map((field, index) => (
+            <div key={index} className="fm-checkmark-field">
+              <input
+                type="text"
+                placeholder="Field Name (e.g., Complete)"
+                value={field.fieldName}
+                onChange={(e) => updateCheckmarkField(index, 'fieldName', e.target.value)}
+                className="fm-input fm-checkmark-field__input"
+              />
+              <input
+                type="text"
+                placeholder="Field ID (e.g., complete)"
+                value={field.fieldId}
+                onChange={(e) => updateCheckmarkField(index, 'fieldId', e.target.value)}
+                className="fm-input fm-checkmark-field__input"
+                disabled
+              />
+              <select
+                value={field.checkmarkType || 'checkbox'}
+                onChange={(e) => updateCheckmarkField(index, 'checkmarkType', e.target.value)}
+                className="fm-input fm-checkmark-field__select"
+              >
+                {CHECKMARK_TYPES.map(type => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => removeCheckmarkField(index)}
+                className="fm-icon-btn fm-icon-btn--delete"
+                title="Remove Field"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))
+        )}
+        
+        <button
+          onClick={addCheckmarkField}
+          className="fm-tool-btn fm-add-field-btn"
+        >
+          <span>+ Add Checkmark Field</span>
+        </button>
+        
+        <div className="fm-modal__actions">
+          <button
+            onClick={() => {
+              setShowCheckmarkFieldsModal(false);
+              setCheckmarkFieldsItem(null);
+            }}
+            className="fm-cancel-btn"
+          >
+            Cancel
+          </button>
+          <button onClick={saveCheckmarkFields} className="fm-submit-btn">
+            Save Fields
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {showAccessModal && accessItem && (
+    <div className="fm-modal" onClick={() => setShowAccessModal(false)}>
+      <div className="fm-modal__content fm-modal__content--wide" onClick={(e) => e.stopPropagation()}>
+        <h3>Access Control: {accessItem.name}</h3>
+        
+        <div className="fm-access-section">
+          <label className="fm-access-label">Access Level:</label>
           
-          {generatedLinks.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#666', margin: '10px 0' }}>
-              No access links generated yet
-            </p>
-          ) : (
-            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-              {generatedLinks.map((link, idx) => (
-                <div key={idx} style={{
-                  padding: '10px',
-                  background: 'white',
-                  borderRadius: '4px',
-                  marginBottom: '8px',
-                  fontSize: '12px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontFamily: 'monospace', fontSize: '11px', color: '#666' }}>
+          <div className="fm-access-options">
+            <label className="fm-radio-label">
+              <input
+                type="radio"
+                name="accessLevel"
+                value="public"
+                checked={accessLevel === 'public'}
+                onChange={(e) => setAccessLevel(e.target.value)}
+              />
+              <Unlock size={16} className="fm-radio-label__icon" />
+              <div className="fm-radio-label__content">
+                <strong>Public</strong>
+                <p className="fm-radio-label__description">
+                  Anyone can view and access this item
+                </p>
+              </div>
+            </label>
+            
+            <label className="fm-radio-label">
+              <input
+                type="radio"
+                name="accessLevel"
+                value="private"
+                checked={accessLevel === 'private'}
+                onChange={(e) => setAccessLevel(e.target.value)}
+              />
+              <Shield size={16} className="fm-radio-label__icon fm-radio-label__icon--private" />
+              <div className="fm-radio-label__content">
+                <strong>Private</strong>
+                <p className="fm-radio-label__description">
+                  Requires authentication or special access link
+                </p>
+              </div>
+            </label>
+            
+            <label className="fm-radio-label">
+              <input
+                type="radio"
+                name="accessLevel"
+                value="locked"
+                checked={accessLevel === 'locked'}
+                onChange={(e) => setAccessLevel(e.target.value)}
+              />
+              <Lock size={16} className="fm-radio-label__icon fm-radio-label__icon--locked" />
+              <div className="fm-radio-label__content">
+                <strong>Locked</strong>
+                <p className="fm-radio-label__description">
+                  Only metadata visible, no content access
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {accessLevel === 'private' && (
+          <div className="fm-access-links-section">
+            <h4 className="fm-access-links-title">Private Access Links</h4>
+            
+            {generatedLinks.length === 0 ? (
+              <p className="fm-access-links-empty">
+                No access links generated yet
+              </p>
+            ) : (
+              <div className="fm-access-links-list">
+                {generatedLinks.map((link, idx) => (
+                  <div key={idx} className="fm-access-link">
+                    <div className="fm-access-link__content">
+                      <div className="fm-access-link__url">
                         {link.accessUrl?.substring(0, 50)}...
                       </div>
-                      <div style={{ marginTop: '4px', color: '#999' }}>
+                      <div className="fm-access-link__meta">
                         Uses: {link.accessCount} | 
                         Expires: {link.expiresAt ? new Date(link.expiresAt).toLocaleString() : 'Never'} |
                         Status: {link.isActive ? '✓ Active' : '✗ Revoked'}
                       </div>
                     </div>
                     <button
+                      onClick={() => copyToClipboard(link.accessUrl, link.linkId)}
+                      className={`fm-copy-btn ${copiedLinkId === link.linkId ? 'fm-copy-btn--copied' : ''}`}
+                      title="Copy link to clipboard"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
                       onClick={() => revokePrivateLink(accessItem._id, link.linkId)}
-                      style={{...styles.iconBtn, color: '#f44336'}}
+                      className="fm-icon-btn fm-icon-btn--delete"
                       disabled={!link.isActive}
                     >
                       <X size={14} />
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <button
-            onClick={() => {
-              setGenerateLinkItem(accessItem);
-              setShowGenerateLinkModal(true);
-            }}
-            style={{...styles.toolBtn, marginTop: '10px', width: '100%', justifyContent: 'center'}}
+                ))}
+              </div>
+            )}
+            
+            <button
+              onClick={() => {
+                setGenerateLinkItem(accessItem);
+                setShowGenerateLinkModal(true);
+              }}
+              className="fm-tool-btn fm-generate-link-btn"
+            >
+              <Link2 size={16} />
+              <span>Generate New Link</span>
+            </button>
+          </div>
+        )}
+
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowAccessModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+          <button 
+            onClick={() => setDocumentAccessLevel(accessItem, accessLevel)}
+            className="fm-submit-btn"
           >
-            <Link2 size={16} />
-            <span>Generate New Link</span>
+            Save Access Level
           </button>
         </div>
-      )}
+      </div>
+    </div>
+  )}
 
-      <div style={styles.modalActions}>
-        <button onClick={() => setShowAccessModal(false)} style={styles.cancelBtn}>
-          Cancel
-        </button>
-        <button 
-          onClick={() => setDocumentAccessLevel(accessItem, accessLevel)}
-          style={styles.submitBtn}
-        >
-          Save Access Level
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{/* Generate Private Link Modal */}
-{showGenerateLinkModal && generateLinkItem && (
-  <div style={styles.modal} onClick={() => setShowGenerateLinkModal(false)}>
-    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-      <h3>Generate Private Access Link</h3>
-      <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-        Create a shareable link for: <strong>{generateLinkItem.name}</strong>
-      </p>
-      
-      <label style={{ display: 'block', marginTop: '20px', fontWeight: '600' }}>
-        Link Expiry (hours):
-      </label>
-      <input
-        type="number"
-        value={linkExpiry}
-        onChange={(e) => setLinkExpiry(e.target.value)}
-        style={styles.input}
-        placeholder="24"
-        min="1"
-      />
-      <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-        Leave blank for no expiry
-      </p>
-      
-      <label style={{ display: 'block', marginTop: '15px', fontWeight: '600' }}>
-        Max Access Count (optional):
-      </label>
-      <input
-        type="number"
-        value={maxAccessCount}
-        onChange={(e) => setMaxAccessCount(e.target.value)}
-        style={styles.input}
-        placeholder="Leave empty for unlimited"
-        min="1"
-      />
-      
-      <div style={styles.modalActions}>
-        <button onClick={() => setShowGenerateLinkModal(false)} style={styles.cancelBtn}>
-          Cancel
-        </button>
-        <button onClick={generatePrivateLink} style={styles.submitBtn}>
-          Generate Link
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{/* Access Requests Modal */}
-{showAccessRequestsModal && (
-  <div style={styles.modal} onClick={() => setShowAccessRequestsModal(false)}>
-    <div style={{...styles.modalContent, minWidth: '700px', maxWidth: '900px'}} onClick={(e) => e.stopPropagation()}>
-      <h3>Access Requests</h3>
-      
-      <div style={{ display: 'flex', gap: '10px', marginTop: '15px', marginBottom: '15px' }}>
-        <button
-          onClick={() => loadAccessRequests('pending')}
-          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
-        >
-          Pending
-        </button>
-        <button
-          onClick={() => loadAccessRequests('approved')}
-          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
-        >
-          Approved
-        </button>
-        <button
-          onClick={() => loadAccessRequests('rejected')}
-          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
-        >
-          Rejected
-        </button>
-      </div>
-      
-      {accessRequests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-          No access requests found
+  {showGenerateLinkModal && generateLinkItem && (
+    <div className="fm-modal" onClick={() => setShowGenerateLinkModal(false)}>
+      <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+        <h3>Generate Private Access Link</h3>
+        <p className="fm-modal__description">
+          Create a shareable link for: <strong>{generateLinkItem.name}</strong>
+        </p>
+        
+        <label className="fm-form-label">
+          Link Expiry (hours):
+        </label>
+        <input
+          type="number"
+          value={linkExpiry}
+          onChange={(e) => setLinkExpiry(e.target.value)}
+          className="fm-input"
+          placeholder="24"
+          min="1"
+        />
+        <p className="fm-form-hint">
+          Leave blank for no expiry
+        </p>
+        
+        <label className="fm-form-label">
+          Max Access Count (optional):
+        </label>
+        <input
+          type="number"
+          value={maxAccessCount}
+          onChange={(e) => setMaxAccessCount(e.target.value)}
+          className="fm-input"
+          placeholder="Leave empty for unlimited"
+          min="1"
+        />
+        
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowGenerateLinkModal(false)} className="fm-cancel-btn">
+            Cancel
+          </button>
+          <button onClick={generatePrivateLink} className="fm-submit-btn">
+            Generate Link
+          </button>
         </div>
-      ) : (
-        <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-          {accessRequests.map((request) => (
-            <div key={request._id} style={{
-              padding: '15px',
-              background: '#f8f9fa',
-              borderRadius: '6px',
-              marginBottom: '10px',
-              border: request.status === 'pending' ? '2px solid #FF9800' : '1px solid #e0e0e0'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div>
-                  <strong>{request.userName}</strong>
-                  <span style={{ marginLeft: '10px', color: '#666', fontSize: '13px' }}>
-                    {request.userEmail}
-                  </span>
-                </div>
-                <div style={{
-                  padding: '4px 12px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  background: request.status === 'pending' ? '#fff3cd' :
-                             request.status === 'approved' ? '#d4edda' : '#f8d7da',
-                  color: request.status === 'pending' ? '#856404' :
-                         request.status === 'approved' ? '#155724' : '#721c24'
-                }}>
-                  {request.status.toUpperCase()}
-                </div>
-              </div>
-              
-              <div style={{ fontSize: '14px', marginBottom: '8px' }}>
-                <strong>Document:</strong> {request.documentId?.name || 'N/A'}
-              </div>
-              
-              <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
-                <strong>Message:</strong>
-                <p style={{
-                  margin: '5px 0 0 0',
-                  padding: '10px',
-                  background: 'white',
-                  borderRadius: '4px',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  {request.requestMessage}
-                </p>
-              </div>
-              
-              <div style={{ fontSize: '12px', color: '#999' }}>
-                Requested: {new Date(request.requestedAt).toLocaleString()}
-              </div>
-              
-              {request.status === 'pending' && (
-                <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                  <button
-                    onClick={() => {
-                      const response = prompt('Admin message (optional):');
-                      if (response !== null) {
-                        approveAccessRequest(request._id, 720, response);
-                      }
-                    }}
-                    style={{...styles.submitBtn, flex: 1}}
-                  >
-                    Approve (30 days)
-                  </button>
-                  <button
-                    onClick={() => {
-                      const response = prompt('Rejection reason (optional):');
-                      if (response !== null) {
-                        rejectAccessRequest(request._id, response);
-                      }
-                    }}
-                    style={{...styles.cancelBtn, flex: 1, background: '#f44336', color: 'white'}}
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-              
-              {request.accessLink && (
-                <div style={{ marginTop: '10px', padding: '10px', background: 'white', borderRadius: '4px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '5px' }}>
-                    Access Link Generated:
+      </div>
+    </div>
+  )}
+
+  {showAccessRequestsModal && (
+    <div className="fm-modal" onClick={() => setShowAccessRequestsModal(false)}>
+      <div className="fm-modal__content fm-modal__content--extra-wide" onClick={(e) => e.stopPropagation()}>
+        <h3>Access Requests</h3>
+        
+        <div className="fm-request-filters">
+          <button
+            onClick={() => loadAccessRequests('pending')}
+            className="fm-tool-btn"
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => loadAccessRequests('approved')}
+            className="fm-tool-btn"
+          >
+            Approved
+          </button>
+          <button
+            onClick={() => loadAccessRequests('rejected')}
+            className="fm-tool-btn"
+          >
+            Rejected
+          </button>
+        </div>
+        
+        {accessRequests.length === 0 ? (
+          <div className="fm-no-requests">
+            No access requests found
+          </div>
+        ) : (
+          <div className="fm-requests-list">
+            {accessRequests.map((request) => (
+              <div key={request._id} className={`fm-request ${request.status === 'pending' ? 'fm-request--pending' : ''}`}>
+                <div className="fm-request__header">
+                  <div>
+                    <strong>{request.userName}</strong>
+                    <span className="fm-request__email">
+                      {request.userEmail}
+                    </span>
                   </div>
-                  <div style={{
-                    fontSize: '11px',
-                    fontFamily: 'monospace',
-                    color: '#2196F3',
-                    wordBreak: 'break-all'
-                  }}>
-                    {request.accessLink}
+                  <div className={`fm-request__status fm-request__status--${request.status}`}>
+                    {request.status.toUpperCase()}
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
+                
+                <div className="fm-request__field">
+                  <strong>Document:</strong> {request.documentId?.name || 'N/A'}
+                </div>
+                
+                <div className="fm-request__message">
+                  <strong>Message:</strong>
+                  <p>{request.requestMessage}</p>
+                </div>
+                
+                <div className="fm-request__date">
+                  Requested: {new Date(request.requestedAt).toLocaleString()}
+                </div>
+                
+                {request.status === 'pending' && (
+                  <div className="fm-request__actions">
+                    <button
+                      onClick={() => {
+                        const response = prompt('Admin message (optional):');
+                        if (response !== null) {
+                          approveAccessRequest(request._id, 720, response);
+                        }
+                      }}
+                      className="fm-submit-btn"
+                    >
+                      Approve (30 days)
+                    </button>
+                    <button
+                      onClick={() => {
+                        const response = prompt('Rejection reason (optional):');
+                        if (response !== null) {
+                          rejectAccessRequest(request._id, response);
+                        }
+                      }}
+                      className="fm-cancel-btn fm-cancel-btn--reject"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+                
+                {request.accessLink && (
+                  <div className="fm-request__link">
+                    <div className="fm-request__link-label">
+                      Access Link Generated:
+                    </div>
+                    <div className="fm-request__link-value">
+                      {request.accessLink}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="fm-modal__actions">
+          <button onClick={() => setShowAccessRequestsModal(false)} className="fm-cancel-btn">
+            Close
+          </button>
         </div>
-      )}
-      
-      <div style={styles.modalActions}>
-        <button onClick={() => setShowAccessRequestsModal(false)} style={styles.cancelBtn}>
-          Close
-        </button>
       </div>
     </div>
-  </div>
-)}
-    </div>
-  );
+  )}
+</div>
+);
 }
-
-const styles = {
- 
-radioLabel: {
-  display: 'flex',
-  alignItems: 'flex-start',
-  padding: '12px',
-  border: '1px solid #e0e0e0',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  transition: 'all 0.2s'
-},
-  container: {
-    width: '100%',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    margintop: '50px',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-    background: '#f5f5f5',
-    minHeight: '100vh'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-  },
-  headerLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px'
-  },
-  title: {
-    margin: 0,
-    fontSize: '24px'
-  },
-  searchBar: {
-    display: 'flex',
-    gap: '5px'
-  },
-  searchInput: {
-    padding: '8px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    width: '300px',
-    fontSize: '14px'
-  },
-  searchBtn: {
-    padding: '8px 12px',
-    background: '#2196F3',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center'
-  },
-  clearBtn: {
-    padding: '8px 12px',
-    background: '#f44336',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center'
-  },
-  message: {
-    padding: '12px',
-    background: '#4CAF50',
-    color: 'white',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    textAlign: 'center'
-  },
-  breadcrumb: {
-    display: 'flex',
-    alignItems: 'center',
-    background: 'white',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    marginBottom: '20px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-  },
-  crumbItem: {
-    cursor: 'pointer',
-    color: '#2196F3',
-    display: 'flex',
-    alignItems: 'center'
-  },
-  chevron: {
-    margin: '0 8px',
-    color: '#999'
-  },
-  toolbar: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '20px'
-  },
-  toolBtn: {
-    padding: '10px 16px',
-    background: 'white',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.2s'
-  },
-  fileGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: '20px'
-  },
-  fileItem: {
-    background: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    textAlign: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    position: 'relative'
-  },
-  fileName: {
-    marginTop: '12px',
-    fontSize: '14px',
-    fontWeight: '500',
-    wordBreak: 'break-word'
-  },
-  filePath: {
-    fontSize: '12px',
-    color: '#999',
-    marginTop: '4px'
-  },
-  fileSize: {
-    fontSize: '12px',
-    color: '#666',
-    marginTop: '4px'
-  },
-  fileActions: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '8px',
-    marginTop: '12px'
-  },
-  iconBtn: {
-    padding: '6px',
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#666',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    transition: 'all 0.2s'
-  },
-  emptyState: {
-    gridColumn: '1 / -1',
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: '#999'
-  },
-  emptyHint: {
-    fontSize: '14px',
-    marginTop: '10px'
-  },
-  sectionTitle: {
-    gridColumn: '1 / -1',
-    fontSize: '18px',
-    fontWeight: '600',
-    marginTop: '20px',
-    marginBottom: '10px'
-  },
-  modal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  },
-  modalContent: {
-    background: 'white',
-    padding: '30px',
-    borderRadius: '8px',
-    minWidth: '400px',
-    maxWidth: '600px',
-    maxHeight: '80vh',
-    overflow: 'auto'
-  },
-  input: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    marginTop: '15px',
-    boxSizing: 'border-box'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '20px'
-  },
-  cancelBtn: {
-    padding: '10px 20px',
-    background: '#f5f5f5',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  },
-  submitBtn: {
-    padding: '10px 20px',
-    background: '#2196F3',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  },
-  treeContainer: {
-    marginTop: '15px',
-    maxHeight: '300px',
-    overflow: 'auto',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    padding: '10px'
-  },
-  treeItem: {
-    padding: '8px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    borderRadius: '4px',
-    transition: 'background 0.2s'
-  },
-  linkUrl: {
-  fontSize: '11px',
-  color: '#9C27B0',
-  marginTop: '4px',
-  wordBreak: 'break-all',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
-},
-excelViewContainer: {
-  background: 'white',
-  borderRadius: '8px',
-  padding: '20px',
-  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-},
-excelHeader: {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '20px',
-  marginBottom: '20px',
-  paddingBottom: '15px',
-  borderBottom: '2px solid #f0f0f0'
-},
-backBtn: {
-  padding: '8px 16px',
-  background: '#f5f5f5',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  fontSize: '14px',
-  fontWeight: '500',
-  transition: 'all 0.2s'
-},
-excelTitle: {
-  margin: 0,
-  fontSize: '20px',
-  fontWeight: '600',
-  display: 'flex',
-  alignItems: 'center'
-},
-sheetTabs: {
-  display: 'flex',
-  gap: '8px',
-  marginBottom: '15px',
-  borderBottom: '1px solid #e0e0e0',
-  paddingBottom: '10px'
-},
-sheetTab: {
-  padding: '8px 16px',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '2px solid transparent',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500',
-  color: '#666',
-  transition: 'all 0.2s'
-},
-activeSheetTab: {
-  color: '#2196F3',
-  borderBottomColor: '#2196F3'
-},
-excelInfo: {
-  display: 'flex',
-  gap: '20px',
-  padding: '12px',
-  background: '#f8f9fa',
-  borderRadius: '6px',
-  marginBottom: '15px',
-  fontSize: '14px',
-  color: '#666'
-},
-tableWrapper: {
-  overflowX: 'auto',
-  overflowY: 'auto',
-  maxHeight: '600px',
-  border: '1px solid #e0e0e0',
-  borderRadius: '6px'
-},
-table: {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '14px'
-},
-tableHeader: {
-  background: '#f8f9fa',
-  padding: '12px',
-  textAlign: 'left',
-  fontWeight: '600',
-  borderBottom: '2px solid #e0e0e0',
-  position: 'sticky',
-  top: 0,
-  zIndex: 10,
-  whiteSpace: 'nowrap'
-},
-tableRow: {
-  borderBottom: '1px solid #f0f0f0',
-  transition: 'background 0.2s'
-},
-tableCell: {
-  padding: '12px',
-  borderRight: '1px solid #f0f0f0',
-  whiteSpace: 'nowrap',
-  maxWidth: '300px',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis'
-},
-tableLink: {
-  color: '#2196F3',
-  textDecoration: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px'
-},
-// Add to existing styles object
-editToolbar: {
-  display: 'flex',
-  gap: '10px',
-  padding: '12px',
-  background: '#f8f9fa',
-  borderRadius: '6px',
-  marginBottom: '15px',
-  alignItems: 'center'
-},
-editBtn: {
-  padding: '8px 16px',
-  background: '#2196F3',
-  color: 'white',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '13px',
-  fontWeight: '500',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  transition: 'background 0.2s'
-},
-editHint: {
-  marginLeft: 'auto',
-  fontSize: '12px',
-  color: '#666',
-  fontStyle: 'italic'
-},
-selectedCell: {
-  background: '#bbdefb',
-  outline: '2px solid #2196F3',
-  outlineOffset: '-2px'
-},
-cellInput: {
-  width: '100%',
-  padding: '6px 8px',
-  border: '2px solid #2196F3',
-  borderRadius: '3px',
-  fontSize: '14px',
-  background: 'white',
-  outline: 'none',
-  boxSizing: 'border-box'
-},
-headerEditContainer: {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '8px'
-},
-editableHeader: {
-  cursor: 'pointer',
-  padding: '4px',
-  borderRadius: '3px',
-  flex: 1,
-  transition: 'background 0.2s'
-},
-headerInput: {
-  width: '100%',
-  padding: '6px 8px',
-  border: '2px solid #2196F3',
-  borderRadius: '3px',
-  fontSize: '13px',
-  fontWeight: '600',
-  background: 'white',
-  outline: 'none'
-},
-miniDeleteBtn: {
-  padding: '3px',
-  background: 'transparent',
-  border: 'none',
-  cursor: 'pointer',
-  color: '#f44336',
-  borderRadius: '3px',
-  display: 'flex',
-  alignItems: 'center',
-  transition: 'background 0.2s'
-},
-rowDeleteBtn: {
-  padding: '4px',
-  background: 'transparent',
-  border: '1px solid #f44336',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  color: '#f44336',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  transition: 'all 0.2s'
-}
-};
