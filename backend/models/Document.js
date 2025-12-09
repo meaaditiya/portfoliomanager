@@ -162,43 +162,49 @@ DocumentSchema.methods.getFullPath = async function() {
 
 DocumentSchema.methods.hasAccess = async function(userId, linkId = null) {
   
-  if (this.accessLevel === 'public') return true;
-  
-  
-  if (this.accessLevel === 'locked') return false;
-  
-  
-  
-  
-  if (linkId) {
-    const link = this.privateAccessLinks.find(l => 
-      l.linkId === linkId && 
-      l.isActive && 
-      (!l.expiresAt || l.expiresAt > new Date()) &&
-      (!l.maxAccessCount || l.accessCount < l.maxAccessCount)
-    );
-    if (link) return true;
-  }
-  
-  
-  if (userId) {
-    const granted = this.grantedUsers.find(g => 
-      g.userId.toString() === userId.toString()
-    );
-    if (granted) return true;
-  }
-  
-  
-  if (this.inheritParentAccess && this.parent) {
-    const parentDoc = await mongoose.model("Document").findById(this.parent);
-    if (parentDoc) {
-      return await parentDoc.hasAccess(userId, linkId);
-    }
-  }
-  
-  return false;
-};
+  const checkAncestorAccess = async (docId) => {
+    const doc = await mongoose.model("Document").findById(docId);
+    if (!doc) return { allowed: false, reason: 'Document not found' };
 
+    if (doc.accessLevel === 'locked') {
+      return { allowed: false, reason: 'Document or parent folder is locked' };
+    }
+
+    if (doc.accessLevel === 'private') {
+      let hasPrivateAccess = false;
+
+      if (linkId) {
+        const link = doc.privateAccessLinks.find(l => 
+          l.linkId === linkId && 
+          l.isActive && 
+          (!l.expiresAt || l.expiresAt > new Date()) &&
+          (!l.maxAccessCount || l.accessCount < l.maxAccessCount)
+        );
+        if (link) hasPrivateAccess = true;
+      }
+
+      if (!hasPrivateAccess && userId) {
+        const granted = doc.grantedUsers.find(g => 
+          g.userId.toString() === userId.toString()
+        );
+        if (granted) hasPrivateAccess = true;
+      }
+
+      if (!hasPrivateAccess) {
+        return { allowed: false, reason: 'Document or parent folder is private' };
+      }
+    }
+
+    if (doc.parent) {
+      return await checkAncestorAccess(doc.parent);
+    }
+
+    return { allowed: true };
+  };
+
+  const result = await checkAncestorAccess(this._id);
+  return result.allowed;
+};
 
 DocumentSchema.pre("save", async function(next) {
   if (this.isModified("parent") || this.isModified("name")) {

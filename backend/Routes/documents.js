@@ -35,7 +35,55 @@ const optionalAuth = (req, res, next) => {
   }
   next();
 };
+const checkFullPathAccess = async (documentId, userId, linkId = null) => {
+  const doc = await Document.findById(documentId);
+  if (!doc) return { hasAccess: false, reason: 'Document not found' };
 
+  const path = [];
+  let current = doc;
+  
+  while (current) {
+    path.unshift(current);
+    if (current.parent) {
+      current = await Document.findById(current.parent);
+    } else {
+      current = null;
+    }
+  }
+
+  for (const ancestor of path) {
+    if (ancestor.accessLevel === 'locked') {
+      return { hasAccess: false, reason: 'Parent folder is locked', lockedItem: ancestor.name };
+    }
+
+    if (ancestor.accessLevel === 'private') {
+      let ancestorHasAccess = false;
+
+      if (linkId) {
+        const link = ancestor.privateAccessLinks.find(l => 
+          l.linkId === linkId && 
+          l.isActive && 
+          (!l.expiresAt || l.expiresAt > new Date()) &&
+          (!l.maxAccessCount || l.accessCount < l.maxAccessCount)
+        );
+        if (link) ancestorHasAccess = true;
+      }
+
+      if (!ancestorHasAccess && userId) {
+        const granted = ancestor.grantedUsers.find(g => 
+          g.userId.toString() === userId.toString()
+        );
+        if (granted) ancestorHasAccess = true;
+      }
+
+      if (!ancestorHasAccess) {
+        return { hasAccess: false, reason: 'Parent folder is private', privateItem: ancestor.name };
+      }
+    }
+  }
+
+  return { hasAccess: true };
+};
 router.post("/api/admin/excel/upload", authenticateToken, multer.single("file"), async (req, res) => {
   try {
     const file = req.file;
@@ -343,37 +391,22 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
 
     const userIdString = req.user ? String(req.user.id) : null;
     
-    // Check access
-    const hasAccess = await doc.hasAccess(userIdString, key);
+    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key);
 
-    // If locked, return only metadata
-    if (doc.accessLevel === 'locked') {
-      return res.json({
-        id: doc._id,
-        name: doc.name,
-        type: doc.type,
-        size: doc.size,
-        accessLevel: 'locked',
-        message: 'This document is locked. Only metadata is available.',
-        canRequestAccess: true
-      });
-    }
-
-    // If no access to private document
-    if (!hasAccess) {
+    if (!accessCheck.hasAccess) {
       return res.status(403).json({
-        message: 'Access denied. This document is private.',
+        message: accessCheck.reason,
         documentInfo: {
           id: doc._id,
           name: doc.name,
           type: doc.type,
           size: doc.size
         },
-        canRequestAccess: true
+        canRequestAccess: true,
+        details: accessCheck.lockedItem || accessCheck.privateItem
       });
     }
 
-    // Increment link access count if using private link
     if (key) {
       const link = doc.privateAccessLinks.find(l => l.linkId === key);
       if (link && link.isActive) {
@@ -382,7 +415,6 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
       }
     }
 
-    // Return full data
     const response = {
       id: doc._id,
       name: doc.name,
@@ -406,29 +438,18 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
   }
 });
 
-// GET Folder Contents - Updated with access control
 router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
-    const { parentId, key } = req.query; // key for private folder access
+    const { parentId, key } = req.query;
+    const userIdString = req.user ? String(req.user.id) : null;
 
-    // Check if accessing a specific folder
     if (parentId) {
-      const folder = await Document.findById(parentId);
-      if (!folder) {
-        return res.status(404).json({ message: "Folder not found" });
-      }
-
-      const userIdString = req.user ? String(req.user.id) : null;
-      const hasAccess = await folder.hasAccess(userIdString, key);
-
-      if (!hasAccess) {
+      const accessCheck = await checkFullPathAccess(parentId, userIdString, key);
+      
+      if (!accessCheck.hasAccess) {
         return res.status(403).json({
-          message: 'Access denied to this folder',
-          folderInfo: {
-            id: folder._id,
-            name: folder.name,
-            type: folder.type
-          },
+          message: accessCheck.reason,
+          details: accessCheck.lockedItem || accessCheck.privateItem,
           canRequestAccess: true
         });
       }
@@ -446,48 +467,29 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
         .select("-embedding -jsonData -rowCheckmarks");
     }
 
-    const userIdString = req.user ? String(req.user.id) : null;
-
-    // Filter items based on access and format response
     const itemsWithAccess = await Promise.all(items.map(async (item) => {
       const itemObj = item.toObject();
       
-      // Check if user has access to this item
-      const hasItemAccess = await item.hasAccess(userIdString, key);
+      const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key);
       
       const isBookmarked = req.user 
         ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
         : false;
 
-      // For locked items, return limited info
-      if (item.accessLevel === 'locked') {
+      if (!itemAccessCheck.hasAccess) {
         return {
           _id: itemObj._id,
           name: itemObj.name,
           type: itemObj.type,
           size: itemObj.size,
-          accessLevel: 'locked',
+          accessLevel: item.accessLevel,
           createdAt: itemObj.createdAt,
           hasAccess: false,
-          canRequestAccess: true
+          canRequestAccess: true,
+          accessDeniedReason: itemAccessCheck.reason
         };
       }
 
-      // For private items without access, return limited info
-      if (item.accessLevel === 'private' && !hasItemAccess) {
-        return {
-          _id: itemObj._id,
-          name: itemObj.name,
-          type: itemObj.type,
-          size: itemObj.size,
-          accessLevel: 'private',
-          createdAt: itemObj.createdAt,
-          hasAccess: false,
-          canRequestAccess: true
-        };
-      }
-
-      // User has access, return full info
       return {
         ...itemObj,
         isBookmarked,
@@ -512,7 +514,8 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   }
 });
 
-// GET Item Details - Updated with access control
+
+
 router.get("/api/item/:id", optionalAuth, async (req, res) => {
   try {
     const { key } = req.query;
@@ -524,32 +527,16 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
     if (!item) return res.status(404).json({ message: "Not found" });
 
     const userIdString = req.user ? String(req.user.id) : null;
-    const hasAccess = await item.hasAccess(userIdString, key);
+    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key);
 
     const itemObj = item.toObject();
     const isBookmarked = req.user 
       ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
       : false;
 
-    // Locked document - return only metadata
-    if (item.accessLevel === 'locked') {
-      return res.json({
-        _id: itemObj._id,
-        name: itemObj.name,
-        type: itemObj.type,
-        size: itemObj.size,
-        createdAt: itemObj.createdAt,
-        accessLevel: 'locked',
-        hasAccess: false,
-        canRequestAccess: true,
-        message: 'This document is locked'
-      });
-    }
-
-    // Private document without access
-    if (!hasAccess) {
+    if (!accessCheck.hasAccess) {
       return res.status(403).json({
-        message: 'Access denied',
+        message: accessCheck.reason,
         documentInfo: {
           id: itemObj._id,
           name: itemObj.name,
@@ -557,11 +544,11 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
           size: itemObj.size,
           accessLevel: item.accessLevel
         },
-        canRequestAccess: true
+        canRequestAccess: true,
+        details: accessCheck.lockedItem || accessCheck.privateItem
       });
     }
 
-    // User has access - return full details
     const response = {
       ...itemObj,
       isBookmarked,
@@ -585,7 +572,6 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
   }
 });
 
-// GET Download Link - Updated with access control
 router.get("/api/download/:id", async (req, res) => {
   try {
     const { key, userId } = req.query;
@@ -596,18 +582,12 @@ router.get("/api/download/:id", async (req, res) => {
       return res.status(400).json({ message: "Cannot download this item type" });
     }
 
-    // Check access
-    const hasAccess = await doc.hasAccess(userId, key);
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, key);
 
-    if (doc.accessLevel === 'locked') {
+    if (!accessCheck.hasAccess) {
       return res.status(403).json({ 
-        message: "This document is locked and cannot be downloaded" 
-      });
-    }
-
-    if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied. You don't have permission to download this file." 
+        message: accessCheck.reason,
+        details: accessCheck.lockedItem || accessCheck.privateItem
       });
     }
 
@@ -618,7 +598,6 @@ router.get("/api/download/:id", async (req, res) => {
       expires: Date.now() + 30 * 60 * 1000
     });
 
-    // Increment link access count if using private link
     if (key) {
       const link = doc.privateAccessLinks.find(l => l.linkId === key);
       if (link && link.isActive) {
@@ -634,7 +613,6 @@ router.get("/api/download/:id", async (req, res) => {
   }
 });
 
-// GET Search - Updated with access control
 router.get("/api/search", optionalAuth, async (req, res) => {
   try {
     const startTime = Date.now();
@@ -642,11 +620,24 @@ router.get("/api/search", optionalAuth, async (req, res) => {
       q, 
       parentId,  
       limit = 10,
-      key // Private access key for folder search
+      key
     } = req.query;
     
     if (!q || q.trim().length === 0) {
       return res.status(400).json({ message: "Query missing" });
+    }
+
+    const userIdString = req.user ? String(req.user.id) : null;
+
+    if (parentId) {
+      const accessCheck = await checkFullPathAccess(parentId, userIdString, key);
+      
+      if (!accessCheck.hasAccess) {
+        return res.status(403).json({
+          message: accessCheck.reason,
+          details: accessCheck.lockedItem || accessCheck.privateItem
+        });
+      }
     }
 
     const normalizedQuery = q.trim();
@@ -732,23 +723,17 @@ router.get("/api/search", optionalAuth, async (req, res) => {
 
     merged.sort((a, b) => b.fusedScore - a.fusedScore);
     const topResults = merged.slice(0, limitNum);
-
-    const userIdString = req.user ? String(req.user.id) : null;
     
-    // Filter results based on access and format response
     const results = await Promise.all(topResults.map(async (item) => {
       const doc = item.doc;
       
-      // Convert to Document model instance for hasAccess method
-      const docInstance = new Document(doc);
-      const hasAccess = await docInstance.hasAccess(userIdString, key);
+      const accessCheck = await checkFullPathAccess(doc._id, userIdString, key);
       
       const isBookmarked = userIdString 
         ? doc.bookmarks?.some(b => String(b.userId) === userIdString)
         : false;
 
-      // For locked or no-access items, return limited info
-      if (doc.accessLevel === 'locked' || !hasAccess) {
+      if (!accessCheck.hasAccess) {
         return {
           _id: doc._id,
           name: doc.name,
@@ -759,7 +744,8 @@ router.get("/api/search", optionalAuth, async (req, res) => {
           accessLevel: doc.accessLevel,
           hasAccess: false,
           canRequestAccess: true,
-          relevanceScore: item.fusedScore
+          relevanceScore: item.fusedScore,
+          accessDeniedReason: accessCheck.reason
         };
       }
 
@@ -803,7 +789,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // Helper function to calculate text score (keep existing implementation)
 function calculateTextScore(doc, query) {
   const queryLower = query.toLowerCase();
@@ -2130,10 +2115,11 @@ router.get("/api/user/check-access/:id", async (req, res) => {
     
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    const hasAccess = await doc.hasAccess(userId, linkId);
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, linkId);
 
     res.json({
-      hasAccess,
+      hasAccess: accessCheck.hasAccess,
+      reason: accessCheck.reason,
       accessLevel: doc.accessLevel,
       documentInfo: {
         name: doc.name,
@@ -2147,7 +2133,6 @@ router.get("/api/user/check-access/:id", async (req, res) => {
   }
 });
 
-
 router.post("/api/user/access-via-link/:id", async (req, res) => {
   try {
     const { linkId } = req.body;
@@ -2159,29 +2144,24 @@ router.post("/api/user/access-via-link/:id", async (req, res) => {
     const doc = await Document.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
+    const accessCheck = await checkFullPathAccess(req.params.id, null, linkId);
+
+    if (!accessCheck.hasAccess) {
+      return res.status(403).json({
+        message: accessCheck.reason,
+        details: accessCheck.lockedItem || accessCheck.privateItem
+      });
+    }
+
     const link = doc.privateAccessLinks.find(l => l.linkId === linkId);
-    if (!link) {
-      return res.status(404).json({ message: "Invalid access link" });
+    if (link && link.isActive) {
+      link.accessCount += 1;
+      await doc.save();
     }
-
-    if (!link.isActive) {
-      return res.status(403).json({ message: "This access link has been revoked" });
-    }
-
-    if (link.expiresAt && link.expiresAt < new Date()) {
-      return res.status(403).json({ message: "This access link has expired" });
-    }
-
-    if (link.maxAccessCount && link.accessCount >= link.maxAccessCount) {
-      return res.status(403).json({ message: "Access limit reached for this link" });
-    }
-
-    link.accessCount += 1;
-    await doc.save();
 
     res.json({ 
       message: "Access granted",
-      accessCount: link.accessCount
+      accessCount: link ? link.accessCount : 0
     });
 
   } catch (err) {
