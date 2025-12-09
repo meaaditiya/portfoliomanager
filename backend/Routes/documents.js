@@ -4,12 +4,14 @@ const XLSX = require("xlsx");
 const jwt = require('jsonwebtoken');
 const authenticateToken = require("../middlewares/authMiddleware");
 const bucket = require("../services/gcs");
-const Document = require("../models/Document");
+const{Document, AccessRequest} = require("../models/Document");
 const { generateQueryEmbedding, cosineSimilarity } = require("../services/embeddingService");
 const User = require("../models/userSchema"); 
+const sendEmail = require("../utils/email");
+const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
 const router = express.Router();
-
-
+const ADMIN_EMAIL= process.env.FROM_EMAIL;
+const crypto = require('crypto');
 const optionalAuth = (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   if (token) {
@@ -186,39 +188,6 @@ router.post("/api/admin/excel/upload", authenticateToken, multer.single("file"),
 
 
 
-router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
-  try {
-    const doc = await Document.findById(req.params.id);
-    
-    if (!doc) return res.status(404).json({ message: "Excel file not found" });
-    if (doc.type !== "excel") {
-      return res.status(400).json({ message: "This is not an Excel file" });
-    }
-
-    
-    const userIdString = req.user ? String(req.user.id) : null;
-
-    const response = {
-      id: doc._id,
-      name: doc.name,
-      sheetNames: doc.sheetNames,
-      rowCount: doc.rowCount,
-      columnCount: doc.columnCount,
-      data: doc.jsonData,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      checkmarkFields: doc.excelCheckmarkFields || [],
-      userCheckmarks: userIdString ? (doc.rowCheckmarks?.[userIdString] || {}) : {},
-      isAuthenticated: !!req.user
-    };
-
-    res.json(response);
-
-  } catch (err) {
-    console.error("Excel data error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 
@@ -322,91 +291,12 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
 
 
 
-router.get("/api/folder/contents", optionalAuth, async (req, res) => {
-  try {
-    const { parentId } = req.query;
-
-    const items = await Document.find({
-      parent: parentId || null
-    })
-    .select("-embedding -jsonData -rowCheckmarks")
-    .sort({ type: 1, name: 1 });
-
-    let currentFolder = null;
-    if (parentId) {
-      currentFolder = await Document.findById(parentId)
-        .select("-embedding -jsonData -rowCheckmarks");
-      if (!currentFolder) {
-        return res.status(404).json({ message: "Folder not found" });
-      }
-    }
-const itemsWithBookmarkStatus = items.map(item => {
-  const itemObj = item.toObject();
-  
-  
-  const isBookmarked = req.user 
-    ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
-    : false;
-
-  return {
-    ...itemObj,
-    isBookmarked,
-    bookmarkEnabled: item.bookmarkEnabled || false,
-    isAuthenticated: !!req.user,
-    bookmarks: undefined 
-  };
-});
-
-    res.json({
-      currentFolder,
-      items: itemsWithBookmarkStatus,
-      path: currentFolder ? currentFolder.path : "/",
-      isAuthenticated: !!req.user
-    });
-
-  } catch (err) {
-    console.error("Folder contents error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 
 
 
-router.get("/api/item/:id", optionalAuth, async (req, res) => {
-  try {
-    const item = await Document.findById(req.params.id)
-      .populate("parent", "name type path")
-      .select("-embedding -jsonData -rowCheckmarks");
-      
-    if (!item) return res.status(404).json({ message: "Not found" });
 
-    const itemObj = item.toObject();
-    const isBookmarked = req.user 
-      ? item.bookmarks.some(b => b.userId === req.user._id)
-      : false;
-
-    const response = {
-      ...itemObj,
-      isBookmarked,
-      bookmarkEnabled: item.bookmarkEnabled || false,
-      bookmarkCount: item.bookmarks.length,
-      isAuthenticated: !!req.user,
-      bookmarks: undefined 
-    };
-
-    if (item.type === "excel") {
-      response.checkmarkFields = item.excelCheckmarkFields || [];
-    }
-
-    res.json(response);
-
-  } catch (err) {
-    console.error("Get item error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 router.get("/api/item/:id/breadcrumb", async (req, res) => {
@@ -440,15 +330,319 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
 
 
 
+router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
+  try {
+    const { key } = req.query; 
+    
+    const doc = await Document.findById(req.params.id);
+    
+    if (!doc) return res.status(404).json({ message: "Excel file not found" });
+    if (doc.type !== "excel") {
+      return res.status(400).json({ message: "This is not an Excel file" });
+    }
 
+    const userIdString = req.user ? String(req.user.id) : null;
+    
+    // Check access
+    const hasAccess = await doc.hasAccess(userIdString, key);
 
+    // If locked, return only metadata
+    if (doc.accessLevel === 'locked') {
+      return res.json({
+        id: doc._id,
+        name: doc.name,
+        type: doc.type,
+        size: doc.size,
+        accessLevel: 'locked',
+        message: 'This document is locked. Only metadata is available.',
+        canRequestAccess: true
+      });
+    }
+
+    // If no access to private document
+    if (!hasAccess) {
+      return res.status(403).json({
+        message: 'Access denied. This document is private.',
+        documentInfo: {
+          id: doc._id,
+          name: doc.name,
+          type: doc.type,
+          size: doc.size
+        },
+        canRequestAccess: true
+      });
+    }
+
+    // Increment link access count if using private link
+    if (key) {
+      const link = doc.privateAccessLinks.find(l => l.linkId === key);
+      if (link && link.isActive) {
+        link.accessCount += 1;
+        await doc.save();
+      }
+    }
+
+    // Return full data
+    const response = {
+      id: doc._id,
+      name: doc.name,
+      sheetNames: doc.sheetNames,
+      rowCount: doc.rowCount,
+      columnCount: doc.columnCount,
+      data: doc.jsonData,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      checkmarkFields: doc.excelCheckmarkFields || [],
+      userCheckmarks: userIdString ? (doc.rowCheckmarks?.[userIdString] || {}) : {},
+      isAuthenticated: !!req.user,
+      accessLevel: doc.accessLevel
+    };
+
+    res.json(response);
+
+  } catch (err) {
+    console.error("Excel data error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Folder Contents - Updated with access control
+router.get("/api/folder/contents", optionalAuth, async (req, res) => {
+  try {
+    const { parentId, key } = req.query; // key for private folder access
+
+    // Check if accessing a specific folder
+    if (parentId) {
+      const folder = await Document.findById(parentId);
+      if (!folder) {
+        return res.status(404).json({ message: "Folder not found" });
+      }
+
+      const userIdString = req.user ? String(req.user.id) : null;
+      const hasAccess = await folder.hasAccess(userIdString, key);
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          message: 'Access denied to this folder',
+          folderInfo: {
+            id: folder._id,
+            name: folder.name,
+            type: folder.type
+          },
+          canRequestAccess: true
+        });
+      }
+    }
+
+    const items = await Document.find({
+      parent: parentId || null
+    })
+    .select("-embedding -jsonData -rowCheckmarks")
+    .sort({ type: 1, name: 1 });
+
+    let currentFolder = null;
+    if (parentId) {
+      currentFolder = await Document.findById(parentId)
+        .select("-embedding -jsonData -rowCheckmarks");
+    }
+
+    const userIdString = req.user ? String(req.user.id) : null;
+
+    // Filter items based on access and format response
+    const itemsWithAccess = await Promise.all(items.map(async (item) => {
+      const itemObj = item.toObject();
+      
+      // Check if user has access to this item
+      const hasItemAccess = await item.hasAccess(userIdString, key);
+      
+      const isBookmarked = req.user 
+        ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
+        : false;
+
+      // For locked items, return limited info
+      if (item.accessLevel === 'locked') {
+        return {
+          _id: itemObj._id,
+          name: itemObj.name,
+          type: itemObj.type,
+          size: itemObj.size,
+          accessLevel: 'locked',
+          createdAt: itemObj.createdAt,
+          hasAccess: false,
+          canRequestAccess: true
+        };
+      }
+
+      // For private items without access, return limited info
+      if (item.accessLevel === 'private' && !hasItemAccess) {
+        return {
+          _id: itemObj._id,
+          name: itemObj.name,
+          type: itemObj.type,
+          size: itemObj.size,
+          accessLevel: 'private',
+          createdAt: itemObj.createdAt,
+          hasAccess: false,
+          canRequestAccess: true
+        };
+      }
+
+      // User has access, return full info
+      return {
+        ...itemObj,
+        isBookmarked,
+        bookmarkEnabled: item.bookmarkEnabled || false,
+        isAuthenticated: !!req.user,
+        bookmarks: undefined,
+        hasAccess: true,
+        accessLevel: item.accessLevel
+      };
+    }));
+
+    res.json({
+      currentFolder,
+      items: itemsWithAccess,
+      path: currentFolder ? currentFolder.path : "/",
+      isAuthenticated: !!req.user
+    });
+
+  } catch (err) {
+    console.error("Folder contents error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Item Details - Updated with access control
+router.get("/api/item/:id", optionalAuth, async (req, res) => {
+  try {
+    const { key } = req.query;
+    
+    const item = await Document.findById(req.params.id)
+      .populate("parent", "name type path")
+      .select("-embedding -jsonData -rowCheckmarks");
+      
+    if (!item) return res.status(404).json({ message: "Not found" });
+
+    const userIdString = req.user ? String(req.user.id) : null;
+    const hasAccess = await item.hasAccess(userIdString, key);
+
+    const itemObj = item.toObject();
+    const isBookmarked = req.user 
+      ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
+      : false;
+
+    // Locked document - return only metadata
+    if (item.accessLevel === 'locked') {
+      return res.json({
+        _id: itemObj._id,
+        name: itemObj.name,
+        type: itemObj.type,
+        size: itemObj.size,
+        createdAt: itemObj.createdAt,
+        accessLevel: 'locked',
+        hasAccess: false,
+        canRequestAccess: true,
+        message: 'This document is locked'
+      });
+    }
+
+    // Private document without access
+    if (!hasAccess) {
+      return res.status(403).json({
+        message: 'Access denied',
+        documentInfo: {
+          id: itemObj._id,
+          name: itemObj.name,
+          type: itemObj.type,
+          size: itemObj.size,
+          accessLevel: item.accessLevel
+        },
+        canRequestAccess: true
+      });
+    }
+
+    // User has access - return full details
+    const response = {
+      ...itemObj,
+      isBookmarked,
+      bookmarkEnabled: item.bookmarkEnabled || false,
+      bookmarkCount: item.bookmarks.length,
+      isAuthenticated: !!req.user,
+      bookmarks: undefined,
+      hasAccess: true,
+      accessLevel: item.accessLevel
+    };
+
+    if (item.type === "excel") {
+      response.checkmarkFields = item.excelCheckmarkFields || [];
+    }
+
+    res.json(response);
+
+  } catch (err) {
+    console.error("Get item error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Download Link - Updated with access control
+router.get("/api/download/:id", async (req, res) => {
+  try {
+    const { key, userId } = req.query;
+    
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Not found" });
+    if (doc.type !== "file") {
+      return res.status(400).json({ message: "Cannot download this item type" });
+    }
+
+    // Check access
+    const hasAccess = await doc.hasAccess(userId, key);
+
+    if (doc.accessLevel === 'locked') {
+      return res.status(403).json({ 
+        message: "This document is locked and cannot be downloaded" 
+      });
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        message: "Access denied. You don't have permission to download this file." 
+      });
+    }
+
+    const file = bucket.file(doc.gcsPath);
+
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 30 * 60 * 1000
+    });
+
+    // Increment link access count if using private link
+    if (key) {
+      const link = doc.privateAccessLinks.find(l => l.linkId === key);
+      if (link && link.isActive) {
+        link.accessCount += 1;
+        await doc.save();
+      }
+    }
+
+    res.json({ downloadUrl: url, filename: doc.originalName });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Search - Updated with access control
 router.get("/api/search", optionalAuth, async (req, res) => {
   try {
     const startTime = Date.now();
     const { 
       q, 
       parentId,  
-      limit = 10 
+      limit = 10,
+      key // Private access key for folder search
     } = req.query;
     
     if (!q || q.trim().length === 0) {
@@ -458,7 +652,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     const normalizedQuery = q.trim();
     const limitNum = parseInt(limit) || 10;
     
-    
     let queryEmbedding;
     try {
       queryEmbedding = await generateQueryEmbedding(normalizedQuery);
@@ -467,10 +660,8 @@ router.get("/api/search", optionalAuth, async (req, res) => {
       return res.status(500).json({ message: "Search failed" });
     }
 
-    
     let folderMatch = {};
     if (parentId) {
-      
       const descendants = await getAllDescendantIds(parentId);
       folderMatch = { 
         $or: [
@@ -480,17 +671,15 @@ router.get("/api/search", optionalAuth, async (req, res) => {
       };
     }
 
-    
     const vectorCandidates = await Document.find({
       ...folderMatch,
       embedding: { $exists: true, $ne: [] }
     })
-    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks")
+    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks accessLevel grantedUsers privateAccessLinks")
     .populate("parent", "name type")
     .limit(200)
     .lean();
 
-    
     const textRegex = new RegExp(normalizedQuery.split(' ').map(escapeRegex).join('|'), 'i');
     const textCandidates = await Document.find({
       ...folderMatch,
@@ -499,14 +688,12 @@ router.get("/api/search", optionalAuth, async (req, res) => {
         { originalName: textRegex }
       ]
     })
-    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks")
+    .select("name originalName type url mimeType size parent embedding rowCount createdAt updatedAt bookmarkEnabled bookmarks accessLevel grantedUsers privateAccessLinks")
     .populate("parent", "name type")
     .limit(100)
     .lean();
 
-    
     const idToDoc = new Map();
-    
     
     for (const doc of vectorCandidates) {
       const id = doc._id.toString();
@@ -521,7 +708,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
       idToDoc.set(id, { doc, vectorSim, textScore: 0 });
     }
 
-    
     for (const doc of textCandidates) {
       const id = doc._id.toString();
       const textScore = calculateTextScore(doc, normalizedQuery);
@@ -533,7 +719,6 @@ router.get("/api/search", optionalAuth, async (req, res) => {
       }
     }
 
-    
     const merged = Array.from(idToDoc.values());
     
     const maxVec = Math.max(...merged.map(m => m.vectorSim), 0.001);
@@ -542,19 +727,41 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     merged.forEach(m => {
       m.vectorNorm = m.vectorSim / maxVec;
       m.textNorm = m.textScore / maxText;
-      m.fusedScore = 0.7 * m.vectorNorm + 0.3 * m.textNorm; 
+      m.fusedScore = 0.7 * m.vectorNorm + 0.3 * m.textNorm;
     });
 
-    
     merged.sort((a, b) => b.fusedScore - a.fusedScore);
     const topResults = merged.slice(0, limitNum);
 
     const userIdString = req.user ? String(req.user.id) : null;
-    const results = topResults.map(item => {
+    
+    // Filter results based on access and format response
+    const results = await Promise.all(topResults.map(async (item) => {
       const doc = item.doc;
+      
+      // Convert to Document model instance for hasAccess method
+      const docInstance = new Document(doc);
+      const hasAccess = await docInstance.hasAccess(userIdString, key);
+      
       const isBookmarked = userIdString 
         ? doc.bookmarks?.some(b => String(b.userId) === userIdString)
         : false;
+
+      // For locked or no-access items, return limited info
+      if (doc.accessLevel === 'locked' || !hasAccess) {
+        return {
+          _id: doc._id,
+          name: doc.name,
+          type: doc.type,
+          size: doc.size,
+          parent: doc.parent,
+          createdAt: doc.createdAt,
+          accessLevel: doc.accessLevel,
+          hasAccess: false,
+          canRequestAccess: true,
+          relevanceScore: item.fusedScore
+        };
+      }
 
       return {
         _id: doc._id,
@@ -570,15 +777,16 @@ router.get("/api/search", optionalAuth, async (req, res) => {
         updatedAt: doc.updatedAt,
         bookmarkEnabled: doc.bookmarkEnabled || false,
         isBookmarked,
+        hasAccess: true,
+        accessLevel: doc.accessLevel,
         relevanceScore: item.fusedScore,
         vectorScore: item.vectorSim,
         textScore: item.textScore
       };
-    });
+    }));
 
     const processingTime = Date.now() - startTime;
 
-    
     res.json({
       results,  
       searchMetadata: {
@@ -595,6 +803,35 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Helper function to calculate text score (keep existing implementation)
+function calculateTextScore(doc, query) {
+  const queryLower = query.toLowerCase();
+  const nameLower = (doc.name || '').toLowerCase();
+  const originalNameLower = (doc.originalName || '').toLowerCase();
+  
+  let score = 0;
+  
+  if (nameLower === queryLower || originalNameLower === queryLower) {
+    score += 10;
+  } else if (nameLower.startsWith(queryLower) || originalNameLower.startsWith(queryLower)) {
+    score += 5;
+  } else if (nameLower.includes(queryLower) || originalNameLower.includes(queryLower)) {
+    score += 3;
+  }
+  
+  const queryWords = queryLower.split(/\s+/);
+  queryWords.forEach(word => {
+    if (nameLower.includes(word)) score += 1;
+    if (originalNameLower.includes(word)) score += 1;
+  });
+  
+  return score;
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 async function getAllDescendantIds(parentId) {
   const descendants = [];
@@ -617,63 +854,18 @@ async function getAllDescendantIds(parentId) {
 }
 
 
-function calculateTextScore(doc, query) {
-  const queryLower = query.toLowerCase();
-  const nameLower = (doc.name || '').toLowerCase();
-  const originalNameLower = (doc.originalName || '').toLowerCase();
-  
-  let score = 0;
-  
-  
-  if (nameLower === queryLower || originalNameLower === queryLower) {
-    score += 10;
-  }
-  
-  else if (nameLower.startsWith(queryLower) || originalNameLower.startsWith(queryLower)) {
-    score += 5;
-  }
-  
-  else if (nameLower.includes(queryLower) || originalNameLower.includes(queryLower)) {
-    score += 3;
-  }
-  
-  
-  const queryWords = queryLower.split(/\s+/);
-  queryWords.forEach(word => {
-    if (nameLower.includes(word)) score += 1;
-    if (originalNameLower.includes(word)) score += 1;
-  });
-  
-  return score;
-}
-
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 
 
 
-router.get("/api/download/:id", async (req, res) => {
-  try {
-    const doc = await Document.findById(req.params.id);
-    if (!doc) return res.status(404).json({ message: "Not found" });
-    if (doc.type !== "file") return res.status(400).json({ message: "Cannot download this item type" });
 
-    const file = bucket.file(doc.gcsPath);
 
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 30 * 60 * 1000
-    });
 
-    res.json({ downloadUrl: url, filename: doc.originalName });
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
+
+
+
 
 
 
@@ -1458,5 +1650,542 @@ router.patch("/api/admin/excel/:id/edit", authenticateToken, async (req, res) =>
     res.status(500).json({ error: err.message });
   }
 });
+router.patch("/api/admin/access/:id/level", authenticateToken, async (req, res) => {
+  try {
+    const { accessLevel, inheritParentAccess } = req.body;
+    
+    if (!['public', 'private', 'locked'].includes(accessLevel)) {
+      return res.status(400).json({ 
+        message: "Invalid access level. Must be: public, private, or locked" 
+      });
+    }
 
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    doc.accessLevel = accessLevel;
+    if (typeof inheritParentAccess === 'boolean') {
+      doc.inheritParentAccess = inheritParentAccess;
+    }
+    
+    await doc.save();
+
+    res.json({ 
+      message: `Access level set to ${accessLevel}`,
+      document: {
+        id: doc._id,
+        name: doc.name,
+        type: doc.type,
+        accessLevel: doc.accessLevel,
+        inheritParentAccess: doc.inheritParentAccess
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate private access link
+router.post("/api/admin/access/:id/generate-link", authenticateToken, async (req, res) => {
+  try {
+    const { expiryHours, maxAccessCount } = req.body;
+    
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    if (doc.accessLevel !== 'private') {
+      return res.status(400).json({ 
+        message: "Can only generate links for private documents" 
+      });
+    }
+
+    const linkId = crypto.randomBytes(32).toString('hex');
+    const expiresAt = expiryHours 
+      ? new Date(Date.now() + expiryHours * 60 * 60 * 1000)
+      : null;
+
+    doc.privateAccessLinks.push({
+      linkId,
+      expiresAt,
+      maxAccessCount: maxAccessCount || null,
+      createdBy: req.user.id,
+      isActive: true,
+      accessCount: 0
+    });
+
+    await doc.save();
+
+    const accessUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/access/${doc._id}?key=${linkId}`;
+
+    res.json({ 
+      message: "Private access link generated",
+      linkId,
+      accessUrl,
+      expiresAt,
+      maxAccessCount
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Revoke private access link
+router.delete("/api/admin/access/:id/link/:linkId", authenticateToken, async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    const link = doc.privateAccessLinks.find(l => l.linkId === req.params.linkId);
+    if (!link) return res.status(404).json({ message: "Link not found" });
+
+    link.isActive = false;
+    await doc.save();
+
+    res.json({ message: "Access link revoked" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Grant access to specific user
+router.post("/api/admin/access/:id/grant-user", authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ message: "User ID required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    const alreadyGranted = doc.grantedUsers.find(
+      g => g.userId.toString() === userId
+    );
+
+    if (alreadyGranted) {
+      return res.status(400).json({ message: "User already has access" });
+    }
+
+    doc.grantedUsers.push({
+      userId,
+      grantedBy: req.user.id,
+      grantedAt: new Date()
+    });
+
+    await doc.save();
+
+    // Send notification email to user
+    const message = `You have been granted access to "${doc.name}".`;
+    const response = `
+      <p>An administrator has granted you access to the following document:</p>
+      <p><strong>Document:</strong> ${doc.name}</p>
+      <p><strong>Type:</strong> ${doc.type}</p>
+      <p>You can now access this document at: <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/documents/${doc._id}">${process.env.CLIENT_URL || 'http://localhost:3000'}/documents/${doc._id}</a></p>
+    `;
+
+    const emailHtml = getReplyEmailTemplate2(user.name, message, response);
+    await sendEmail(user.email, 'Access Granted - Document Portal', emailHtml);
+
+    res.json({ 
+      message: "Access granted to user",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Revoke user access
+router.delete("/api/admin/access/:id/revoke-user/:userId", authenticateToken, async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    doc.grantedUsers = doc.grantedUsers.filter(
+      g => g.userId.toString() !== req.params.userId
+    );
+
+    await doc.save();
+
+    res.json({ message: "User access revoked" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all access requests (admin view)
+router.get("/api/admin/access-requests", authenticateToken, async (req, res) => {
+  try {
+    const { status, limit = 50 } = req.query;
+    
+    let query = {};
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      query.status = status;
+    }
+
+    const requests = await AccessRequest.find(query)
+      .populate('documentId', 'name type size accessLevel')
+      .populate('userId', 'name email')
+      .sort({ requestedAt: -1 })
+      .limit(parseInt(limit));
+
+    res.json({ 
+      requests,
+      count: requests.length
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Approve access request
+router.post("/api/admin/access-requests/:requestId/approve", authenticateToken, async (req, res) => {
+  try {
+    const { expiryHours, adminResponse } = req.body;
+    
+    const request = await AccessRequest.findById(req.params.requestId)
+      .populate('documentId');
+    
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ message: "Request already processed" });
+    }
+
+    const doc = request.documentId;
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    // Generate private access link
+    const linkId = crypto.randomBytes(32).toString('hex');
+    const expiresAt = expiryHours 
+      ? new Date(Date.now() + expiryHours * 60 * 60 * 1000)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days
+
+    doc.privateAccessLinks.push({
+      linkId,
+      expiresAt,
+      maxAccessCount: null,
+      createdBy: req.user.id,
+      isActive: true,
+      accessCount: 0
+    });
+
+    await doc.save();
+
+    const accessUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/access/${doc._id}?key=${linkId}`;
+
+    // Update request
+    request.status = 'approved';
+    request.adminResponse = adminResponse || 'Your access request has been approved.';
+    request.respondedAt = new Date();
+    request.respondedBy = req.user.id;
+    request.accessLink = accessUrl;
+    request.accessLinkId = linkId;
+    request.accessLinkExpiry = expiresAt;
+    request.responseEmailSent = true;
+
+    await request.save();
+
+    // Send approval email to user
+    const message = `Your access request for "${doc.name}" has been approved!`;
+    const response = `
+      <p>Good news! Your request to access the following document has been approved:</p>
+      <p><strong>Document:</strong> ${doc.name}</p>
+      <p><strong>Type:</strong> ${doc.type}</p>
+      ${adminResponse ? `<p><strong>Admin Message:</strong> ${adminResponse}</p>` : ''}
+      <br>
+      <p>Click the link below to access the document:</p>
+      <a href="${accessUrl}" style="display: inline-block; padding: 12px 24px; background-color: #2c2c2c; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0;">Access Document</a>
+      <p><strong>Link expires:</strong> ${expiresAt.toLocaleString()}</p>
+      <p><em>Note: Please save this link as you'll need it to access the document.</em></p>
+    `;
+
+    const emailHtml = getReplyEmailTemplate2(request.userName, message, response);
+    await sendEmail(request.userEmail, 'Access Request Approved - Document Portal', emailHtml);
+
+    res.json({ 
+      message: "Access request approved and email sent",
+      request,
+      accessUrl
+    });
+
+  } catch (err) {
+    console.error("Approve request error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reject access request
+router.post("/api/admin/access-requests/:requestId/reject", authenticateToken, async (req, res) => {
+  try {
+    const { adminResponse } = req.body;
+    
+    const request = await AccessRequest.findById(req.params.requestId)
+      .populate('documentId', 'name type');
+    
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ message: "Request already processed" });
+    }
+
+    request.status = 'rejected';
+    request.adminResponse = adminResponse || 'Your access request has been rejected.';
+    request.respondedAt = new Date();
+    request.respondedBy = req.user.id;
+    request.responseEmailSent = true;
+
+    await request.save();
+
+    // Send rejection email to user
+    const message = `Your access request for "${request.documentId.name}" has been reviewed.`;
+    const response = `
+      <p>We have reviewed your request to access "${request.documentId.name}".</p>
+      <p>Unfortunately, we are unable to grant access at this time.</p>
+      ${adminResponse ? `<p><strong>Reason:</strong> ${adminResponse}</p>` : ''}
+      <p>If you have any questions, please contact the administrator.</p>
+    `;
+
+    const emailHtml = getReplyEmailTemplate2(request.userName, message, response);
+    await sendEmail(request.userEmail, 'Access Request Update - Document Portal', emailHtml);
+
+    res.json({ 
+      message: "Access request rejected and email sent",
+      request
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get document access settings
+router.get("/api/admin/access/:id/settings", authenticateToken, async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id)
+      .populate('grantedUsers.userId', 'name email')
+      .populate('grantedUsers.grantedBy', 'name email')
+      .populate('privateAccessLinks.createdBy', 'name email');
+    
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    res.json({
+      document: {
+        id: doc._id,
+        name: doc.name,
+        type: doc.type,
+        accessLevel: doc.accessLevel,
+        inheritParentAccess: doc.inheritParentAccess
+      },
+      grantedUsers: doc.grantedUsers,
+      privateAccessLinks: doc.privateAccessLinks.map(link => ({
+        linkId: link.linkId,
+        createdAt: link.createdAt,
+        expiresAt: link.expiresAt,
+        accessCount: link.accessCount,
+        maxAccessCount: link.maxAccessCount,
+        isActive: link.isActive,
+        createdBy: link.createdBy,
+        accessUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/access/${doc._id}?key=${link.linkId}`
+      }))
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== USER ROUTES ====================
+
+// Request access to a document
+router.post("/api/user/request-access/:id", async (req, res) => {
+  try {
+    const { name, email, message, userId } = req.body;
+    
+    if (!name || !email || !message) {
+      return res.status(400).json({ 
+        message: "Name, email, and message are required" 
+      });
+    }
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    if (doc.accessLevel === 'public') {
+      return res.status(400).json({ 
+        message: "This document is already public" 
+      });
+    }
+
+    // Check for duplicate pending requests
+    const existingRequest = await AccessRequest.findOne({
+      documentId: doc._id,
+      userEmail: email,
+      status: 'pending'
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({ 
+        message: "You already have a pending request for this document" 
+      });
+    }
+
+    // Create access request
+    const request = await AccessRequest.create({
+      documentId: doc._id,
+      userName: name,
+      userEmail: email,
+      userId: userId || null,
+      requestMessage: message,
+      requestedAt: new Date(),
+      status: 'pending'
+    });
+
+    const adminMessage = `New access request received for document: ${doc.name}`;
+    const adminResponse = `
+      <h3>Access Request Details</h3>
+      <p><strong>Document:</strong> ${doc.name}</p>
+      <p><strong>Type:</strong> ${doc.type}</p>
+      <p><strong>Requested by:</strong> ${name} (${email})</p>
+      <p><strong>Message:</strong></p>
+      <p style="background: #f5f5f5; padding: 15px; border-radius: 5px;">${message}</p>
+      <br>
+      <p>To review and respond to this request, please log in to your admin dashboard:</p>
+      <a href="${process.env.CLIENT_URL || 'connectwithaaditiyaadmin.onrender.com'}/admin/access-requests" style="display: inline-block; padding: 12px 24px; background-color: #2c2c2c; color: white; text-decoration: none; border-radius: 5px; margin: 15px 0;">View Access Requests</a>
+      <p><strong>Request ID:</strong> ${request._id}</p>
+    `;
+
+    const adminEmailHtml = getReplyEmailTemplate2('Admin', adminMessage, adminResponse);
+    await sendEmail(ADMIN_EMAIL, 'New Access Request - Document Portal', adminEmailHtml);
+
+  
+    const userMessage = `Your access request for "${doc.name}" has been submitted.`;
+    const userResponse = `
+      <p>Thank you for your interest in accessing "${doc.name}".</p>
+      <p>Your request has been forwarded to the administrator and is currently pending review.</p>
+      <p><strong>Your Message:</strong></p>
+      <p style="background: #f5f5f5; padding: 15px; border-radius: 5px;">${message}</p>
+      <p>You will receive an email notification once your request has been reviewed.</p>
+      <p><strong>Request ID:</strong> ${request._id}</p>
+    `;
+
+    const userEmailHtml = getReplyEmailTemplate2(name, userMessage, userResponse);
+    await sendEmail(email, 'Access Request Submitted - Document Portal', userEmailHtml);
+
+    request.requestEmailSent = true;
+    await request.save();
+
+    res.json({ 
+      message: "Access request submitted successfully",
+      requestId: request._id
+    });
+
+  } catch (err) {
+    console.error("Request access error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.get("/api/user/my-access-requests", async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
+    }
+
+    const requests = await AccessRequest.find({ userEmail: email })
+      .populate('documentId', 'name type size')
+      .sort({ requestedAt: -1 });
+
+    res.json({ 
+      requests,
+      count: requests.length
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/api/user/check-access/:id", async (req, res) => {
+  try {
+    const { linkId, userId } = req.query;
+    
+    const doc = await Document.findById(req.params.id)
+      .select('name type size accessLevel inheritParentAccess');
+    
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    const hasAccess = await doc.hasAccess(userId, linkId);
+
+    res.json({
+      hasAccess,
+      accessLevel: doc.accessLevel,
+      documentInfo: {
+        name: doc.name,
+        type: doc.type,
+        size: doc.size
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+router.post("/api/user/access-via-link/:id", async (req, res) => {
+  try {
+    const { linkId } = req.body;
+    
+    if (!linkId) {
+      return res.status(400).json({ message: "Link ID required" });
+    }
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    const link = doc.privateAccessLinks.find(l => l.linkId === linkId);
+    if (!link) {
+      return res.status(404).json({ message: "Invalid access link" });
+    }
+
+    if (!link.isActive) {
+      return res.status(403).json({ message: "This access link has been revoked" });
+    }
+
+    if (link.expiresAt && link.expiresAt < new Date()) {
+      return res.status(403).json({ message: "This access link has expired" });
+    }
+
+    if (link.maxAccessCount && link.accessCount >= link.maxAccessCount) {
+      return res.status(403).json({ message: "Access limit reached for this link" });
+    }
+
+    link.accessCount += 1;
+    await doc.save();
+
+    res.json({ 
+      message: "Access granted",
+      accessCount: link.accessCount
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart } from 'lucide-react';
+import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart ,Lock, Unlock, Shield, Link2} from 'lucide-react';
 
 export default function FileManager() {
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -35,6 +35,17 @@ const [selectedCell, setSelectedCell] = useState(null);
 const [editingCell, setEditingCell] = useState(null);
 const [cellValue, setCellValue] = useState('');
 const [editingHeader, setEditingHeader] = useState(null);
+const [showAccessModal, setShowAccessModal] = useState(false);
+const [accessItem, setAccessItem] = useState(null);
+const [accessLevel, setAccessLevel] = useState('public');
+const [showGenerateLinkModal, setShowGenerateLinkModal] = useState(false);
+const [generateLinkItem, setGenerateLinkItem] = useState(null);
+const [linkExpiry, setLinkExpiry] = useState(24);
+const [maxAccessCount, setMaxAccessCount] = useState('');
+const [generatedLinks, setGeneratedLinks] = useState([]);
+const [showAccessRequestsModal, setShowAccessRequestsModal] = useState(false);
+const [accessRequests, setAccessRequests] = useState([]);
+const [selectedRequest, setSelectedRequest] = useState(null);
 const [headerValue, setHeaderValue] = useState('');
 const CHECKMARK_TYPES = [
   { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
@@ -341,6 +352,183 @@ const createLink = async () => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
+
+
+
+
+// Set access level for document/folder
+const setDocumentAccessLevel = async (item, level, inheritParent = false) => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access/${item._id}/level`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        accessLevel: level,
+        inheritParentAccess: inheritParent
+      })
+    });
+
+    if (res.ok) {
+      showMessage(`Access level set to ${level}`);
+      setShowAccessModal(false);
+      loadFolder(currentFolder?._id);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error setting access level', 'error');
+    }
+  } catch (err) {
+    showMessage('Error setting access level', 'error');
+  }
+};
+
+// Generate private access link
+const generatePrivateLink = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access/${generateLinkItem._id}/generate-link`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        expiryHours: parseInt(linkExpiry),
+        maxAccessCount: maxAccessCount ? parseInt(maxAccessCount) : null
+      })
+    });
+
+    const data = await res.json();
+    
+    if (res.ok) {
+      showMessage('Private link generated successfully');
+      setGeneratedLinks([...generatedLinks, data]);
+      loadAccessSettings(generateLinkItem._id);
+    } else {
+      showMessage(data.message || 'Error generating link', 'error');
+    }
+  } catch (err) {
+    showMessage('Error generating link', 'error');
+  }
+};
+
+// Load access settings for a document
+const loadAccessSettings = async (itemId) => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access/${itemId}/settings`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    const data = await res.json();
+    if (res.ok) {
+      setGeneratedLinks(data.privateAccessLinks || []);
+    }
+  } catch (err) {
+    console.error('Error loading access settings:', err);
+  }
+};
+
+// Revoke private link
+const revokePrivateLink = async (itemId, linkId) => {
+  if (!confirm('Revoke this access link?')) return;
+  
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access/${itemId}/link/${linkId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (res.ok) {
+      showMessage('Link revoked successfully');
+      loadAccessSettings(itemId);
+    } else {
+      showMessage('Error revoking link', 'error');
+    }
+  } catch (err) {
+    showMessage('Error revoking link', 'error');
+  }
+};
+
+// Load access requests
+const loadAccessRequests = async (status = 'pending') => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access-requests?status=${status}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    const data = await res.json();
+    if (res.ok) {
+      setAccessRequests(data.requests || []);
+    }
+  } catch (err) {
+    showMessage('Error loading access requests', 'error');
+  }
+};
+
+// Approve access request
+const approveAccessRequest = async (requestId, expiryHours = 720, adminResponse = '') => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        expiryHours: parseInt(expiryHours),
+        adminResponse
+      })
+    });
+
+    if (res.ok) {
+      showMessage('Access request approved and email sent');
+      loadAccessRequests();
+      setSelectedRequest(null);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error approving request', 'error');
+    }
+  } catch (err) {
+    showMessage('Error approving request', 'error');
+  }
+};
+
+// Reject access request
+const rejectAccessRequest = async (requestId, adminResponse = '') => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/access-requests/${requestId}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        adminResponse
+      })
+    });
+
+    if (res.ok) {
+      showMessage('Access request rejected');
+      loadAccessRequests();
+      setSelectedRequest(null);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error rejecting request', 'error');
+    }
+  } catch (err) {
+    showMessage('Error rejecting request', 'error');
+  }
+};
+
+
+
 
 const toggleBookmarkAvailability = async (item, enabled) => {
   try {
@@ -1219,6 +1407,16 @@ if (viewingExcel && excelData) {
   <FileSpreadsheet size={16} />
   <span>Upload Excel</span>
 </button>
+<button
+  onClick={() => {
+    loadAccessRequests();
+    setShowAccessRequestsModal(true);
+  }}
+  style={{...styles.toolBtn, background: '#FF9800', color: 'white'}}
+>
+  <Shield size={16} />
+  <span>Access Requests</span>
+</button>
       </div>
 
       {/* File Grid */}
@@ -1354,6 +1552,7 @@ if (viewingExcel && excelData) {
   >
     <ExternalLink size={16} />
   </button>
+  
 )}
       <button
         onClick={() => {
@@ -1414,6 +1613,25 @@ if (viewingExcel && excelData) {
       <CheckSquare size={16} />
     </button>
   )}
+  <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setAccessItem(item);
+    setAccessLevel(item.accessLevel || 'public');
+    loadAccessSettings(item._id);
+    setShowAccessModal(true);
+  }}
+  style={{
+    ...styles.iconBtn,
+    color: item.accessLevel === 'locked' ? '#f44336' : 
+           item.accessLevel === 'private' ? '#FF9800' : '#4CAF50'
+  }}
+  title={`Access: ${item.accessLevel || 'public'}`}
+>
+  {item.accessLevel === 'locked' ? <Lock size={16} /> : 
+   item.accessLevel === 'private' ? <Shield size={16} /> : 
+   <Unlock size={16} />}
+</button>
     </div>
   </div>
 ))
@@ -1655,11 +1873,339 @@ if (viewingExcel && excelData) {
     </div>
   </div>
 )}
+{showAccessModal && accessItem && (
+  <div style={styles.modal} onClick={() => setShowAccessModal(false)}>
+    <div style={{...styles.modalContent, minWidth: '600px'}} onClick={(e) => e.stopPropagation()}>
+      <h3>Access Control: {accessItem.name}</h3>
+      
+      <div style={{ marginTop: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>
+          Access Level:
+        </label>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <label style={styles.radioLabel}>
+            <input
+              type="radio"
+              name="accessLevel"
+              value="public"
+              checked={accessLevel === 'public'}
+              onChange={(e) => setAccessLevel(e.target.value)}
+            />
+            <Unlock size={16} style={{ marginLeft: '8px', marginRight: '8px' }} />
+            <div>
+              <strong>Public</strong>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
+                Anyone can view and access this item
+              </p>
+            </div>
+          </label>
+          
+          <label style={styles.radioLabel}>
+            <input
+              type="radio"
+              name="accessLevel"
+              value="private"
+              checked={accessLevel === 'private'}
+              onChange={(e) => setAccessLevel(e.target.value)}
+            />
+            <Shield size={16} style={{ marginLeft: '8px', marginRight: '8px', color: '#FF9800' }} />
+            <div>
+              <strong>Private</strong>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
+                Requires authentication or special access link
+              </p>
+            </div>
+          </label>
+          
+          <label style={styles.radioLabel}>
+            <input
+              type="radio"
+              name="accessLevel"
+              value="locked"
+              checked={accessLevel === 'locked'}
+              onChange={(e) => setAccessLevel(e.target.value)}
+            />
+            <Lock size={16} style={{ marginLeft: '8px', marginRight: '8px', color: '#f44336' }} />
+            <div>
+              <strong>Locked</strong>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>
+                Only metadata visible, no content access
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {accessLevel === 'private' && (
+        <div style={{ marginTop: '20px', padding: '15px', background: '#fff3cd', borderRadius: '6px' }}>
+          <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Private Access Links</h4>
+          
+          {generatedLinks.length === 0 ? (
+            <p style={{ fontSize: '13px', color: '#666', margin: '10px 0' }}>
+              No access links generated yet
+            </p>
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {generatedLinks.map((link, idx) => (
+                <div key={idx} style={{
+                  padding: '10px',
+                  background: 'white',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                  fontSize: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '11px', color: '#666' }}>
+                        {link.accessUrl?.substring(0, 50)}...
+                      </div>
+                      <div style={{ marginTop: '4px', color: '#999' }}>
+                        Uses: {link.accessCount} | 
+                        Expires: {link.expiresAt ? new Date(link.expiresAt).toLocaleString() : 'Never'} |
+                        Status: {link.isActive ? '✓ Active' : '✗ Revoked'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => revokePrivateLink(accessItem._id, link.linkId)}
+                      style={{...styles.iconBtn, color: '#f44336'}}
+                      disabled={!link.isActive}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <button
+            onClick={() => {
+              setGenerateLinkItem(accessItem);
+              setShowGenerateLinkModal(true);
+            }}
+            style={{...styles.toolBtn, marginTop: '10px', width: '100%', justifyContent: 'center'}}
+          >
+            <Link2 size={16} />
+            <span>Generate New Link</span>
+          </button>
+        </div>
+      )}
+
+      <div style={styles.modalActions}>
+        <button onClick={() => setShowAccessModal(false)} style={styles.cancelBtn}>
+          Cancel
+        </button>
+        <button 
+          onClick={() => setDocumentAccessLevel(accessItem, accessLevel)}
+          style={styles.submitBtn}
+        >
+          Save Access Level
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* Generate Private Link Modal */}
+{showGenerateLinkModal && generateLinkItem && (
+  <div style={styles.modal} onClick={() => setShowGenerateLinkModal(false)}>
+    <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <h3>Generate Private Access Link</h3>
+      <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+        Create a shareable link for: <strong>{generateLinkItem.name}</strong>
+      </p>
+      
+      <label style={{ display: 'block', marginTop: '20px', fontWeight: '600' }}>
+        Link Expiry (hours):
+      </label>
+      <input
+        type="number"
+        value={linkExpiry}
+        onChange={(e) => setLinkExpiry(e.target.value)}
+        style={styles.input}
+        placeholder="24"
+        min="1"
+      />
+      <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+        Leave blank for no expiry
+      </p>
+      
+      <label style={{ display: 'block', marginTop: '15px', fontWeight: '600' }}>
+        Max Access Count (optional):
+      </label>
+      <input
+        type="number"
+        value={maxAccessCount}
+        onChange={(e) => setMaxAccessCount(e.target.value)}
+        style={styles.input}
+        placeholder="Leave empty for unlimited"
+        min="1"
+      />
+      
+      <div style={styles.modalActions}>
+        <button onClick={() => setShowGenerateLinkModal(false)} style={styles.cancelBtn}>
+          Cancel
+        </button>
+        <button onClick={generatePrivateLink} style={styles.submitBtn}>
+          Generate Link
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* Access Requests Modal */}
+{showAccessRequestsModal && (
+  <div style={styles.modal} onClick={() => setShowAccessRequestsModal(false)}>
+    <div style={{...styles.modalContent, minWidth: '700px', maxWidth: '900px'}} onClick={(e) => e.stopPropagation()}>
+      <h3>Access Requests</h3>
+      
+      <div style={{ display: 'flex', gap: '10px', marginTop: '15px', marginBottom: '15px' }}>
+        <button
+          onClick={() => loadAccessRequests('pending')}
+          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
+        >
+          Pending
+        </button>
+        <button
+          onClick={() => loadAccessRequests('approved')}
+          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
+        >
+          Approved
+        </button>
+        <button
+          onClick={() => loadAccessRequests('rejected')}
+          style={{...styles.toolBtn, flex: 1, justifyContent: 'center'}}
+        >
+          Rejected
+        </button>
+      </div>
+      
+      {accessRequests.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+          No access requests found
+        </div>
+      ) : (
+        <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+          {accessRequests.map((request) => (
+            <div key={request._id} style={{
+              padding: '15px',
+              background: '#f8f9fa',
+              borderRadius: '6px',
+              marginBottom: '10px',
+              border: request.status === 'pending' ? '2px solid #FF9800' : '1px solid #e0e0e0'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div>
+                  <strong>{request.userName}</strong>
+                  <span style={{ marginLeft: '10px', color: '#666', fontSize: '13px' }}>
+                    {request.userEmail}
+                  </span>
+                </div>
+                <div style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  background: request.status === 'pending' ? '#fff3cd' :
+                             request.status === 'approved' ? '#d4edda' : '#f8d7da',
+                  color: request.status === 'pending' ? '#856404' :
+                         request.status === 'approved' ? '#155724' : '#721c24'
+                }}>
+                  {request.status.toUpperCase()}
+                </div>
+              </div>
+              
+              <div style={{ fontSize: '14px', marginBottom: '8px' }}>
+                <strong>Document:</strong> {request.documentId?.name || 'N/A'}
+              </div>
+              
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
+                <strong>Message:</strong>
+                <p style={{
+                  margin: '5px 0 0 0',
+                  padding: '10px',
+                  background: 'white',
+                  borderRadius: '4px',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {request.requestMessage}
+                </p>
+              </div>
+              
+              <div style={{ fontSize: '12px', color: '#999' }}>
+                Requested: {new Date(request.requestedAt).toLocaleString()}
+              </div>
+              
+              {request.status === 'pending' && (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                  <button
+                    onClick={() => {
+                      const response = prompt('Admin message (optional):');
+                      if (response !== null) {
+                        approveAccessRequest(request._id, 720, response);
+                      }
+                    }}
+                    style={{...styles.submitBtn, flex: 1}}
+                  >
+                    Approve (30 days)
+                  </button>
+                  <button
+                    onClick={() => {
+                      const response = prompt('Rejection reason (optional):');
+                      if (response !== null) {
+                        rejectAccessRequest(request._id, response);
+                      }
+                    }}
+                    style={{...styles.cancelBtn, flex: 1, background: '#f44336', color: 'white'}}
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+              
+              {request.accessLink && (
+                <div style={{ marginTop: '10px', padding: '10px', background: 'white', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '5px' }}>
+                    Access Link Generated:
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    color: '#2196F3',
+                    wordBreak: 'break-all'
+                  }}>
+                    {request.accessLink}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      <div style={styles.modalActions}>
+        <button onClick={() => setShowAccessRequestsModal(false)} style={styles.cancelBtn}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
 
 const styles = {
+ 
+radioLabel: {
+  display: 'flex',
+  alignItems: 'flex-start',
+  padding: '12px',
+  border: '1px solid #e0e0e0',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  transition: 'all 0.2s'
+},
   container: {
     width: '100%',
     maxWidth: '1400px',
