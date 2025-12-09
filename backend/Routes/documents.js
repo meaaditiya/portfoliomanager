@@ -466,47 +466,71 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
       currentFolder = await Document.findById(parentId)
         .select("-embedding -jsonData -rowCheckmarks");
     }
+const itemsWithAccess = await Promise.all(items.map(async (item) => {
+  const itemObj = item.toObject();
+  
+  const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key);
+  
+  const isBookmarked = req.user 
+    ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
+    : false;
 
-    const itemsWithAccess = await Promise.all(items.map(async (item) => {
-      const itemObj = item.toObject();
-      
-      const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key);
-      
-      const isBookmarked = req.user 
-        ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
-        : false;
+  if (!itemAccessCheck.hasAccess) {
+    return {
+      _id: itemObj._id,
+      name: itemObj.name,
+      type: itemObj.type,
+      size: itemObj.size,
+      accessLevel: item.accessLevel,
+      createdAt: itemObj.createdAt,
+      hasAccess: false,
+      canRequestAccess: true,
+      accessDeniedReason: itemAccessCheck.reason
+    };
+  }
 
-      if (!itemAccessCheck.hasAccess) {
-        return {
-          _id: itemObj._id,
-          name: itemObj.name,
-          type: itemObj.type,
-          size: itemObj.size,
-          accessLevel: item.accessLevel,
-          createdAt: itemObj.createdAt,
-          hasAccess: false,
-          canRequestAccess: true,
-          accessDeniedReason: itemAccessCheck.reason
-        };
-      }
+  return {
+    _id: itemObj._id,
+    name: itemObj.name,
+    originalName: itemObj.originalName,
+    type: itemObj.type,
+    url: itemObj.url,
+    mimeType: itemObj.mimeType,
+    size: itemObj.size,
+    rowCount: itemObj.rowCount,
+    parent: itemObj.parent,
+    path: itemObj.path,
+    createdAt: itemObj.createdAt,
+    updatedAt: itemObj.updatedAt,
+    bookmarkEnabled: item.bookmarkEnabled || false,
+    isBookmarked,
+    hasAccess: true,
+    accessLevel: item.accessLevel,
+    bookmarkCount: item.bookmarks?.length || 0
+  };
+}));
 
-      return {
-        ...itemObj,
-        isBookmarked,
-        bookmarkEnabled: item.bookmarkEnabled || false,
-        isAuthenticated: !!req.user,
-        bookmarks: undefined,
-        hasAccess: true,
-        accessLevel: item.accessLevel
-      };
-    }));
+let currentFolderResponse = null;
+if (currentFolder) {
+  currentFolderResponse = {
+    _id: currentFolder._id,
+    name: currentFolder.name,
+    type: currentFolder.type,
+    parent: currentFolder.parent,
+    path: currentFolder.path,
+    createdAt: currentFolder.createdAt,
+    updatedAt: currentFolder.updatedAt,
+    bookmarkEnabled: currentFolder.bookmarkEnabled || false,
+    accessLevel: currentFolder.accessLevel
+  };
+}
 
-    res.json({
-      currentFolder,
-      items: itemsWithAccess,
-      path: currentFolder ? currentFolder.path : "/",
-      isAuthenticated: !!req.user
-    });
+res.json({
+  currentFolder: currentFolderResponse,
+  items: itemsWithAccess,
+  path: currentFolder ? currentFolder.path : "/",
+  isAuthenticated: !!req.user
+});
 
   } catch (err) {
     console.error("Folder contents error:", err);
