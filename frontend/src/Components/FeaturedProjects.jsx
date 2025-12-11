@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './AdminProjects.css';
 
 const AdminProjects = () => {
   const [projects, setProjects] = useState([]);
@@ -8,20 +9,20 @@ const AdminProjects = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [formData, setFormData] = useState({
-  title: '',
-  period: '',
-  teamSize: 1,
-  description: '',
-  detailedDescription: [''],
-  tech: [''],
-  outcomes: [''],
-  link: '',
-  githubUrl: '',
-  color: '',
-  imageUrl: '',        
-  galleryImages: [],   
-  order: 0
-});
+    title: '',
+    period: '',
+    teamSize: 1,
+    description: '',
+    detailedDescription: [''],
+    tech: [''],
+    outcomes: [''],
+    link: '',
+    githubUrl: '',
+    color: '',
+    imageUrl: '',        
+    galleryImages: [],   
+    order: 0
+  });
 
   const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
 
@@ -127,18 +128,17 @@ const AdminProjects = () => {
     setError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setError('');
     setSuccessMessage('');
 
- const cleanedData = {
-  ...formData,
-  detailedDescription: formData.detailedDescription.filter(item => item.trim() !== ''),
-  tech: formData.tech.filter(item => item.trim() !== ''),
-  outcomes: formData.outcomes.filter(item => item.trim() !== ''),
-  galleryImages: formData.galleryImages.filter(item => item.trim() !== '') 
-};
+    const cleanedData = {
+      ...formData,
+      detailedDescription: formData.detailedDescription.filter(item => item.trim() !== ''),
+      tech: formData.tech.filter(item => item.trim() !== ''),
+      outcomes: formData.outcomes.filter(item => item.trim() !== ''),
+      galleryImages: formData.galleryImages.filter(item => item.trim() !== '') 
+    };
 
     try {
       const url = editingProject 
@@ -213,65 +213,62 @@ const AdminProjects = () => {
   };
 
   if (loading) {
-    return <div style={styles.loading}>Loading projects...</div>;
+    return <div className="ap-loading">Loading projects...</div>;
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Admin Projects Dashboard</h1>
-        <button style={styles.addButton} onClick={() => openModal()}>
+    <div className="ap-container">
+      <div className="ap-header">
+        <h1 className="ap-title">Admin Projects Dashboard</h1>
+        <button className="ap-add-button" onClick={() => openModal()}>
           + Add New Project
         </button>
       </div>
 
-      {error && <div style={styles.errorMessage}>{error}</div>}
-      {successMessage && <div style={styles.successMessage}>{successMessage}</div>}
+      {error && <div className="ap-error-message">{error}</div>}
+      {successMessage && <div className="ap-success-message">{successMessage}</div>}
 
-      <div style={styles.projectsGrid}>
+      <div className="ap-projects-grid">
         {projects.map(project => (
-          <div key={project._id} style={styles.projectCard}>
-            <div style={styles.projectHeader}>
-              <h3 style={styles.projectTitle}>{project.title}</h3>
-              <span style={{
-                ...styles.statusBadge,
-                backgroundColor: project.isActive ? '#10b981' : '#ef4444'
-              }}>
+          <div key={project._id} className="ap-project-card">
+            <div className="ap-project-header">
+              <h3 className="ap-project-title">{project.title}</h3>
+              <span className={`ap-status-badge ${project.isActive ? 'ap-status-active' : 'ap-status-inactive'}`}>
                 {project.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
             
-            <p style={styles.period}>{project.period}</p>
-            <p style={styles.teamSize}>Team Size: {project.teamSize}</p>
-            <p style={styles.description}>{project.description}</p>
+            <p className="ap-period">{project.period}</p>
+            <p className="ap-team-size">Team Size: {project.teamSize}</p>
+            <p className="ap-description">{project.description}</p>
             
-            <div style={styles.techStack}>
+            <div className="ap-tech-stack">
               {project.tech.map((tech, idx) => (
-                <span key={idx} style={styles.techBadge}>{tech}</span>
+                <span key={idx} className="ap-tech-badge">{tech}</span>
               ))}
             </div>
 
-            <div style={styles.links}>
+            <div className="ap-links">
               {project.link && (
-                <a href={project.link} target="_blank" rel="noopener noreferrer" style={styles.link}>
+                <a href={project.link} target="_blank" rel="noopener noreferrer" className="ap-link">
                   Live Demo
                 </a>
               )}
               {project.githubUrl && (
-                <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" style={styles.link}>
+                <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="ap-link">
                   GitHub
                 </a>
               )}
             </div>
 
-            <div style={styles.actions}>
-              <button style={styles.editButton} onClick={() => openModal(project)}>
+            <div className="ap-actions">
+              <button className="ap-edit-button" onClick={() => openModal(project)}>
                 Edit
               </button>
-              <button style={styles.toggleButton} onClick={() => handleToggle(project._id)}>
+              <button className="ap-toggle-button" onClick={() => handleToggle(project._id)}>
                 {project.isActive ? 'Deactivate' : 'Activate'}
               </button>
-              <button style={styles.deleteButton} onClick={() => handleDelete(project._id)}>
+              <button className="ap-delete-button" onClick={() => handleDelete(project._id)}>
                 Delete
               </button>
             </div>
@@ -280,84 +277,84 @@ const AdminProjects = () => {
       </div>
 
       {showModal && (
-        <div style={styles.modalOverlay} onClick={closeModal}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>
+        <div className="ap-modal-overlay" onClick={closeModal}>
+          <div className="ap-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ap-modal-header">
+              <h2 className="ap-modal-title">
                 {editingProject ? 'Edit Project' : 'Add New Project'}
               </h2>
-              <button style={styles.closeButton} onClick={closeModal}>×</button>
+              <button className="ap-close-button" onClick={closeModal}>×</button>
             </div>
 
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Title *</label>
+            <div className="ap-form">
+              <div className="ap-form-group">
+                <label className="ap-label">Title *</label>
                 <input
                   type="text"
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
-                  style={styles.input}
+                  className="ap-input"
                   required
                 />
               </div>
 
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Period *</label>
+              <div className="ap-form-row">
+                <div className="ap-form-group">
+                  <label className="ap-label">Period *</label>
                   <input
                     type="text"
                     name="period"
                     value={formData.period}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                     placeholder="30 May, 2025 - 23 Jul, 2024"
                     required
                   />
                 </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Team Size *</label>
+                <div className="ap-form-group">
+                  <label className="ap-label">Team Size *</label>
                   <input
                     type="number"
                     name="teamSize"
                     value={formData.teamSize}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                     min="1"
                     required
                   />
                 </div>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Description *</label>
+              <div className="ap-form-group">
+                <label className="ap-label">Description *</label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
-                  style={styles.textarea}
+                  className="ap-textarea"
                   rows="3"
                   required
                 />
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Detailed Description *</label>
+              <div className="ap-form-group">
+                <label className="ap-label">Detailed Description *</label>
                 {formData.detailedDescription.map((item, index) => (
-                  <div key={index} style={styles.arrayInputGroup}>
+                  <div key={index} className="ap-array-input-group">
                     <input
                       type="text"
                       value={item}
                       onChange={(e) => handleArrayInputChange('detailedDescription', index, e.target.value)}
-                      style={styles.input}
+                      className="ap-input"
                       placeholder={`Point ${index + 1}`}
                     />
                     {formData.detailedDescription.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeArrayField('detailedDescription', index)}
-                        style={styles.removeButton}
+                        className="ap-remove-button"
                       >
                         ×
                       </button>
@@ -367,28 +364,28 @@ const AdminProjects = () => {
                 <button
                   type="button"
                   onClick={() => addArrayField('detailedDescription')}
-                  style={styles.addFieldButton}
+                  className="ap-add-field-button"
                 >
                   + Add Point
                 </button>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Tech Stack *</label>
+              <div className="ap-form-group">
+                <label className="ap-label">Tech Stack *</label>
                 {formData.tech.map((item, index) => (
-                  <div key={index} style={styles.arrayInputGroup}>
+                  <div key={index} className="ap-array-input-group">
                     <input
                       type="text"
                       value={item}
                       onChange={(e) => handleArrayInputChange('tech', index, e.target.value)}
-                      style={styles.input}
+                      className="ap-input"
                       placeholder={`Technology ${index + 1}`}
                     />
                     {formData.tech.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeArrayField('tech', index)}
-                        style={styles.removeButton}
+                        className="ap-remove-button"
                       >
                         ×
                       </button>
@@ -398,28 +395,28 @@ const AdminProjects = () => {
                 <button
                   type="button"
                   onClick={() => addArrayField('tech')}
-                  style={styles.addFieldButton}
+                  className="ap-add-field-button"
                 >
                   + Add Technology
                 </button>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Outcomes *</label>
+              <div className="ap-form-group">
+                <label className="ap-label">Outcomes *</label>
                 {formData.outcomes.map((item, index) => (
-                  <div key={index} style={styles.arrayInputGroup}>
+                  <div key={index} className="ap-array-input-group">
                     <input
                       type="text"
                       value={item}
                       onChange={(e) => handleArrayInputChange('outcomes', index, e.target.value)}
-                      style={styles.input}
+                      className="ap-input"
                       placeholder={`Outcome ${index + 1}`}
                     />
                     {formData.outcomes.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeArrayField('outcomes', index)}
-                        style={styles.removeButton}
+                        className="ap-remove-button"
                       >
                         ×
                       </button>
@@ -429,429 +426,120 @@ const AdminProjects = () => {
                 <button
                   type="button"
                   onClick={() => addArrayField('outcomes')}
-                  style={styles.addFieldButton}
+                  className="ap-add-field-button"
                 >
                   + Add Outcome
                 </button>
               </div>
 
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Live Link</label>
+              <div className="ap-form-row">
+                <div className="ap-form-group">
+                  <label className="ap-label">Live Link</label>
                   <input
                     type="url"
                     name="link"
                     value={formData.link}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                     placeholder="https://..."
                   />
                 </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>GitHub URL</label>
+                <div className="ap-form-group">
+                  <label className="ap-label">GitHub URL</label>
                   <input
                     type="url"
                     name="githubUrl"
                     value={formData.githubUrl}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                     placeholder="https://github.com/..."
                   />
                 </div>
               </div>
 
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Color</label>
+              <div className="ap-form-row">
+                <div className="ap-form-group">
+                  <label className="ap-label">Color</label>
                   <input
                     type="text"
                     name="color"
                     value={formData.color}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                     placeholder="purple, blue, etc."
                   />
                 </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Order</label>
+                <div className="ap-form-group">
+                  <label className="ap-label">Order</label>
                   <input
                     type="number"
                     name="order"
                     value={formData.order}
                     onChange={handleInputChange}
-                    style={styles.input}
+                    className="ap-input"
                   />
                 </div>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Image URL</label>
+              <div className="ap-form-group">
+                <label className="ap-label">Image URL</label>
                 <input
                   type="url"
                   name="imageUrl"
                   value={formData.imageUrl}
                   onChange={handleInputChange}
-                  style={styles.input}
+                  className="ap-input"
                   placeholder="https://..."
                 />
               </div>
-               <div style={styles.formGroup}>
-  <label style={styles.label}>Gallery Images</label>
-  {formData.galleryImages.map((item, index) => (
-    <div key={index} style={styles.arrayInputGroup}>
-      <input
-        type="url"
-        value={item}
-        onChange={(e) => handleArrayInputChange('galleryImages', index, e.target.value)}
-        style={styles.input}
-        placeholder={`Image URL ${index + 1}`}
-      />
-      {formData.galleryImages.length > 0 && (
-        <button
-          type="button"
-          onClick={() => removeArrayField('galleryImages', index)}
-          style={styles.removeButton}
-        >
-          ×
-        </button>
-      )}
-    </div>
-  ))}
-  <button
-    type="button"
-    onClick={() => addArrayField('galleryImages')}
-    style={styles.addFieldButton}
-  >
-    + Add Gallery Image
-  </button>
-</div>
-              <div style={styles.modalActions}>
-                <button type="button" onClick={closeModal} style={styles.cancelButton}>
+
+              <div className="ap-form-group">
+                <label className="ap-label">Gallery Images</label>
+                {formData.galleryImages.map((item, index) => (
+                  <div key={index} className="ap-array-input-group">
+                    <input
+                      type="url"
+                      value={item}
+                      onChange={(e) => handleArrayInputChange('galleryImages', index, e.target.value)}
+                      className="ap-input"
+                      placeholder={`Image URL ${index + 1}`}
+                    />
+                    {formData.galleryImages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => removeArrayField('galleryImages', index)}
+                        className="ap-remove-button"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addArrayField('galleryImages')}
+                  className="ap-add-field-button"
+                >
+                  + Add Gallery Image
+                </button>
+              </div>
+
+              <div className="ap-modal-actions">
+                <button type="button" onClick={closeModal} className="ap-cancel-button">
                   Cancel
                 </button>
-                <button type="submit" style={styles.submitButton}>
+                <button type="button" onClick={handleSubmit} className="ap-submit-button">
                   {editingProject ? 'Update Project' : 'Create Project'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: '24px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: '#f9fafb',
-    minHeight: '100vh'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '32px'
-  },
-  title: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#111827',
-    margin: 0
-  },
-  addButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s'
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '48px',
-    fontSize: '18px',
-    color: '#6b7280'
-  },
-  errorMessage: {
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    padding: '16px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-    border: '1px solid #fecaca'
-  },
-  successMessage: {
-    backgroundColor: '#d1fae5',
-    color: '#065f46',
-    padding: '16px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-    border: '1px solid #6ee7b7'
-  },
-  projectsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-    gap: '24px'
-  },
-  projectCard: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    transition: 'box-shadow 0.2s'
-  },
-  projectHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '12px'
-  },
-  projectTitle: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#111827',
-    margin: 0,
-    flex: 1
-  },
-  statusBadge: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'white',
-    padding: '4px 12px',
-    borderRadius: '999px',
-    marginLeft: '8px'
-  },
-  period: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '8px'
-  },
-  teamSize: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '12px'
-  },
-  description: {
-    fontSize: '14px',
-    color: '#374151',
-    lineHeight: '1.6',
-    marginBottom: '16px'
-  },
-  techStack: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    marginBottom: '16px'
-  },
-  techBadge: {
-    fontSize: '12px',
-    color: '#3b82f6',
-    backgroundColor: '#eff6ff',
-    padding: '4px 12px',
-    borderRadius: '999px',
-    fontWeight: '500'
-  },
-  links: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '16px'
-  },
-  link: {
-    fontSize: '14px',
-    color: '#3b82f6',
-    textDecoration: 'none',
-    fontWeight: '500'
-  },
-  actions: {
-    display: 'flex',
-    gap: '8px',
-    paddingTop: '16px',
-    borderTop: '1px solid #e5e7eb'
-  },
-  editButton: {
-    flex: 1,
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer'
-  },
-  toggleButton: {
-    flex: 1,
-    backgroundColor: '#f59e0b',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer'
-  },
-  deleteButton: {
-    flex: 1,
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer'
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: '24px'
-  },
-  modal: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    width: '100%',
-    maxWidth: '800px',
-    maxHeight: '90vh',
-    overflow: 'auto',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '24px',
-    borderBottom: '1px solid #e5e7eb'
-  },
-  modalTitle: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#111827',
-    margin: 0
-  },
-  closeButton: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    fontSize: '32px',
-    color: '#6b7280',
-    cursor: 'pointer',
-    padding: 0,
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  form: {
-    padding: '24px'
-  },
-  formGroup: {
-    marginBottom: '20px'
-  },
-  formRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-    marginBottom: '20px'
-  },
-  label: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: '8px'
-  },
-  input: {
-    width: '100%',
-    padding: '10px 12px',
-    fontSize: '14px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-    boxSizing: 'border-box'
-  },
-  textarea: {
-    width: '100%',
-    padding: '10px 12px',
-    fontSize: '14px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-    boxSizing: 'border-box'
-  },
-  arrayInputGroup: {
-    display: 'flex',
-    gap: '8px',
-    marginBottom: '8px'
-  },
-  removeButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '10px 16px',
-    fontSize: '18px',
-    cursor: 'pointer',
-    flexShrink: 0
-  },
-  addFieldButton: {
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    marginTop: '4px'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    paddingTop: '24px',
-    borderTop: '1px solid #e5e7eb'
-  },
-  cancelButton: {
-    backgroundColor: 'white',
-    color: '#374151',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    padding: '10px 24px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer'
-  },
-  submitButton: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '10px 24px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer'
-  }
 };
 
 export default AdminProjects;

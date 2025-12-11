@@ -71,7 +71,7 @@ body {
   background: linear-gradient(135deg, var(--primary-bg) 0%, var(--tertiary-bg) 100%);
   padding: var(--spacing-lg);
   position: relative;
-  top:30px;
+ 
 }
 
 /* Header Styles */

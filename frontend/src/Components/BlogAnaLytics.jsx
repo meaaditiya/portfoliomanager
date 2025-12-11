@@ -1388,7 +1388,7 @@ const BlogAnalytics = ({ blogId }) => {
                 <h3>Blog Reports ({reports.total})</h3>
                 {reports.total > 0 && (
                   <button 
-                    className="btn-clear-reports"
+                    className="img-edt-btn"
                     onClick={clearAllReports}
                   >
                     <FaTrash /> Clear All Reports
@@ -1417,7 +1417,7 @@ const BlogAnalytics = ({ blogId }) => {
                       
                       <div className="report-actions">
                         <button 
-                          className="btn btn-sm btn-delete"
+                          className="img-edt-btn"
                           onClick={() => deleteReport(report._id)}
                           title="Delete this report"
                         >
@@ -1665,7 +1665,7 @@ const BlogAnalytics = ({ blogId }) => {
                           <div className="comment-actions">
                             {commentTab !== 'approved' && (
                               <button 
-                                className="btn btn-sm btn-approve"
+                                className="img-edt-btn"
                                 onClick={() => updateCommentStatus(comment._id, 'approved')}
                                 title="Approve comment"
                               >
@@ -1674,7 +1674,7 @@ const BlogAnalytics = ({ blogId }) => {
                             )}
                             {commentTab !== 'pending' && (
                               <button 
-                                className="btn btn-sm btn-pending"
+                                className="img-edt-btn"
                                 onClick={() => updateCommentStatus(comment._id, 'pending')}
                                 title="Mark as pending"
                               >
@@ -1683,7 +1683,7 @@ const BlogAnalytics = ({ blogId }) => {
                             )}
                             {commentTab !== 'rejected' && (
                               <button 
-                                className="btn btn-sm btn-reject"
+                                className="img-edt-btn"
                                 onClick={() => updateCommentStatus(comment._id, 'rejected')}
                                 title="Reject comment"
                               >
@@ -1691,7 +1691,7 @@ const BlogAnalytics = ({ blogId }) => {
                               </button>
                             )}
                             <button 
-                              className="btn btn-sm btn-delete"
+                              className="img-dlt-btn"
                               onClick={() => deleteComment(comment._id)}
                               title="Delete comment"
                             >

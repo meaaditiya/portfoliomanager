@@ -292,37 +292,37 @@ const EmailDashboard = () => {
   };
 
   return (
-    <div className="container">
+    <div className="emd-dashboard-container-wrap">
       {message && (
-        <div className={`message ${messageType}`}>
+        <div className={`emd-alert-notification-box emd-alert-${messageType}`}>
           {message}
         </div>
       )}
 
-      <div className="tabs">
+      <div className="emd-navigation-tabs-wrapper">
         <button
-          className={`tab ${activeTab === 'send' ? 'active-tab' : ''}`}
+          className={`emd-nav-tab-button ${activeTab === 'send' ? 'emd-nav-tab-active' : ''}`}
           onClick={() => setActiveTab('send')}
         >
           <Send size={16} />
           Send Email
         </button>
         <button
-          className={`tab ${activeTab === 'bulk' ? 'active-tab' : ''}`}
+          className={`emd-nav-tab-button ${activeTab === 'bulk' ? 'emd-nav-tab-active' : ''}`}
           onClick={() => setActiveTab('bulk')}
         >
           <Users size={16} />
           Bulk Email
         </button>
         <button
-          className={`tab ${activeTab === 'history' ? 'active-tab' : ''}`}
+          className={`emd-nav-tab-button ${activeTab === 'history' ? 'emd-nav-tab-active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
           <Mail size={16} />
           History
         </button>
         <button
-          className={`tab ${activeTab === 'stats' ? 'active-tab' : ''}`}
+          className={`emd-nav-tab-button ${activeTab === 'stats' ? 'emd-nav-tab-active' : ''}`}
           onClick={() => setActiveTab('stats')}
         >
           <BarChart3 size={16} />
@@ -330,61 +330,61 @@ const EmailDashboard = () => {
         </button>
       </div>
 
-      <div className="content">
+      <div className="emd-main-content-area">
         {activeTab === 'send' && (
-          <div className="card">
-            <h2 className="card-title">Send Single Email</h2>
-            <form onSubmit={sendSingleEmail} className="form">
-              <div className="form-group">
-                <label className="label">To:</label>
+          <div className="emd-content-card-box">
+            <h2 className="emd-section-heading-title">Send Single Email</h2>
+            <form onSubmit={sendSingleEmail} className="emd-email-form-container">
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">To:</label>
                 <input
                   type="email"
                   value={singleEmail.to}
                   onChange={(e) => setSingleEmail({...singleEmail, to: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Subject:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Subject:</label>
                 <input
                   type="text"
                   value={singleEmail.subject}
                   onChange={(e) => setSingleEmail({...singleEmail, subject: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Sender Name:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Sender Name:</label>
                 <input
                   type="text"
                   value={singleEmail.senderName}
                   onChange={(e) => setSingleEmail({...singleEmail, senderName: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                 />
               </div>
-               <div className="form-group">
-                <label className="label">Receiver Name:</label>
+               <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Receiver Name:</label>
                 <input
                   type="text"
                   value={singleEmail.receiverName}
                   onChange={(e) => setSingleEmail({...singleEmail, receiverName: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Message:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Message:</label>
                 <textarea
                   value={singleEmail.message}
                   onChange={(e) => setSingleEmail({...singleEmail, message: e.target.value})}
-                  className="textarea"
+                  className="emd-textarea-input-field"
                   rows={6}
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Attachments:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Attachments:</label>
                 <div style={{ marginBottom: '10px' }}>
                   <input
                     type="file"
@@ -418,12 +418,12 @@ const EmailDashboard = () => {
                   </small>
                 </div>
                 {singleAttachments.length > 0 && (
-                  <div className="attachment-list">
+                  <div className="emd-attachment-files-list">
                     <p style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
                       Selected Files ({singleAttachments.length}):
                     </p>
                     {singleAttachments.map((file, index) => (
-                      <div key={index} className="attachment-item" style={{
+                      <div key={index} className="emd-attachment-file-item" style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -453,7 +453,7 @@ const EmailDashboard = () => {
                   </div>
                 )}
               </div>
-              <button type="submit" className="submit-button" disabled={loading}>
+              <button type="submit" className="emd-primary-submit-btn" disabled={loading}>
                 {loading ? 'Sending...' : 'Send Email'}
               </button>
             </form>
@@ -461,18 +461,18 @@ const EmailDashboard = () => {
         )}
 
         {activeTab === 'bulk' && (
-          <div className="card">
-            <h2 className="card-title">Send Bulk Email</h2>
-            <form onSubmit={sendBulkEmail} className="form">
-              <div className="form-group">
-                <label className="label">Recipients:</label>
+          <div className="emd-content-card-box">
+            <h2 className="emd-section-heading-title">Send Bulk Email</h2>
+            <form onSubmit={sendBulkEmail} className="emd-email-form-container">
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Recipients:</label>
                 {bulkEmail.recipients.map((email, index) => (
-                  <div key={index} className="recipient-row">
+                  <div key={index} className="emd-recipient-input-row">
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => updateBulkRecipient(index, e.target.value)}
-                      className="input"
+                      className="emd-text-input-field"
                       placeholder="Enter email address"
                       required
                     />
@@ -480,7 +480,7 @@ const EmailDashboard = () => {
                       <button
                         type="button"
                         onClick={() => removeBulkRecipient(index)}
-                        className="remove-button"
+                        className="emd-recipient-remove-btn"
                       >
                         <Minus size={16} />
                       </button>
@@ -490,53 +490,53 @@ const EmailDashboard = () => {
                 <button
                   type="button"
                   onClick={addBulkRecipient}
-                  className="add-button"
+                  className="emd-recipient-add-btn"
                 >
                   <Plus size={16} />
                   Add Recipient
                 </button>
               </div>
-              <div className="form-group">
-                <label className="label">Subject:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Subject:</label>
                 <input
                   type="text"
                   value={bulkEmail.subject}
                   onChange={(e) => setBulkEmail({...bulkEmail, subject: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Sender Name:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Sender Name:</label>
                 <input
                   type="text"
                   value={bulkEmail.senderName}
                   onChange={(e) => setBulkEmail({...bulkEmail, senderName: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                 />
               </div>
               
-               <div className="form-group">
-                <label className="label">Receiver Name:</label>
+               <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Receiver Name:</label>
                 <input
                   type="text"
                   value={bulkEmail.receiverName}
                   onChange={(e) => setBulkEmail({...bulkEmail, receiverName: e.target.value})}
-                  className="input"
+                  className="emd-text-input-field"
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Message:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Message:</label>
                 <textarea
                   value={bulkEmail.message}
                   onChange={(e) => setBulkEmail({...bulkEmail, message: e.target.value})}
-                  className="textarea"
+                  className="emd-textarea-input-field"
                   rows={6}
                   required
                 />
               </div>
-              <div className="form-group">
-                <label className="label">Attachments:</label>
+              <div className="emd-form-field-group">
+                <label className="emd-input-field-label">Attachments:</label>
                 <div style={{ marginBottom: '10px' }}>
                   <input
                     type="file"
@@ -570,12 +570,12 @@ const EmailDashboard = () => {
                   </small>
                 </div>
                 {bulkAttachments.length > 0 && (
-                  <div className="attachment-list">
+                  <div className="emd-attachment-files-list">
                     <p style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>
                       Selected Files ({bulkAttachments.length}):
                     </p>
                     {bulkAttachments.map((file, index) => (
-                      <div key={index} className="attachment-item" style={{
+                      <div key={index} className="emd-attachment-file-item" style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -605,7 +605,7 @@ const EmailDashboard = () => {
                   </div>
                 )}
               </div>
-              <button type="submit" className="submit-button" disabled={loading}>
+              <button type="submit" className="emd-primary-submit-btn" disabled={loading}>
                 {loading ? 'Sending...' : 'Send Bulk Email'}
               </button>
             </form>
@@ -613,40 +613,40 @@ const EmailDashboard = () => {
         )}
 
         {activeTab === 'history' && (
-          <div className="card">
-            <h2 className="card-title">Email History</h2>
-            <div className="table-container">
-              <table className="table">
+          <div className="emd-content-card-box">
+            <h2 className="emd-section-heading-title">Email History</h2>
+            <div className="emd-data-table-wrapper">
+              <table className="emd-history-data-table">
                 <thead>
                   <tr>
-                    <th className="th">To</th>
-                    <th className="th">Subject</th>
-                    <th className="th">Status</th>
-                    <th className="th">Date</th>
-                    <th className="th">Actions</th>
+                    <th className="emd-table-header-cell">To</th>
+                    <th className="emd-table-header-cell">Subject</th>
+                    <th className="emd-table-header-cell">Status</th>
+                    <th className="emd-table-header-cell">Date</th>
+                    <th className="emd-table-header-cell">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {emailHistory.map((email) => (
                     <tr key={email._id}>
-                      <td className="td">{email.to}</td>
-                      <td className="td">{email.subject}</td>
-                      <td className="td">
-                        <span className={`status ${email.status === 'sent' ? 'status-sent' : 'status-failed'}`}>
+                      <td className="emd-table-body-cell">{email.to}</td>
+                      <td className="emd-table-body-cell">{email.subject}</td>
+                      <td className="emd-table-body-cell">
+                        <span className={`emd-email-status-badge ${email.status === 'sent' ? 'emd-status-sent-badge' : 'emd-status-failed-badge'}`}>
                           {email.status}
                         </span>
                       </td>
-                      <td className="td">
+                      <td className="emd-table-body-cell">
                         {new Date(email.sentAt).toLocaleDateString()}
                       </td>
-                      <td className="td">
-                        <div className="action-buttons">
+                      <td className="emd-table-body-cell">
+                        <div className="emd-table-action-btns">
                           {email.attachments && email.attachments.length > 0 && (
                             email.attachments.map((attachment, index) => (
                               <button
                                 key={index}
                                 onClick={() => downloadAttachment(email._id, attachment._id, attachment.filename)}
-                                className="action-button"
+                                className="emd-icon-action-btn"
                                 title={`Download ${attachment.filename}`}
                               >
                                 <Download size={16} />
@@ -655,7 +655,7 @@ const EmailDashboard = () => {
                           )}
                           <button
                             onClick={() => deleteEmail(email._id)}
-                            className="action-button"
+                            className="emd-icon-action-btn"
                             title="Delete email"
                           >
                             <Trash2 size={16} />
@@ -667,21 +667,21 @@ const EmailDashboard = () => {
                 </tbody>
               </table>
             </div>
-            <div className="pagination">
+            <div className="emd-table-pagination-controls">
               <button
                 onClick={() => fetchEmailHistory(pagination.page - 1)}
                 disabled={pagination.page === 1}
-                className="pagination-button"
+                className="emd-pagination-nav-btn"
               >
                 Previous
               </button>
-              <span className="pagination-info">
+              <span className="emd-pagination-page-info">
                 Page {pagination.page} of {pagination.pages}
               </span>
               <button
                 onClick={() => fetchEmailHistory(pagination.page + 1)}
                 disabled={pagination.page === pagination.pages}
-                className="pagination-button"
+                className="emd-pagination-nav-btn"
               >
                 Next
               </button>
@@ -690,24 +690,24 @@ const EmailDashboard = () => {
         )}
 
         {activeTab === 'stats' && (
-          <div className="card">
-            <h2 className="card-title">Email Statistics</h2>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h3 className="stat-title">Total Emails</h3>
-                <p className="stat-value">{stats.total || 0}</p>
+          <div className="emd-content-card-box">
+            <h2 className="emd-section-heading-title">Email Statistics</h2>
+            <div className="emd-statistics-grid-layout">
+              <div className="emd-stat-display-card">
+                <h3 className="emd-stat-card-title">Total Emails</h3>
+                <p className="emd-stat-card-value">{stats.total || 0}</p>
               </div>
-              <div className="stat-card">
-                <h3 className="stat-title">Sent</h3>
-                <p className="stat-value">{stats.sent || 0}</p>
+              <div className="emd-stat-display-card">
+                <h3 className="emd-stat-card-title">Sent</h3>
+                <p className="emd-stat-card-value">{stats.sent || 0}</p>
               </div>
-              <div className="stat-card">
-                <h3 className="stat-title">Failed</h3>
-                <p className="stat-value">{stats.failed || 0}</p>
+              <div className="emd-stat-display-card">
+                <h3 className="emd-stat-card-title">Failed</h3>
+                <p className="emd-stat-card-value">{stats.failed || 0}</p>
               </div>
-              <div className="stat-card">
-                <h3 className="stat-title">Last 24 Hours</h3>
-                <p className="stat-value">{stats.last24Hours || 0}</p>
+              <div className="emd-stat-display-card">
+                <h3 className="emd-stat-card-title">Last 24 Hours</h3>
+                <p className="emd-stat-card-value">{stats.last24Hours || 0}</p>
               </div>
             </div>
           </div>

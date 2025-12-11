@@ -1,109 +1,283 @@
-/* Base styles */
+/* Welcome.css - Professional Minimalist Design */
+
+:root {
+  --color-accent: #06b6d4;
+  --color-black: #0f172a;
+  --color-white: #f5f3f0;
+  --color-gray-50: #f5f3f0;
+  --color-gray-100: #ede8e3;
+  --color-gray-200: #e2d9d0;
+  --color-gray-300: #d4c7b8;
+  --color-gray-400: #b8a894;
+  --color-gray-500: #9c8a70;
+  --color-gray-600: #7d6b53;
+  --color-gray-700: #5e4d3a;
+  --color-gray-800: #453629;
+  --color-gray-900: #2d201a;
+  --color-gold: #fbbf24;
+  --color-gold-dark: #f59e0b;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .welcome-container {
-  background-color: #ffffff;
-  color: #000000;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 40px 24px;
-  max-width: 600px;
-  margin: 40px auto;
-  border: 2px solid #000000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  padding: 32px;
+  background-color: var(--color-gray-50);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: relative;
-  top:40px;
 }
 
-/* Title */
+/* Subtle background texture */
+.welcome-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(circle at 2px 2px, var(--color-gray-200) 1px, transparent 0);
+  background-size: 32px 32px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 .welcome-title {
-  font-size: 32px;
+  font-size: clamp(32px, 5vw, 56px);
   font-weight: 700;
-  color: #000000;
-  margin-bottom: 16px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  color: var(--color-black);
+  margin: 0 0 24px 0;
+  text-align: center;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
 }
 
-/* Message */
+/* Accent line under title */
+.welcome-title::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background-color: var(--color-gold);
+}
+
 .welcome-message {
-  font-size: 16px;
-  color: #333333;
+  font-size: clamp(16px, 2.5vw, 20px);
   line-height: 1.6;
-  margin-bottom: 24px;
-  max-width: 80%;
+  color: var(--color-gray-700);
+  margin: 0 0 40px 0;
+  text-align: center;
+  max-width: 600px;
+  position: relative;
+  z-index: 1;
 }
 
-/* Button */
 .welcome-btn {
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
-  padding: 12px 32px;
-  font-size: 14px;
+  background-color: var(--color-black);
+  color: var(--color-white);
+  border: 1px solid var(--color-gray-800);
+  padding: 16px 48px;
+  font-size: 18px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 0;
+  position: relative;
+  z-index: 1;
+  letter-spacing: -0.01em;
+  min-width: 180px;
 }
 
 .welcome-btn:hover {
-  background-color: #333333;
-  transform: translateY(-2px);
+  background-color: var(--color-gray-900);
+  border-color: var(--color-gray-700);
 }
 
 .welcome-btn:active {
-  transform: translateY(0);
+  background-color: var(--color-gray-800);
 }
 
-/* Responsive Design */
+.welcome-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-gray-300);
+}
+
+/* Tablet Responsive - 1024px and below */
+@media (max-width: 1024px) {
+  .welcome-container {
+    padding: 24px;
+  }
+
+  .welcome-title {
+    margin-bottom: 20px;
+  }
+
+  .welcome-title::after {
+    width: 70px;
+    bottom: -10px;
+  }
+
+  .welcome-message {
+    margin-bottom: 32px;
+  }
+
+  .welcome-btn {
+    padding: 14px 40px;
+    font-size: 16px;
+  }
+}
+
+/* Mobile Responsive - 768px and below */
 @media (max-width: 768px) {
   .welcome-container {
-    padding: 24px 16px;
-    margin: 24px 8px;
-    width: calc(100vw - 16px); /* Full width minus padding */
-    box-sizing: border-box;
+    padding: 20px 16px;
+  }
+
+  .welcome-title {
+    margin-bottom: 16px;
+  }
+
+  .welcome-title::after {
+    width: 60px;
+    height: 2px;
+    bottom: -8px;
+  }
+
+  .welcome-message {
+    margin-bottom: 28px;
+    font-size: 16px;
+  }
+
+  .welcome-btn {
+    padding: 12px 32px;
+    font-size: 15px;
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
+/* Small Mobile - 480px and below */
+@media (max-width: 480px) {
+  .welcome-container {
+    padding: 16px 12px;
   }
 
   .welcome-title {
     font-size: 28px;
+    margin-bottom: 12px;
+  }
+
+  .welcome-title::after {
+    width: 50px;
+    bottom: -6px;
   }
 
   .welcome-message {
     font-size: 14px;
-    max-width: 90%;
+    margin-bottom: 24px;
   }
 
   .welcome-btn {
-    padding: 10px 24px;
-    font-size: 13px;
+    padding: 12px 24px;
+    font-size: 14px;
+    width: 100%;
+    max-width: 280px;
   }
 }
 
-@media (max-width: 480px) {
+/* Extra Small Mobile - 360px and below */
+@media (max-width: 360px) {
   .welcome-container {
-    padding: 16px 12px;
-    margin: 16px 4px;
-    width: calc(100vw - 8px); /* Full width minus minimal padding */
+    padding: 12px;
   }
 
   .welcome-title {
     font-size: 24px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+  }
+
+  .welcome-title::after {
+    width: 40px;
   }
 
   .welcome-message {
     font-size: 13px;
-    max-width: 95%;
+    margin-bottom: 20px;
   }
 
   .welcome-btn {
-    padding: 8px 20px;
-    font-size: 12px;
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+}
+
+/* Landscape Mobile Orientation */
+@media (max-height: 600px) and (orientation: landscape) {
+  .welcome-container {
+    min-height: auto;
+    padding: 16px;
+  }
+
+  .welcome-title {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .welcome-title::after {
+    display: none;
+  }
+
+  .welcome-message {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .welcome-btn {
+    padding: 10px 32px;
+    font-size: 14px;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .welcome-btn {
+    border-width: 2px;
+  }
+
+  .welcome-title::after {
+    height: 4px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .welcome-container {
+    min-height: auto;
+    background-color: white;
+  }
+
+  .welcome-container::before {
+    display: none;
+  }
+
+  .welcome-btn {
+    display: none;
+  }
+
+  .welcome-title,
+  .welcome-message {
+    color: black;
   }
 }

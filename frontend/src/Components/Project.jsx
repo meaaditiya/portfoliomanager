@@ -220,51 +220,51 @@ const AdminProjectRequests = () => {
     const previewUrl = filePreviewUrls[`${requestId}_${index}`];
 
     return (
-      <div key={index} className="file-item">
-        <div className="file-preview">
+      <div key={index} className="proj-file-card">
+        <div className="proj-file-preview-wrapper">
           {isImage ? (
-            <div className="image-preview">
+            <div className="proj-image-preview-box">
               {previewUrl ? (
                 <img 
                   src={previewUrl} 
                   alt={file.originalName}
-                  className="preview-image"
+                  className="proj-preview-image"
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'block';
+                    e.target.nextSibling.style.display = 'flex';
                   }}
                 />
               ) : (
-                <div className="loading-preview">Loading...</div>
+                <div className="proj-loading-preview">Loading...</div>
               )}
-              <div className="image-fallback" style={{ display: 'none' }}>
-                <span className="file-icon">🖼️</span>
-                <span className="file-error">Preview not available</span>
+              <div className="proj-image-fallback" style={{ display: 'none' }}>
+                <span className="proj-file-icon">🖼️</span>
+                <span className="proj-file-error">Preview not available</span>
               </div>
             </div>
           ) : (
-            <div className="file-icon-container">
-              <span className="file-icon">{getFileIcon(file.mimetype)}</span>
+            <div className="proj-file-icon-wrapper">
+              <span className="proj-file-icon">{getFileIcon(file.mimetype)}</span>
             </div>
           )}
         </div>
         
-        <div className="file-info">
-          <span className="file-name" title={file.originalName}>
+        <div className="proj-file-info-section">
+          <span className="proj-file-name" title={file.originalName}>
             {file.originalName}
           </span>
-          <span className="file-details">
+          <span className="proj-file-meta">
             {file.mimetype} • {formatFileSize(file.size)}
           </span>
-          <span className="file-uploaded">
+          <span className="proj-file-timestamp">
             Uploaded: {new Date(file.uploadedAt).toLocaleString()}
           </span>
         </div>
         
-        <div className="file-actions">
+        <div className="proj-file-actions-group">
           {isImage && previewUrl && (
             <button
-              className="preview-button"
+              className="proj-preview-btn"
               onClick={() => window.open(previewUrl, '_blank')}
               title="Open in new tab"
             >
@@ -272,7 +272,7 @@ const AdminProjectRequests = () => {
             </button>
           )}
           <button
-            className="download-button"
+            className="proj-download-btn"
             onClick={() => handleDownloadFile(requestId, index, file.originalName)}
             title="Download file"
           >
@@ -284,12 +284,12 @@ const AdminProjectRequests = () => {
   };
 
   const renderRequestDetails = () => (
-    <div className="fullscreen-modal">
-      <div className="modal-content">
-        <div className="modal-header">
+    <div className="proj-modal-overlay">
+      <div className="proj-modal-container">
+        <div className="proj-modal-header">
           <h2>Project Request Details</h2>
           <button
-            className="close-button"
+            className="proj-close-btn"
             onClick={() => {
               setSelectedRequest(null);
               // Clean up preview URLs
@@ -306,78 +306,78 @@ const AdminProjectRequests = () => {
           </button>
         </div>
         
-        <div className="modal-body">
-          <div className="detail-grid">
-            <div className="detail-item">
+        <div className="proj-modal-body">
+          <div className="proj-details-grid">
+            <div className="proj-detail-field">
               <strong>Name:</strong>
               <span>{selectedRequest?.name || 'N/A'}</span>
             </div>
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Email:</strong>
               <span>{selectedRequest?.email || 'N/A'}</span>
             </div>
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Project Type:</strong>
               <span>{selectedRequest?.projectType || 'N/A'}</span>
             </div>
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Budget:</strong>
               <span>{selectedRequest?.budget || 'Not specified'}</span>
             </div>
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Timeline:</strong>
               <span>{selectedRequest?.timeline || 'Not specified'}</span>
             </div>
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Status:</strong>
-              <span className={`status ${selectedRequest?.status}`}>
+              <span className={`proj-status-badge ${selectedRequest?.status}`}>
                 {selectedRequest?.status || 'N/A'}
               </span>
             </div>
             
-            <div className="detail-item full-width">
+            <div className="proj-detail-field proj-field-full">
               <strong>Description:</strong>
               <p>{selectedRequest?.description || 'N/A'}</p>
             </div>
             
-            <div className="detail-item full-width">
+            <div className="proj-detail-field proj-field-full">
               <strong>Features:</strong>
               <p>{selectedRequest?.features || 'Not specified'}</p>
             </div>
             
-            <div className="detail-item full-width">
+            <div className="proj-detail-field proj-field-full">
               <strong>Tech Preferences:</strong>
               <p>{selectedRequest?.techPreferences || 'Not specified'}</p>
             </div>
             
-            <div className="detail-item full-width">
+            <div className="proj-detail-field proj-field-full">
               <strong>Additional Info:</strong>
               <p>{selectedRequest?.additionalInfo || 'Not specified'}</p>
             </div>
             
             {/* Enhanced File Display Section */}
             {selectedRequest?.files && selectedRequest.files.length > 0 ? (
-              <div className="detail-item full-width">
+              <div className="proj-detail-field proj-field-full">
                 <strong>Uploaded Files ({selectedRequest.files.length}):</strong>
-                <div className="files-list">
+                <div className="proj-files-list">
                   {selectedRequest.files.map((file, index) => 
                     renderFileItem(file, index, selectedRequest._id)
                   )}
                 </div>
               </div>
             ) : (
-              <div className="detail-item full-width">
+              <div className="proj-detail-field proj-field-full">
                 <strong>Uploaded Files:</strong>
-                <p className="no-files">No files uploaded with this request.</p>
+                <p className="proj-no-files">No files uploaded with this request.</p>
               </div>
             )}
             
-            <div className="detail-item">
+            <div className="proj-detail-field">
               <strong>Submitted At:</strong>
               <span>
                 {selectedRequest?.createdAt ? new Date(selectedRequest.createdAt).toLocaleString() : 'N/A'}
@@ -386,10 +386,10 @@ const AdminProjectRequests = () => {
           </div>
         </div>
         
-        <div className="modal-actions">
+        <div className="proj-modal-footer">
           {selectedRequest?.status === 'pending' && (
             <button
-              className="action-button acknowledge"
+              className="proj-action-btn proj-acknowledge-btn"
               onClick={() => handleAcknowledge(selectedRequest._id)}
               disabled={actionLoading}
             >
@@ -397,7 +397,7 @@ const AdminProjectRequests = () => {
             </button>
           )}
           <button
-            className="action-button delete"
+            className="proj-action-btn proj-delete-btn"
             onClick={() => handleDeleteRequest(selectedRequest._id)}
             disabled={actionLoading}
           >
@@ -409,54 +409,52 @@ const AdminProjectRequests = () => {
   );
 
   return (
-    <div className="admin-container">
-      <div className="header">
-         <div className="header-actions">
-        <button
-          className="button2"
-          onClick={fetchRequests}
-          disabled={loading}
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
-        {requests.length > 0 && (
+    <div className="proj-main-wrapper">
+      <div className="proj-header-section">
+        <div className="proj-header-actions">
           <button
-            className="button2"
-            onClick={handleDeleteAllRequests}
-            disabled={actionLoading}
+            className="proj-refresh-btn"
+            onClick={fetchRequests}
+            disabled={loading}
           >
-            {actionLoading ? 'Deleting All...' : 'Delete All'}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
-        )}
-      </div>
+          {requests.length > 0 && (
+            <button
+              className="proj-delete-all-btn"
+              onClick={handleDeleteAllRequests}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Deleting All...' : 'Delete All'}
+            </button>
+          )}
+        </div>
       </div>
 
       {success && (
-        <div className="notification success">
+        <div className="proj-notification proj-notification-success">
           {success}
         </div>
       )}
 
       {error && (
-        <div className="notification error">
+        <div className="proj-notification proj-notification-error">
           {error}
         </div>
       )}
       
-     
-      
       {loading ? (
-        <div className="loading">
-          <div className="spinner"></div>
+        <div className="proj-loading-state">
+          <div className="proj-spinner"></div>
           Loading project requests...
         </div>
       ) : requests.length === 0 ? (
-        <div className="empty-state">
+        <div className="proj-empty-state">
           No project requests found.
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table">
+        <div className="proj-table-wrapper">
+          <table className="proj-data-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -476,7 +474,7 @@ const AdminProjectRequests = () => {
                   <td>{request.projectType || 'N/A'}</td>
                   <td>{request.files?.length || 0}</td>
                   <td>
-                    <span className={`status ${request.status}`}>
+                    <span className={`proj-status-badge ${request.status}`}>
                       {request.status || 'N/A'}
                     </span>
                   </td>
@@ -485,14 +483,13 @@ const AdminProjectRequests = () => {
                   </td>
                   <td>
                     <button
-                      className="button3 button4"
+                      className="proj-view-btn"
                       onClick={() => fetchRequestDetails(request._id)}
-                      style={{ marginRight: '8px' }}
                     >
                       View 
                     </button>
                     <button
-                      className="button3"
+                      className="proj-table-delete-btn"
                       onClick={() => handleDeleteRequest(request._id)}
                       disabled={actionLoading}
                     >

@@ -67,6 +67,7 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background-color: var(--bg-secondary);
+   background-color: var(--color-gray-50);
 }
 
 /* Portfolio Site Manager Container */
@@ -74,6 +75,7 @@ body {
   min-height: 100vh;
   background: var(--bg-secondary);
   position: relative;
+   background-color: var(--color-gray-50);
 }
 
 /* Loading State */

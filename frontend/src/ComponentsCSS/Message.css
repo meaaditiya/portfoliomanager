@@ -1,103 +1,167 @@
+/* Message.css - Professional Minimalist Design */
 
+:root {
+  --color-accent: #06b6d4;
+  --color-black: #0f172a;
+  --color-white: #f5f3f0;
+  --color-gold: #fbbf24;
+  --color-gold-dark: #f59e0b;
+  --color-success: #27ae60;
+  --color-error: #e74c3c;
+  --color-warning: #f39c12;
+  --color-info: #3498db;
+  --color-border: #2d3748;
+  --color-hover: #1a202c;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Main Wrapper */
 .insta-messages-main-wrapper {
-  background-color: #ffffff;
-  color: #000000;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  line-height: 1.6;
-  padding: 20px;
-  max-width: 1800px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
-  margin-left:-10px;
-  margin-right:-10px;
-  margin-top:40px;
+  padding: 24px;
+  background-color: white;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* Header */
 .insta-messages-header {
   margin-bottom: 24px;
-  text-align: center;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--color-gold);
 }
 
 .insta-messages-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #000000;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-black);
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-content: center;
+  gap: 12px;
+}
+
+.insta-messages-title svg {
+  color: var(--color-gold);
+  font-size: 24px;
 }
 
 /* Notification Toast */
 .insta-notification-toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 12px 24px;
-  border-radius: 8px;
+  top: 70px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 2px;
+  font-size: 14px;
   font-weight: 500;
   z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid;
+  animation: slideIn 0.3s ease-out;
 }
 
 .insta-notification-toast.success {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--color-success);
+  color: white;
+  border-color: #229954;
 }
 
 .insta-notification-toast.error {
-  background-color: #ffffff;
-  color: #000000;
-  border: 0.2px solid #000000;
+  background-color: var(--color-error);
+  color: white;
+  border-color: #c0392b;
 }
 
-/* Stats Tabs */
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Stats & Tabs Container */
 .insta-stats-tabs-container {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .insta-stat-tab {
-  background-color: #ffffff;
-  border: 0.2px solid #000000;
-  padding: 10px 16px;
-  border-radius: 12px;
+  background-color: white;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: 20px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
+  text-align: center;
+  position: relative;
 }
 
 .insta-stat-tab:hover {
-  background-color: #f5f5f5;
+  border-color: var(--color-gold);
 }
 
-.insta-stat-tab.insta-active-tab {
-  background-color: #000000;
-  color: #ffffff;
+.insta-active-tab {
+  background-color: var(--color-gold);
+  border-color: var(--color-gold);
+}
+
+.insta-active-tab:hover {
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 .insta-stat-number {
-  font-weight: 700;
-  font-size: 16px;
+  display: block;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-black);
+  margin-bottom: 6px;
+  line-height: 1;
 }
 
 .insta-stat-label {
-  font-size: 14px;
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-black);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .insta-unread-dot {
-  color: #ff4444;
-  width: 10px;
-  height: 10px;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--color-error);
+  font-size: 10px;
+  animation: pulse 2s infinite;
 }
 
-/* Loading and Error States */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Messages List Container */
+.insta-messages-list-container {
+  background-color: white;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  min-height: 500px;
+}
+
+/* Loading, Error, Empty States */
 .insta-loading-state,
 .insta-error-state,
 .insta-empty-state {
@@ -105,184 +169,255 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
-  text-align: center;
-  color: #666666;
+  gap: 16px;
+  padding: 80px 20px;
+  color: var(--color-black);
+}
+
+.insta-loading-spinner,
+.insta-empty-icon {
+  font-size: 48px;
+  color: var(--color-black);
+}
+
+.insta-loading-state span,
+.insta-error-state span,
+.insta-empty-state p {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-black);
 }
 
 .insta-loading-spinner {
-  width: 24px;
-  height: 24px;
   animation: spin 1s linear infinite;
-  margin-bottom: 12px;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  to { transform: rotate(360deg); }
 }
 
-.insta-error-state svg,
-.insta-empty-icon {
-  width: 24px;
-  height: 24px;
-  margin-bottom: 12px;
+.insta-error-state {
+  color: var(--color-error);
+}
+
+.insta-error-state svg {
+  color: var(--color-error);
 }
 
 /* Conversations List */
-.insta-messages-list-container {
-  background-color: #ffffff;
-  border: 0.2px solid #000000;
-  border-radius: 8px;
-  overflow-y: auto;
-  max-height: 70vh;
-}
-
 .insta-conversations-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .insta-conversation-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  transition: all 0.3s ease;
+  gap: 16px;
 }
 
 .insta-conversation-item:hover {
-  background-color: #f8f8f8;
+  background-color: rgba(251, 191, 36, 0.05);
+}
+
+.insta-conversation-item:last-child {
+  border-bottom: none;
+}
+
+.insta-conversation-item.unread {
+  border-left: 3px solid var(--color-info);
+}
+
+.insta-conversation-item.read {
+  border-left: 3px solid var(--color-black);
+}
+
+.insta-conversation-item.replied {
+  border-left: 3px solid var(--color-success);
 }
 
 .insta-conversation-content {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-grow: 1;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
 }
 
+/* Conversation Avatar */
 .insta-conversation-avatar {
-  width: 40px;
-  height: 40px;
-  background-color: #000000;
-  color: #ffffff;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--color-gold);
+  color: var(--color-black);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 600;
+  flex-shrink: 0;
   position: relative;
+  border: 2px solid var(--color-black);
 }
 
 .insta-online-indicator {
-  width: 10px;
-  height: 10px;
-  background-color: #ff4444;
-  border-radius: 50%;
   position: absolute;
-  bottom: 0;
-  right: 0;
-  border: 0.2px solid #ffffff;
+  bottom: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  background-color: var(--color-success);
+  border: 2px solid white;
+  border-radius: 50%;
 }
 
+/* Conversation Details */
 .insta-conversation-details {
-  flex-grow: 1;
+  flex: 1;
+  min-width: 0;
 }
 
 .insta-conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 6px;
+  gap: 12px;
 }
 
 .insta-conversation-name {
-  font-weight: 600;
   font-size: 16px;
-  color: #000000;
+  font-weight: 600;
+  color: var(--color-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .insta-conversation-time {
   font-size: 12px;
-  color: #666666;
+  font-weight: 500;
+  color: var(--color-black);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .insta-conversation-info {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 4px 0;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 12px;
 }
 
 .insta-conversation-email {
-  font-size: 14px;
-  color: #666666;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .insta-conversation-stats-inline {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
-.insta-message-count,
+.insta-message-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-black);
+  white-space: nowrap;
+}
+
 .insta-unread-count {
   font-size: 12px;
-  color: #666666;
-}
-
-.insta-unread-count {
-  color: #ff4444;
   font-weight: 600;
+  color: var(--color-info);
+  white-space: nowrap;
 }
 
 .insta-conversation-preview {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .insta-status-indicator {
-  font-size: 12px;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
 .insta-status-indicator.unread {
-  color: #ff4444;
+  color: var(--color-info);
 }
 
 .insta-status-indicator.read {
-  color: #8e8e8e;
+  color: var(--color-black);
 }
 
 .insta-status-indicator.replied {
-  color: #00d851;
+  color: var(--color-success);
 }
 
 .insta-latest-message {
-  font-size: 14px;
-  color: #666666;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* Conversation Actions - Clear Buttons */
 .insta-conversation-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .insta-action-btn {
-  background-color: #000000;
-  color: #ffffff;
-  border: 0.2px solid #000000;
-  padding: 8px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  background-color: white;
+  color: var(--color-black);
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
 }
 
-.insta-action-btn:hover:not(:disabled) {
-  background-color: #333333;
+.insta-action-btn:hover {
+  border-color: var(--color-black);
+}
+
+.insta-action-btn.mark-read:hover {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+}
+
+.insta-action-btn.mark-unread:hover {
+  background-color: var(--color-info);
+  border-color: var(--color-info);
+  color: white;
+}
+
+.insta-action-btn.delete:hover {
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: white;
 }
 
 .insta-action-btn:disabled {
@@ -290,215 +425,331 @@
   cursor: not-allowed;
 }
 
-.insta-action-btn svg {
-  width: 16px;
-  height: 16px;
+.insta-spinner {
+  animation: spin 1s linear infinite;
 }
 
-/* Chat View */
+/* Chat View Container */
 .insta-chat-container {
-  background-color: #ffffff;
-  border: 0.2px solid #000000;
-  border-radius: 8px;
-  max-height: 80vh;
+  background-color: white;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
+/* Chat Header */
 .insta-chat-header {
+  padding: 20px;
+  border-bottom: 2px solid var(--color-gold);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  border-bottom: 0.1px solid #000000;
+  gap: 16px;
   flex-wrap: wrap;
-  gap: 12px;
+  background-color: white;
 }
 
 .insta-back-button {
-  background-color: #ffffff;
-  color: #000000;
-  border: 0.2px solid #000000;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 8px 16px;
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-black);
+  border-radius: 2px;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+  gap: 8px;
 }
 
 .insta-back-button:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-black);
+  border-color: var(--color-black);
+  color: white;
 }
 
 .insta-chat-user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-grow: 1;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
 }
 
 .insta-chat-avatar {
-  width: 48px;
-  height: 48px;
-  background-color: #000000;
-  color: #ffffff;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--color-gold);
+  color: var(--color-black);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
+  flex-shrink: 0;
+  border: 2px solid var(--color-black);
 }
 
 .insta-chat-user-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .insta-chat-username {
   font-size: 18px;
   font-weight: 600;
-  color: #000000;
-  margin: 0;
+  color: var(--color-black);
+  margin-bottom: 4px;
 }
 
 .insta-chat-user-email {
-  font-size: 14px;
-  color: #666666;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-black);
+  display: block;
+  margin-bottom: 6px;
 }
 
 .insta-conversation-stats {
   display: flex;
-  gap: 12px;
-  font-size: 12px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .insta-stat-item {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-black);
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #666666;
 }
 
 .insta-stat-item.unread {
-  color: #ff4444;
+  color: var(--color-info);
+  font-weight: 600;
 }
 
+/* Chat Actions - Clear Buttons */
 .insta-chat-actions {
   display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mark-all-read,
+.mark-all-unread,
+.delete-all {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  background-color: white;
+  color: var(--color-black);
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
   gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-height: 36px;
 }
 
+.mark-all-read:hover {
+  background-color: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+}
+
+.mark-all-unread:hover {
+  background-color: var(--color-info);
+  border-color: var(--color-info);
+  color: white;
+}
+
+.delete-all:hover {
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: white;
+}
+
+.mark-all-read:disabled,
+.mark-all-unread:disabled,
+.delete-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon1 {
+  font-size: 14px;
+}
+
+/* Chat Messages Area */
 .insta-chat-messages-area {
-  flex-grow: 1;
+  flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 24px;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
+.insta-chat-messages-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.insta-chat-messages-area::-webkit-scrollbar-track {
+  background: white;
+}
+
+.insta-chat-messages-area::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+.insta-chat-messages-area::-webkit-scrollbar-thumb:hover {
+  background: var(--color-black);
+}
+
+/* Message Group */
 .insta-message-group {
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .insta-original-message {
-  margin-bottom: 8px;
+  display: flex;
+  justify-content: flex-start;
   cursor: pointer;
 }
 
-.insta-original-message.selected {
-  background-color: #f5f5f5;
-  border-radius: 8px;
+.insta-original-message.selected .insta-message-bubble {
+  border-color: var(--color-gold);
 }
 
+.insta-reply-message {
+  display: flex;
+  justify-content: flex-end;
+  padding-left: 60px;
+}
+
+/* Message Bubbles */
 .insta-message-bubble {
-  max-width: 80%;
-  padding: 12px;
-  border-radius: 12px;
+  max-width: 70%;
+  padding: 16px;
+  border-radius: 2px;
+  border: 1px solid var(--color-border);
   position: relative;
 }
 
 .insta-received-message {
-  background-color: #ffffff;
-  border: 0.2px solid #000000;
-  margin-right: auto;
+  background-color: white;
+  border-color: var(--color-border);
 }
 
 .insta-sent-message {
-  background-color: #000000;
-  color: #ffffff;
-  margin-left: auto;
-  margin-top:10px;
+  background-color: var(--color-gold);
+  border-color: var(--color-gold);
 }
 
 .insta-message-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  gap: 12px;
 }
 
 .insta-status-badge {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid;
 }
 
 .insta-status-badge.unread {
-  color: #ff4444;
+  background-color: var(--color-info);
+  color: white;
+  border-color: #2980b9;
 }
 
 .insta-status-badge.read {
-  color: #8e8e8e;
+  background-color: var(--color-black);
+  color: white;
+  border-color: var(--color-hover);
 }
 
 .insta-status-badge.replied {
-  color: #00d851;
+  background-color: var(--color-success);
+  color: white;
+  border-color: #229954;
 }
 
 .insta-delete-message-btn {
-  background: none;
-  border: none;
-  color: #000000;
+  background-color: white;
+  border: 1px solid var(--color-border);
+  color: var(--color-black);
+  padding: 6px 10px;
+  border-radius: 2px;
   cursor: pointer;
-  padding: 4px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .insta-delete-message-btn:hover {
-  color: #333333;
+  background-color: var(--color-error);
+  border-color: var(--color-error);
+  color: white;
 }
 
 .insta-message-text {
-  margin: 0;
   font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-black);
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  font-weight: 400;
+}
+
+.insta-sent-message .insta-message-text {
+  color: var(--color-black);
+  font-weight: 500;
 }
 
 .insta-message-timestamp {
-  font-size: 12px;
-  color: #666666;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-black);
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
 }
 
-.insta-reply-message {
-  margin-left: 20px;
-}
-
+/* Chat Input Area */
 .insta-chat-input-area {
-  padding: 16px;
-  border-top: 0.1px solid #000000;
+  border-top: 1px solid var(--color-border);
+  padding: 20px;
+  background-color: white;
 }
 
 .insta-selected-message-preview {
-  background-color: #f5f5f5;
-  border: 0.2px solid #000000;
-  border-radius: 8px;
+  background-color: rgba(251, 191, 36, 0.1);
+  border: 1px solid var(--color-gold);
+  border-radius: 2px;
   padding: 12px;
   margin-bottom: 12px;
 }
@@ -507,96 +758,101 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.insta-selected-message-header span {
+  font-size: 12px;
   font-weight: 600;
-  color: #000000;
+  color: var(--color-black);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .insta-clear-selection {
   background: none;
   border: none;
-  color: #000000;
+  color: var(--color-black);
   cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .insta-clear-selection:hover {
-  color: #333333;
+  color: var(--color-error);
 }
 
 .insta-selected-message-content {
-  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .insta-selected-message-content p {
-  margin: 0 0 4px;
-  font-size: 14px;
-  color: #666666;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-black);
+  line-height: 1.5;
 }
 
 .insta-selected-message-content span {
-  font-size: 12px;
-  color: #666666;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-black);
 }
 
+/* Message Form */
 .insta-message-form {
-  display: flex;
-  align-items: center;
+  width: 100%;
 }
 
 .insta-input-wrapper {
   display: flex;
-  align-items: center;
-  width: 100%;
-  border: 0.2px none #000000;
-  border-radius: 12px;
-  padding: 8px;
-  background-color: #ffffff;
+  gap: 12px;
+  align-items: flex-end;
 }
 
 .insta-message-input {
-  flex-grow: 1;
-  border: none;
-  outline: none;
-  background-color: transparent;
-  color: #000000;
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
   font-size: 14px;
-  resize: none;
-  padding: 8px;
-}
-.mark-all-read,
-.mark-all-unread,
-.delete-all{
+  font-weight: 400;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
   background-color: white;
-  color:black;
-  padding:8px;
-  border-radius: 10px;
-  border: 1px solid black
+  color: var(--color-black);
 }
-.mark-all-read:hover,
-.mark-all-unread:hover,
-.delete-all:hover{
-  cursor:pointer;
-}
-.icon1{
-  position: relative;
-  left:10px;
-}
+
 .insta-message-input:focus {
   outline: none;
+  border-color: var(--color-gold);
 }
 
 .insta-send-button {
-  background-color: #000000;
-  color: #ffffff;
-  border: 0.2px solid #000000;
-  padding: 8px 12px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  background-color: var(--color-gold);
+  border: 1px solid var(--color-gold);
+  color: var(--color-black);
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
-.insta-send-button:hover:not(:disabled) {
-  background-color: #333333;
+.insta-send-button:hover {
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 .insta-send-button:disabled {
@@ -604,129 +860,258 @@
   cursor: not-allowed;
 }
 
-.insta-send-button svg {
-  width: 16px;
-  height: 16px;
+/* Tablet Responsive - 1024px and below */
+@media (max-width: 1024px) {
+  .insta-messages-main-wrapper {
+    padding: 20px;
+  }
+
+  .insta-stats-tabs-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .insta-chat-container {
+    height: calc(100vh - 120px);
+  }
+
+  .insta-message-bubble {
+    max-width: 80%;
+  }
 }
 
-/* Responsive Design */
+/* Mobile Responsive - 768px and below */
 @media (max-width: 768px) {
   .insta-messages-main-wrapper {
     padding: 16px;
   }
 
   .insta-messages-title {
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .insta-stats-tabs-container {
-    flex-direction: column;
-    align-items: stretch;
+    gap: 12px;
   }
 
   .insta-stat-tab {
-    justify-content: center;
+    padding: 16px;
+  }
+
+  .insta-stat-number {
+    font-size: 24px;
+  }
+
+  .insta-stat-label {
+    font-size: 11px;
   }
 
   .insta-conversation-item {
-    flex-direction: column;
-    align-items: stretch;
+    padding: 16px;
   }
 
-  .insta-conversation-content {
-    margin-bottom: 12px;
+  .insta-conversation-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
   }
 
   .insta-conversation-actions {
-    justify-content: center;
+    flex-direction: column;
   }
 
-  .insta-chat-container {
-    max-height: none;
+  .insta-action-btn {
+    width: 100%;
+    height: 40px;
   }
 
   .insta-chat-header {
+    padding: 16px;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
   .insta-chat-user-info {
-    margin-bottom: 12px;
+    width: 100%;
   }
 
   .insta-chat-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mark-all-read,
+  .mark-all-unread,
+  .delete-all {
+    flex: 1;
     justify-content: center;
   }
 
+  .insta-chat-messages-area {
+    padding: 16px;
+  }
+
   .insta-message-bubble {
-    max-width: 100%;
+    max-width: 85%;
   }
 
-  .insta-message-form {
-    flex-direction: column;
+  .insta-reply-message {
+    padding-left: 30px;
   }
 
-  .insta-input-wrapper {
-    flex-direction: column;
-  }
-
-  .insta-send-button {
-    width: 100%;
-    text-align: center;
+  .insta-chat-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
   }
 }
 
+/* Mobile Responsive - 480px and below */
 @media (max-width: 480px) {
   .insta-messages-main-wrapper {
     padding: 12px;
   }
 
   .insta-messages-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
-  .insta-conversation-avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
+  .insta-stats-tabs-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  .insta-conversation-name {
-    font-size: 14px;
+  .insta-conversation-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px;
   }
 
-  .insta-conversation-email,
-  .insta-latest-message {
-    font-size: 12px;
+  .insta-conversation-content {
+    width: 100%;
   }
 
-  .insta-chat-username {
+  .insta-conversation-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .insta-action-btn {
+    flex: 1;
+    width: auto;
+  }
+
+  .insta-chat-header {
+    padding: 14px;
+  }
+
+  .insta-chat-avatar {
+    width: 44px;
+    height: 44px;
     font-size: 16px;
   }
 
-  .insta-chat-user-email {
-    font-size: 12px;
-  }
-
-  .insta-message-text {
-    font-size: 12px;
-  }
-
-  .insta-message-timestamp,
-  .insta-status-badge {
+  .mark-all-read,
+  .mark-all-unread,
+  .delete-all {
+    padding: 7px 12px;
     font-size: 10px;
+    min-height: 34px;
   }
 
+  .insta-message-bubble {
+    max-width: 90%;
+    padding: 14px;
+  }
+
+  .insta-input-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .insta-send-button {
+    width: 100%;
+    height: 44px;
+  }
+
+  .insta-message-input {
+    min-height: 70px;
+  }
+}
+
+/* Extra Small Mobile - 360px and below */
+@media (max-width: 360px) {
+  .insta-messages-main-wrapper {
+    padding: 10px;
+  }
+
+  .insta-messages-title {
+    font-size: 16px;
+  }
+
+  .insta-conversation-avatar,
+  .insta-chat-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .insta-stat-number {
+    font-size: 22px;
+  }
+}
+
+/* Landscape Mobile Orientation */
+@media (max-height: 600px) and (orientation: landscape) {
+  .insta-chat-container {
+    height: calc(100vh - 100px);
+  }
+
+  .insta-chat-header {
+    padding: 12px 20px;
+  }
+
+  .insta-chat-messages-area {
+    padding: 16px;
+  }
+
+  .insta-chat-input-area {
+    padding: 16px;
+  }
+
+  .insta-message-input {
+    min-height: 60px;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .insta-conversation-item,
   .insta-action-btn,
-  .insta-send-button,
-  .insta-back-button {
-    padding: 6px 10px;
+  .insta-message-bubble,
+  .mark-all-read,
+  .mark-all-unread,
+  .delete-all {
+    border-width: 2px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .insta-messages-main-wrapper {
+    background-color: white;
   }
 
-  .insta-action-btn svg,
-  .insta-send-button svg,
-  .insta-back-button svg {
-    width: 14px;
-    height: 14px;
+  .insta-conversation-actions,
+  .insta-chat-actions,
+  .insta-chat-input-area,
+  .insta-action-btn {
+    display: none;
+  }
+
+  .insta-conversation-item,
+  .insta-message-bubble {
+    border: 1px solid black;
+    page-break-inside: avoid;
   }
 }

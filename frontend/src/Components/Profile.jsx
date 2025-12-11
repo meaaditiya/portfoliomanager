@@ -268,10 +268,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
-      <div className="dashboard-header">
-        <h1>Admin Dashboard</h1>
-        <p>Manage profile image and quote</p>
-      </div>
+    
 
       {error && (
         <div className="alert alert-error">

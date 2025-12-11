@@ -12,22 +12,24 @@ html, body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #ffffff;
+   background-color: var(--color-gray-50);
   color: #333333;
 }
 
 /* Root container */
 #root {
   height: 100%;
-  background-color: #ffffff;
+  background-color: var(--color-gray-50);
 }
 
 /* App container */
 .app-container {
+  margin-top:-60px;
   min-height: 100vh;
-  background-color: #ffffff;
+   background-color: var(--color-gray-50);
   display: flex;
   flex-direction: column;
+   background-color: var(--color-gray-50);
 }
 
 /* Header styles - assuming header has a fixed position */
@@ -52,6 +54,7 @@ html, body {
  
   max-width: 1800px;
   margin-right:10px;
+   background-color: var(--color-gray-50);
 }
 
 /* When header is present - add top padding to prevent content hiding */

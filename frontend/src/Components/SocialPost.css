@@ -1,15 +1,39 @@
-/* SocialMediaAdmin.css - Black & White Sober Theme */
+/* SocialPost.css - Professional Minimalist Design */
+
+:root {
+  --color-accent: #06b6d4;
+  --color-black: #0f172a;
+  --color-white: #f5f3f0;
+  --color-gray-50: #f5f3f0;
+  --color-gray-100: #ede8e3;
+  --color-gray-200: #e2d9d0;
+  --color-gray-300: #d4c7b8;
+  --color-gray-400: #b8a894;
+  --color-gray-500: #9c8a70;
+  --color-gray-600: #7d6b53;
+  --color-gray-700: #5e4d3a;
+  --color-gray-800: #453629;
+  --color-gray-900: #2d201a;
+  --color-gold: #fbbf24;
+  --color-gold-dark: #f59e0b;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 /* Base styles */
 .tyagi12-container {
-  background-color: #ffffff;
-  color: #000000;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--color-gray-50);
+  color: var(--color-black);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   line-height: 1.6;
   padding: 20px;
-  max-width: 1200px;
+  max-width: 2000px;
   margin: 0 auto;
-  margin-top: 40px;
+  margin-top: 0px;
 }
 
 /* Header */
@@ -21,13 +45,13 @@
 .tyagi12-header-title {
   font-size: 28px;
   font-weight: 700;
-  color: #000000;
+  color: var(--color-black);
   margin: 0 0 8px;
 }
 
 .tyagi12-header-subtitle {
   font-size: 16px;
-  color: #666666;
+  color: var(--color-gray-600);
   margin: 0;
 }
 
@@ -36,19 +60,22 @@
 .tyagi12-alert-success {
   padding: 16px;
   margin: 16px 0;
-  border: 2px solid #000000;
+  border: 2px solid;
   font-weight: 500;
   text-align: center;
+  border-radius: 2px;
 }
 
 .tyagi12-alert-error {
-  background-color: #ffffff;
-  color: #000000;
+  background-color: rgba(231, 76, 60, 0.1);
+  color: #c0392b;
+  border-color: #e74c3c;
 }
 
 .tyagi12-alert-success {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--color-gold);
+  color: var(--color-black);
+  border-color: var(--color-gold-dark);
 }
 
 /* Controls */
@@ -76,17 +103,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #000000;
-  padding: 8px;
-  background-color: #ffffff;
-  border-radius: 10px;
+  border: 1px solid var(--color-gray-500);
+  padding: 8px 12px;
+  background-color: var(--color-white);
+  border-radius: 2px;
 }
 
 .tyagi12-search-icon,
 .tyagi12-filter-icon {
   width: 20px;
   height: 20px;
-  color: #000000;
+  color: var(--color-gray-600);
 }
 
 .tyagi12-search-input,
@@ -94,58 +121,65 @@
   border: none;
   outline: none;
   font-size: 14px;
-  color: #000000;
+  color: var(--color-black);
   background-color: transparent;
   width: 100%;
+  font-family: inherit;
 }
 
 .tyagi12-search-input::placeholder {
-  color: #666666;
+  color: var(--color-gray-500);
 }
 
 .tyagi12-add-button {
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
-  padding: 10px 16px;
+  background-color: var(--color-gold);
+  color: var(--color-black);
+  border: 1px solid var(--color-gold);
+  padding: 8px 16px;
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.3s ease;
-   border-radius: 10px;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-add-button:hover {
-  background-color: #333333;
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 /* Table */
 .tyagi12-table-container {
   overflow-x: auto;
-  border: 1px solid #000000;
-  background-color: #ffffff;
-   border-radius: 10px;
+  border: 1px solid var(--color-gray-400);
+  background-color: var(--color-white);
+  border-radius: 2px;
 }
-.tyagi12-table::-webkit-scrollbar {
-  width:0px;
-  background: #f1f1f1; 
+
+.tyagi12-table-wrapper::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
 }
+
 .tyagi12-table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .tyagi12-table-header {
-  background-color: #000000;
+  background-color: var(--color-black);
+}
+.tyagi12-table-header:hover{
+  background-color: var(--color-black);
 }
 
 .tyagi12-table-th {
   padding: 12px 16px;
   text-align: left;
-  color: #ffffff;
+  color: var(--color-white);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 12px;
@@ -153,16 +187,16 @@
 }
 
 .tyagi12-table-body {
-  background-color: #ffffff;
+  background-color: var(--color-white);
 }
 
 .tyagi12-table-row:hover {
-  background-color: #f8f8f8;
+  background-color: var(--color-gray-100);
 }
 
 .tyagi12-table-td {
   padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-gray-200);
   vertical-align: middle;
 }
 
@@ -174,7 +208,7 @@
 
 .tyagi12-title-text {
   font-weight: 600;
-  color: #000000;
+  color: var(--color-black);
 }
 
 .tyagi12-platform-text {
@@ -186,68 +220,72 @@
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 600;
-  border: 1px solid #000000;
+  border: 1px solid;
   display: inline-block;
+  border-radius: 2px;
 }
 
 .tyagi12-platform-twitter {
-  background-color: #000000;
-  color: #ffffff;
-   border-radius: 10px;
+  background-color: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-black);
 }
 
 .tyagi12-platform-facebook {
-  background-color: #666666;
-  color: #ffffff;
-   border-radius: 10px;
+  background-color: var(--color-gray-700);
+  color: var(--color-white);
+  border-color: var(--color-gray-700);
 }
 
 .tyagi12-platform-linkedin {
-  background-color: #333333;
-  color: #ffffff;
-   border-radius: 10px;
+  background-color: var(--color-gray-600);
+  color: var(--color-white);
+  border-color: var(--color-gray-600);
 }
 
 .tyagi12-url-link {
-  color: #000000;
-  text-decoration: underline;
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
 }
 
 .tyagi12-url-link:hover {
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .tyagi12-status-button {
   padding: 6px 12px;
-  border: 2px solid #000000;
+  border: 1px solid;
   font-size: 12px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 10px;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-status-active {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--color-gold);
+  color: var(--color-black);
+  border-color: var(--color-gold);
 }
 
 .tyagi12-status-inactive {
-  background-color: #ffffff;
-  color: #666666;
-  border-color: #666666;
+  background-color: var(--color-white);
+  color: var(--color-gray-600);
+  border-color: var(--color-gray-500);
 }
 
 .tyagi12-status-active:hover {
-  background-color: #333333;
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 .tyagi12-status-inactive:hover {
-  background-color: #f5f5f5;
-  color: #000000;
+  background-color: var(--color-gray-100);
+  border-color: var(--color-gray-600);
 }
 
 .tyagi12-status-icon {
@@ -257,7 +295,7 @@
 
 .tyagi12-date-text {
   font-size: 12px;
-  color: #666666;
+  color: var(--color-gray-600);
 }
 
 .tyagi12-actions-container {
@@ -267,22 +305,24 @@
 
 .tyagi12-action-button {
   padding: 8px;
-  border: 2px solid #000000;
-  background-color: #ffffff;
+  border: 1px solid var(--color-gray-500);
+  background-color: var(--color-white);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-action-button:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-gray-100);
+  border-color: var(--color-gray-600);
 }
 
 .tyagi12-edit-button {
-  color: #000000;
+  color: var(--color-black);
 }
 
 .tyagi12-delete-button {
-  color: #000000;
+  color: var(--color-black);
 }
 
 .tyagi12-action-icon {
@@ -302,8 +342,8 @@
 .tyagi12-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e0e0e0;
-  border-top: 3px solid #000000;
+  border: 3px solid var(--color-gray-300);
+  border-top: 3px solid var(--color-gold);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
@@ -315,34 +355,36 @@
 }
 
 .tyagi12-loading-text {
-  color: #666666;
+  color: var(--color-gray-600);
   font-size: 14px;
 }
 
 .tyagi12-empty-state {
   text-align: center;
   padding: 40px;
-  color: #666666;
-  font-style: italic;
+  color: var(--color-gray-600);
 }
 
 .tyagi12-empty-text {
   font-size: 16px;
   margin-bottom: 16px;
+  font-style: italic;
 }
 
 .tyagi12-empty-button {
-  background-color: #000000;
-  color: #ffffff;
-  border: 2px solid #000000;
+  background-color: var(--color-gold);
+  color: var(--color-black);
+  border: 1px solid var(--color-gold);
   padding: 10px 16px;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-empty-button:hover {
-  background-color: #333333;
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 /* Pagination */
@@ -360,7 +402,7 @@
 
 .tyagi12-pagination-info {
   font-size: 14px;
-  color: #666666;
+  color: var(--color-gray-600);
 }
 
 .tyagi12-pagination-buttons {
@@ -369,18 +411,20 @@
 }
 
 .tyagi12-pagination-button {
-  background-color: #ffffff;
-  color: #000000;
-  border: 2px solid #000000;
+  background-color: var(--color-white);
+  color: var(--color-black);
+  border: 1px solid var(--color-gray-500);
   padding: 8px 12px;
   cursor: pointer;
   font-weight: 600;
   font-size: 12px;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-pagination-button:hover:not(:disabled) {
-  background-color: #f5f5f5;
+  background-color: var(--color-gray-100);
+  border-color: var(--color-gray-600);
 }
 
 .tyagi12-pagination-button:disabled {
@@ -395,29 +439,38 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(15, 23, 42, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .tyagi12-modal-container {
-  background-color: #ffffff;
+  background-color: var(--color-white);
   width: 100%;
   max-width: 600px;
-  border: 0px solid #000000;
+  border: 1px solid var(--color-gray-400);
   padding: 24px;
   position: relative;
-  margin-top:200px;
-  margin-bottom: 100px;;
-  overflow-y:auto;
-  max-height: 70vh;
-  border-radius: 20px;
-  
+  overflow-y: auto;
+  max-height: 80vh;
+  border-radius: 2px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
+
 .tyagi12-modal-container::-webkit-scrollbar {
-  width:0px;
+  width: 6px;
+}
+
+.tyagi12-modal-container::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+}
+
+.tyagi12-modal-container::-webkit-scrollbar-thumb {
+  background: var(--color-gray-500);
+  border-radius: 3px;
 }
 
 .tyagi12-modal-header {
@@ -425,12 +478,14 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--color-gold);
 }
 
 .tyagi12-modal-title {
   font-size: 20px;
   font-weight: 700;
-  color: #000000;
+  color: var(--color-black);
   margin: 0;
 }
 
@@ -439,12 +494,20 @@
   border: none;
   cursor: pointer;
   padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.tyagi12-modal-close:hover {
+  opacity: 0.7;
 }
 
 .tyagi12-modal-close-icon {
   width: 20px;
   height: 20px;
-  color: #000000;
+  color: var(--color-black);
 }
 
 .tyagi12-form-container {
@@ -462,27 +525,29 @@
 .tyagi12-form-label {
   font-weight: 600;
   font-size: 14px;
-  color: #000000;
+  color: var(--color-black);
 }
 
 .tyagi12-form-input,
 .tyagi12-form-select,
 .tyagi12-form-textarea {
-  padding: 10px;
-  border: 1px solid #000000;
-  background-color: #ffffff;
-  color: #000000;
+  padding: 10px 12px;
+  border: 1px solid var(--color-gray-500);
+  background-color: var(--color-white);
+  color: var(--color-black);
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
-  border-radius: 10px;
+  border-radius: 2px;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
 }
 
 .tyagi12-form-input:focus,
 .tyagi12-form-select:focus,
 .tyagi12-form-textarea:focus {
   outline: none;
-  border-color: #333333;
+  border-color: var(--color-gold);
 }
 
 .tyagi12-form-textarea {
@@ -491,7 +556,7 @@
 
 .tyagi12-form-help {
   font-size: 12px;
-  color: #666666;
+  color: var(--color-gray-600);
   margin: 4px 0 0;
 }
 
@@ -504,12 +569,14 @@
 .tyagi12-checkbox-input {
   width: 16px;
   height: 16px;
-  accent-color: #000000;
+  accent-color: var(--color-gold);
+  cursor: pointer;
 }
 
 .tyagi12-checkbox-label {
   font-size: 14px;
-  color: #000000;
+  color: var(--color-black);
+  cursor: pointer;
 }
 
 .tyagi12-form-buttons {
@@ -517,39 +584,43 @@
   gap: 12px;
   justify-content: flex-end;
   flex-wrap: wrap;
-  border-radius:10px;
+  margin-top: 8px;
 }
 
 .tyagi12-cancel-button,
 .tyagi12-submit-button {
   padding: 10px 16px;
-  border: 2px solid #000000;
+  border: 1px solid;
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
-  transition: all 0.3s ease;
-  border-radius:10px;
+  transition: all 0.2s ease;
+  border-radius: 2px;
 }
 
 .tyagi12-cancel-button {
-  background-color: #ffffff;
-  color: #000000;
+  background-color: var(--color-white);
+  color: var(--color-black);
+  border-color: var(--color-gray-500);
 }
 
 .tyagi12-cancel-button:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-gray-100);
+  border-color: var(--color-gray-600);
 }
 
 .tyagi12-submit-button {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--color-gold);
+  color: var(--color-black);
+  border-color: var(--color-gold);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .tyagi12-submit-button:hover {
-  background-color: #333333;
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
 }
 
 .tyagi12-submit-icon {
@@ -558,9 +629,25 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .tyagi12-container {
     padding: 16px;
+  }
+
+  .tyagi12-header-title {
+    font-size: 26px;
+  }
+
+  .tyagi12-table-th,
+  .tyagi12-table-td {
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tyagi12-container {
+    padding: 12px;
+    margin-top: 0px;
   }
 
   .tyagi12-header-title {
@@ -602,8 +689,9 @@
   }
 
   .tyagi12-modal-container {
-    width: 90%;
-    padding: 16px;
+    width: 95%;
+    padding: 20px;
+    max-height: 85vh;
   }
 
   .tyagi12-form-buttons {
@@ -614,12 +702,13 @@
   .tyagi12-submit-button {
     width: 100%;
     text-align: center;
+    justify-content: center;
   }
 }
 
 @media (max-width: 480px) {
   .tyagi12-container {
-    padding: 12px;
+    padding: 8px;
   }
 
   .tyagi12-header-title {
@@ -657,12 +746,42 @@
   .tyagi12-form-select,
   .tyagi12-form-textarea {
     font-size: 13px;
-    padding: 8px;
+    padding: 8px 10px;
   }
 
   .tyagi12-cancel-button,
   .tyagi12-submit-button {
-    padding: 8px;
+    padding: 8px 12px;
     font-size: 13px;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .tyagi12-table-container,
+  .tyagi12-form-input,
+  .tyagi12-form-select,
+  .tyagi12-form-textarea,
+  .tyagi12-action-button {
+    border-width: 2px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .tyagi12-controls-container,
+  .tyagi12-actions-container,
+  .tyagi12-pagination-container,
+  .tyagi12-modal-overlay {
+    display: none;
+  }
+
+  .tyagi12-container {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .tyagi12-table-container {
+    border: 1px solid black;
   }
 }

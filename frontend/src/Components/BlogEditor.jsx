@@ -760,7 +760,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
             <div className="content-image-actions">
               <button
                 type="button"
-                className="btn btn-small btn-edit"
+                className="img-edt-btn"
                 onClick={() => handleEditImage(image)}
                 title="Edit this image"
               >
@@ -768,7 +768,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
               </button>
               <button
                 type="button"
-                className="btn btn-small btn-delete"
+                className="img-remv-btn"
                 onClick={() => removeImageFromContent(image.imageId)}
                 title="Remove this image from content"
               >
@@ -846,7 +846,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
               </div>
               <button
                 type="button"
-                className="btn btn-small btn-delete"
+                className="img-remv-btn"
                 onClick={() => removeVideoFromContent(video.embedId)}
                 title="Remove this video from content"
               >
