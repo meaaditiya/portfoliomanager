@@ -40,6 +40,12 @@ const CommentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  
+  authorAdminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment',

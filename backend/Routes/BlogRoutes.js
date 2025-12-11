@@ -1555,18 +1555,21 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
+    
     let comments = await Comment.find({ 
       blog: blogId,
       status: 'approved',
       parentComment: null
     })
+    .populate('authorAdminId', 'name email profileImage') 
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
-    .lean();  
+    .lean();
     
     
     for (let comment of comments) {
+      
       if (comment.user.userId) {
         const userData = await User.findById(comment.user.userId)
           .select('name email profilePicture googleId')
@@ -1578,6 +1581,13 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
         }
       }
       
+      
+      if (comment.isAuthorComment && comment.authorAdminId) {
+        comment.authorHasProfileImage = !!(
+          comment.authorAdminId.profileImage && 
+          comment.authorAdminId.profileImage.data
+        );
+      }
       
       comment.repliesCount = await Comment.countDocuments({
         parentComment: comment._id,
@@ -2133,7 +2143,6 @@ router.post(
     }
   }
 );
-
 router.get('/api/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2142,10 +2151,12 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
+    
     let replies = await Comment.find({ 
       parentComment: commentId,
       status: 'approved'
     })
+    .populate('authorAdminId', 'name email profileImage') 
     .sort({ createdAt: 1 })
     .skip(skip)
     .limit(limit)
@@ -2153,6 +2164,7 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     
     
     for (let reply of replies) {
+      
       if (reply.user.userId) {
         const userData = await User.findById(reply.user.userId)
           .select('name email profilePicture googleId')
@@ -2162,6 +2174,14 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
           reply.user.profilePicture = userData.profilePicture;
           reply.user.googleId = userData.googleId;
         }
+      }
+      
+      
+      if (reply.isAuthorComment && reply.authorAdminId) {
+        reply.authorHasProfileImage = !!(
+          reply.authorAdminId.profileImage && 
+          reply.authorAdminId.profileImage.data
+        );
       }
     }
     
@@ -2183,6 +2203,7 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 router.post(
   '/api/comments/:commentId/reactions',
@@ -2445,7 +2466,6 @@ router.post(
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
   ],
   async (req, res) => {
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -2455,7 +2475,6 @@ router.post(
       const { blogId } = req.params;
       const { content } = req.body;
 
-      
       const blog = await Blog.findById(blogId);
       if (!blog) {
         return res.status(404).json({ message: 'Blog not found' });
@@ -2470,11 +2489,11 @@ router.post(
         },
         content,
         isAuthorComment: true,
-        status: 'approved' 
+        authorAdminId: req.user.admin_id, 
+        status: 'approved'
       });
 
       await newComment.save();
-      
       
       await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
 
@@ -2488,7 +2507,6 @@ router.post(
     }
   }
 );
-
 
 router.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, res) => {
   try {
@@ -2789,63 +2807,60 @@ router.post(
     }
   });
   
-  router.post(
-    '/api/comments/:commentId/author-reply',
-    authenticateToken,
-    [
-      body('content').trim().notEmpty().withMessage('Reply content is required')
-        .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
-    ],
-    async (req, res) => {
-      
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-  
-      try {
-        const { commentId } = req.params;
-        const { content } = req.body;
-  
-        
-        const parentComment = await Comment.findById(commentId);
-        if (!parentComment) {
-          return res.status(404).json({ message: 'Parent comment not found' });
-        }
-  
-        
-        if (parentComment.status !== 'approved') {
-          return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
-        }
-  
-        
-        const newReply = new Comment({
-          blog: parentComment.blog,
-          user: { 
-            name: req.user.name || 'Aaditiya Tyagi',
-            email: req.user.email
-          },
-          content,
-          parentComment: commentId,
-          isAuthorComment: true,
-          status: 'approved' 
-        });
-  
-        await newReply.save();
-        
-        
-        await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
-  
-        res.status(201).json({ 
-          message: 'Author reply added successfully',
-          reply: newReply
-        });
-      } catch (error) {
-        console.error('Error adding author reply:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-      }
+router.post(
+  '/api/comments/:commentId/author-reply',
+  authenticateToken,
+  [
+    body('content').trim().notEmpty().withMessage('Reply content is required')
+      .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-  );
+
+    try {
+      const { commentId } = req.params;
+      const { content } = req.body;
+
+      const parentComment = await Comment.findById(commentId);
+      if (!parentComment) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+
+      if (parentComment.status !== 'approved') {
+        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
+      }
+
+      
+      const newReply = new Comment({
+        blog: parentComment.blog,
+        user: { 
+          name: req.user.name || 'Aaditiya Tyagi',
+          email: req.user.email
+        },
+        content,
+        parentComment: commentId,
+        isAuthorComment: true,
+        authorAdminId: req.user.admin_id, 
+        status: 'approved'
+      });
+
+      await newReply.save();
+      
+      await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Author reply added successfully',
+        reply: newReply
+      });
+    } catch (error) {
+      console.error('Error adding author reply:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
 function getRelevanceLevel(score) {
   if (score >= 0.8) return 'very_high';
   if (score >= 0.6) return 'high';
@@ -3020,7 +3035,20 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
           limit: candidateLimit
         }
       },
-      
+      {
+    $lookup: {
+      from: 'admins', 
+      localField: 'author',
+      foreignField: '_id',
+      as: 'author'
+    }
+  },
+  {
+    $unwind: {
+      path: '$author',
+      preserveNullAndEmptyArrays: true  // Keep blogs without authors
+    }
+  },
       { $match: includeUnpublished ? {} : { status: 'published' } },
       
       {
@@ -3028,6 +3056,12 @@ router.post('/api/search', extractAuthFromToken, async (req, res) => {
           title: 1,
           summary: 1,
           slug: 1,
+          author: { 
+        _id: 1,
+        name: 1,
+        email: 1,
+        profileImage: 1
+      },
           author: 1,
           tags: 1,
           featuredImage: 1,
