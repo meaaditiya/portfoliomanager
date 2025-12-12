@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.production
+security-test-results.json
 logs/
 tests/
 *.log
