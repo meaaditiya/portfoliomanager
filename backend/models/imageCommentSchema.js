@@ -18,6 +18,11 @@ const imageCommentSchema = new mongoose.Schema({
     deviceId: {
       type: String,
       required: false
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
     }
   },
   content: {
@@ -31,6 +36,12 @@ const imageCommentSchema = new mongoose.Schema({
     default: false
   },
   
+  authorAdminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
+  
   parentComment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ImageComment',
@@ -40,6 +51,11 @@ const imageCommentSchema = new mongoose.Schema({
   likes: [{
     deviceId: String,
     email: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     timestamp: {
       type: Date,
       default: Date.now
@@ -48,6 +64,11 @@ const imageCommentSchema = new mongoose.Schema({
   dislikes: [{
     deviceId: String,
     email: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     timestamp: {
       type: Date,
       default: Date.now
@@ -80,11 +101,9 @@ const imageCommentSchema = new mongoose.Schema({
   }
 });
 
-
 imageCommentSchema.index({ post: 1, status: 1, parentComment: 1, createdAt: -1 });
 imageCommentSchema.index({ parentComment: 1 });
 imageCommentSchema.index({ 'user.email': 1 });
-
 
 imageCommentSchema.pre('save', function(next) {
   this.likeCount = this.likes.length;

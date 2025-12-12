@@ -10,7 +10,7 @@ const extractDeviceId = require("../middlewares/extractDeviceId");
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const apicache = require("apicache");
-
+const User = require("../models/userSchema");
 
 const clearPostCaches = (postId = null) => {
   
@@ -489,10 +489,33 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       status: 'active',
       parentComment: null
     })
+    .populate('authorAdminId', 'name email profileImage')
     .sort({ isAuthorComment: -1, createdAt: -1 })
     .select('-user.deviceId')
     .lean();
-    
+    for (let comment of comments) {
+  if (comment.user?.userId) {
+    try {
+      const userData = await User.findById(comment.user.userId)
+        .select('name email profilePicture googleId')
+        .lean();
+      
+      if (userData) {
+        comment.user.profilePicture = userData.profilePicture;
+        comment.user.googleId = userData.googleId;
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+  }
+  
+  if (comment.isAuthorComment && comment.authorAdminId) {
+    comment.authorHasProfileImage = !!(
+      comment.authorAdminId.profileImage && 
+      comment.authorAdminId.profileImage.data
+    );
+  }
+}
     res.json({
       post: {
         id: post._id,
@@ -526,16 +549,41 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    const comments = await ImageComment.find({
+    let comments = await ImageComment.find({
       post: id,
       status: 'active',
       parentComment: null
     })
+    .populate('authorAdminId', 'name email profileImage')
     .sort({ isAuthorComment: -1, createdAt: -1 })
     .skip(skip)
     .limit(limitNum)
-    .select('-user.deviceId')
     .lean();
+    
+    // ✅ ADD THIS SECTION - Fetch user profile data
+    for (let comment of comments) {
+      if (comment.user?.userId) {
+        try {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
+      }
+      
+      if (comment.isAuthorComment && comment.authorAdminId) {
+        comment.authorHasProfileImage = !!(
+          comment.authorAdminId.profileImage && 
+          comment.authorAdminId.profileImage.data
+        );
+      }
+    }
     
     const total = await ImageComment.countDocuments({
       post: id,
@@ -559,6 +607,7 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
 });
 
 
+
 router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -568,15 +617,40 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
     const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
     
-    const replies = await ImageComment.find({
+    let replies = await ImageComment.find({
       parentComment: commentId,
       status: 'active'
     })
+    .populate('authorAdminId', 'name email profileImage')
     .sort({ isAuthorComment: -1, createdAt: 1 })
     .skip(skip)
     .limit(limitNum)
-    .select('-user.deviceId')
     .lean();
+    
+    // ✅ ADD THIS SECTION - Fetch user profile data for replies
+    for (let reply of replies) {
+      if (reply.user?.userId) {
+        try {
+          const userData = await User.findById(reply.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          
+          if (userData) {
+            reply.user.profilePicture = userData.profilePicture;
+            reply.user.googleId = userData.googleId;
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
+      }
+      
+      if (reply.isAuthorComment && reply.authorAdminId) {
+        reply.authorHasProfileImage = !!(
+          reply.authorAdminId.profileImage && 
+          reply.authorAdminId.profileImage.data
+        );
+      }
+    }
     
     const total = await ImageComment.countDocuments({
       parentComment: commentId,
@@ -597,9 +671,6 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
-
-
 
 router.post('/api/image-posts/:id/react', UserAuthMiddleware, async (req, res) => {
   try {
@@ -680,6 +751,7 @@ router.get('/api/image-posts/:id/has-reacted', UserAuthMiddleware, async (req, r
 });
 
 
+
 router.post('/api/image-posts/:id/comments', 
   UserAuthMiddleware,
   [
@@ -720,7 +792,8 @@ router.post('/api/image-posts/:id/comments',
         user: {
           name: userName,
           email: userEmail,
-          deviceId: userId
+          deviceId: userId,
+          userId: userId
         },
         content,
         isAuthorComment: false,
@@ -737,15 +810,26 @@ router.post('/api/image-posts/:id/comments',
       
       clearPostCaches(id);
       
-      
       const updatedComments = await ImageComment.find({ 
         post: id,
         status: 'active',
         parentComment: parentCommentId || null
       })
+      .populate('authorAdminId', 'name email profileImage')
       .sort({ isAuthorComment: -1, createdAt: -1 })
-      .select('-user.deviceId')
       .lean();
+      
+      for (let comment of updatedComments) {
+        if (comment.user.userId) {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        }
+      }
       
       res.status(201).json({
         message: parentCommentId ? 'Reply added successfully' : 'Comment added successfully',
@@ -775,19 +859,19 @@ router.post('/api/image-posts/comments/:commentId/like',
       }
 
       const alreadyLiked = comment.likes.some(
-        like => like.email === userEmail || like.deviceId === userId
+        like => like.email === userEmail || like.userId?.toString() === userId
       );
 
       if (alreadyLiked) {
         comment.likes = comment.likes.filter(
-          like => like.email !== userEmail && like.deviceId !== userId
+          like => like.email !== userEmail && like.userId?.toString() !== userId
         );
       } else {
         comment.dislikes = comment.dislikes.filter(
-          dislike => dislike.email !== userEmail && dislike.deviceId !== userId
+          dislike => dislike.email !== userEmail && dislike.userId?.toString() !== userId
         );
         
-        comment.likes.push({ email: userEmail, deviceId: userId });
+        comment.likes.push({ email: userEmail, userId: userId });
       }
 
       await comment.save();
@@ -806,6 +890,7 @@ router.post('/api/image-posts/comments/:commentId/like',
 );
 
 
+// POST: Dislike comment with userId
 router.post('/api/image-posts/comments/:commentId/dislike',
   UserAuthMiddleware,
   async (req, res) => {
@@ -820,19 +905,19 @@ router.post('/api/image-posts/comments/:commentId/dislike',
       }
 
       const alreadyDisliked = comment.dislikes.some(
-        dislike => dislike.email === userEmail || dislike.deviceId === userId
+        dislike => dislike.email === userEmail || dislike.userId?.toString() === userId
       );
 
       if (alreadyDisliked) {
         comment.dislikes = comment.dislikes.filter(
-          dislike => dislike.email !== userEmail && dislike.deviceId !== userId
+          dislike => dislike.email !== userEmail && dislike.userId?.toString() !== userId
         );
       } else {
         comment.likes = comment.likes.filter(
-          like => like.email !== userEmail && like.deviceId !== userId
+          like => like.email !== userEmail && like.userId?.toString() !== userId
         );
         
-        comment.dislikes.push({ email: userEmail, deviceId: userId });
+        comment.dislikes.push({ email: userEmail, userId: userId });
       }
 
       await comment.save();
@@ -849,8 +934,6 @@ router.post('/api/image-posts/comments/:commentId/dislike',
     }
   }
 );
-
-
 router.get('/api/image-posts/comments/:commentId/user-reaction',
   UserAuthMiddleware,
   async (req, res) => {
@@ -867,11 +950,11 @@ router.get('/api/image-posts/comments/:commentId/user-reaction',
       }
 
       const userLiked = comment.likes.some(
-        like => like.email === userEmail || like.deviceId === userId
+        like => like.email === userEmail || like.userId?.toString() === userId
       );
 
       const userDisliked = comment.dislikes.some(
-        dislike => dislike.email === userEmail || dislike.deviceId === userId
+        dislike => dislike.email === userEmail || dislike.userId?.toString() === userId
       );
 
       res.json({
@@ -886,6 +969,7 @@ router.get('/api/image-posts/comments/:commentId/user-reaction',
     }
   }
 );
+
 
 
 router.delete('/api/image-posts/comments/:commentId', 
@@ -954,8 +1038,6 @@ router.delete('/api/image-posts/comments/:commentId',
 );
 
 
-
-
 router.post('/api/image-posts/:id/author-comment',
   authenticateToken,
   [
@@ -996,6 +1078,7 @@ router.post('/api/image-posts/:id/author-comment',
         },
         content,
         isAuthorComment: true,
+        authorAdminId: req.user.admin_id,
         parentComment: parentCommentId || null,
         status: 'active'
       });
@@ -1022,6 +1105,7 @@ router.post('/api/image-posts/:id/author-comment',
 );
 
 
+
 router.get('/api/admin/image-posts/:id/comments', 
   authenticateToken,
   async (req, res) => {
@@ -1038,19 +1122,45 @@ router.get('/api/admin/image-posts/:id/comments',
         filter.status = status;
       }
       
-      const comments = await ImageComment.find(filter)
+      let comments = await ImageComment.find(filter)
+        .populate('authorAdminId', 'name email profileImage')
         .sort({ isAuthorComment: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean();
       
+      for (let comment of comments) {
+        if (comment.user.userId) {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        }
+      }
+      
       if (includeReplies === 'true') {
         for (let comment of comments) {
-          const replies = await ImageComment.find({ 
+          let replies = await ImageComment.find({ 
             parentComment: comment._id 
           })
+          .populate('authorAdminId', 'name email profileImage')
           .sort({ isAuthorComment: -1, createdAt: 1 })
           .lean();
+          
+          for (let reply of replies) {
+            if (reply.user.userId) {
+              const userData = await User.findById(reply.user.userId)
+                .select('name email profilePicture googleId')
+                .lean();
+              if (userData) {
+                reply.user.profilePicture = userData.profilePicture;
+                reply.user.googleId = userData.googleId;
+              }
+            }
+          }
           
           comment.replies = replies;
         }
