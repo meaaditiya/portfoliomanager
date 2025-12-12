@@ -124,7 +124,7 @@ function addSuspicionScore(ip, points, reason) {
   logger.warn(`Suspicion added to ${ip}: +${points} (${reason}), total: ${current.score}`);
   
   if (current.score >= config.suspicionThreshold) {
-    blockIP(ip, 3600000, `Suspicion threshold exceeded: ${current.score} points`);
+    blockIP(ip, 300000, `Suspicion threshold exceeded: ${current.score} points`);
   }
 }
 
