@@ -40,8 +40,50 @@ const cacheMiddleware = (req, res, next) => {
 };
 
 
-
-
+router.get('/api/image-posts/:id/media', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const post = await ImagePost.findById(id).select('image video mediaType');
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    if (post.mediaType === 'image' && post.image?.data) {
+      res.set('Content-Type', post.image.contentType);
+      res.set('Cache-Control', 'public, max-age=31536000'); 
+      return res.send(post.image.data);
+    } else if (post.mediaType === 'video' && post.video?.data) {
+      res.set('Content-Type', post.video.contentType);
+      res.set('Cache-Control', 'public, max-age=31536000');
+      return res.send(post.video.data);
+    }
+    
+    res.status(404).json({ message: 'Media not found' });
+  } catch (error) {
+    console.error('Error serving media:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+router.get('/api/image-posts/:id/thumbnail', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const post = await ImagePost.findById(id).select('video.thumbnail');
+    
+    if (!post || !post.video?.thumbnail?.data) {
+      return res.status(404).json({ message: 'Thumbnail not found' });
+    }
+    
+    res.set('Content-Type', post.video.thumbnail.contentType);
+    res.set('Cache-Control', 'public, max-age=31536000');
+    res.send(post.video.thumbnail.data);
+  } catch (error) {
+    console.error('Error serving thumbnail:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 router.post('/api/admin/image-posts', authenticateToken, upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
@@ -257,7 +299,6 @@ router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
   }
 });
 
-
 router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -269,18 +310,11 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    let mediaData = null;
-    let thumbnailData = null;
     
-    if (post.mediaType === 'image' && post.image?.data) {
-      mediaData = `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`;
-    } else if (post.mediaType === 'video' && post.video?.data) {
-      mediaData = `data:${post.video.contentType};base64,${post.video.data.toString('base64')}`;
-      
-      if (post.video.thumbnail?.data) {
-        thumbnailData = `data:${post.video.thumbnail.contentType};base64,${post.video.thumbnail.data.toString('base64')}`;
-      }
-    }
+    const mediaUrl = `/api/image-posts/${id}/media`;
+    const thumbnailUrl = post.mediaType === 'video' && post.video?.thumbnail?.data 
+      ? `/api/image-posts/${id}/thumbnail` 
+      : null;
     
     const reactions = await ImageReaction.find({ post: id }).countDocuments();
     const comments = await ImageComment.find({ post: id }).sort({ createdAt: -1 });
@@ -288,8 +322,8 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
     res.json({
       post: {
         ...post._doc,
-        media: mediaData,
-        thumbnail: thumbnailData,
+        media: mediaUrl,  
+        thumbnail: thumbnailUrl,  
         videoDuration: post.video?.duration,
         image: undefined,
         video: undefined
@@ -433,7 +467,6 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    
     if (req.query.bustCache) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -445,19 +478,11 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    let mediaData = null;
-    let thumbnailData = null;
     
-    if (post.mediaType === 'image' && post.image?.data) {
-      mediaData = `data:${post.image.contentType};base64,${post.image.data.toString('base64')}`;
-    } else if (post.mediaType === 'video' && post.video?.data) {
-      mediaData = `data:${post.video.contentType};base64,${post.video.data.toString('base64')}`;
-      
-      if (post.video.thumbnail?.data) {
-        thumbnailData = `data:${post.video.thumbnail.contentType};base64,${post.video.thumbnail.data.toString('base64')}`;
-      }
-    }
-    
+    const mediaUrl = `/api/image-posts/${id}/media`;
+    const thumbnailUrl = post.mediaType === 'video' && post.video?.thumbnail?.data 
+      ? `/api/image-posts/${id}/thumbnail` 
+      : null;
     
     const comments = await ImageComment.find({ 
       post: id,
@@ -473,8 +498,8 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         id: post._id,
         caption: post.caption,
         mediaType: post.mediaType,
-        media: mediaData,
-        thumbnail: thumbnailData,
+        media: mediaUrl,  
+        thumbnail: thumbnailUrl,  
         videoDuration: post.video?.duration,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -482,7 +507,6 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         commentCount: post.commentCount
       },
       comments,
-      
       timestamp: Date.now()
     });
   } catch (error) {
