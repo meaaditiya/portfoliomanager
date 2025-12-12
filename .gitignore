@@ -1,8 +1,8 @@
-backend/
 .env
 .env.local
 .env.production
 logs/
+tests/
 *.log
 coverage/
 backend/node_modules/
