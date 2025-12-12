@@ -34,8 +34,6 @@ const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 
 const app = express();
 
-// IMPORTANT: Enable trust proxy BEFORE security middleware
-// This allows proper IP detection from X-Forwarded-For headers
 app.set('trust proxy', true);
 
 const server = http.createServer(app); 
@@ -57,7 +55,6 @@ if (!fs.existsSync("./keys")) {
 fs.writeFileSync("./keys/gcs.json", process.env.GCS_JSON);
 
 const securityService = require("./security/securityService");
-const securityMiddlewares = securityService(app);
 
 app.use(express.json({ 
   limit: '10mb',
@@ -71,7 +68,8 @@ app.use(express.urlencoded({
 app.use(cookieParser());
 app.use(corsMiddleware);
 
-app.use(securityMiddlewares);
+const securityMiddlewares = securityService(app);
+securityMiddlewares.forEach(middleware => app.use(middleware));
 
 app.use(
   session({
