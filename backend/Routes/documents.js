@@ -12,6 +12,76 @@ const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
 const router = express.Router();
 const ADMIN_EMAIL= process.env.FROM_EMAIL;
 const crypto = require('crypto');
+const https = require('https');
+
+
+const verifyTurnstile = async (token) => {
+  return new Promise((resolve, reject) => {
+    const postData = new URLSearchParams({
+      secret: process.env.TURNSTILE_SECRET_KEY,
+      response: token
+    }).toString();
+
+    const options = {
+      hostname: 'challenges.cloudflare.com',
+      port: 443,
+      path: '/turnstile/v0/siteverify',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          console.log('Turnstile verification response:', response);
+          resolve(response.success === true);
+        } catch (error) {
+          console.error('Error parsing Turnstile response:', error);
+          resolve(false);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('Turnstile request error:', error);
+      resolve(false);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+};
+const verifyTurnstileToken = async (req, res, next) => {
+  const turnstileToken = req.headers['x-turnstile-token'] || req.body.turnstileToken || req.query.turnstileToken;
+  
+  if (!turnstileToken) {
+    return res.status(403).json({ 
+      message: 'Turnstile verification required',
+      requiresTurnstile: true 
+    });
+  }
+
+  const isValid = await verifyTurnstile(turnstileToken);
+  
+  if (!isValid) {
+    return res.status(403).json({ 
+      message: 'Turnstile verification failed',
+      requiresTurnstile: true 
+    });
+  }
+
+  next();
+};
 const optionalAuth = (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   if (token) {
@@ -376,9 +446,7 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
   }
 });
 
-
-
-router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
+router.get("/api/excel/:id/data", optionalAuth, verifyTurnstileToken, async (req, res) => {
   try {
     const { key } = req.query; 
     
@@ -437,6 +505,8 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
@@ -596,9 +666,26 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
   }
 });
 
+// Remove verifyTurnstileToken from download route temporarily
 router.get("/api/download/:id", async (req, res) => {
   try {
-    const { key, userId } = req.query;
+    const { key, userId, turnstileToken } = req.query;
+    
+    // Manual turnstile check for download
+    if (turnstileToken) {
+      const isValid = await verifyTurnstile(turnstileToken);
+      if (!isValid) {
+        return res.status(403).json({ 
+          message: 'Verification failed',
+          requiresTurnstile: true 
+        });
+      }
+    } else {
+      return res.status(403).json({ 
+        message: 'Turnstile verification required',
+        requiresTurnstile: true 
+      });
+    }
     
     const doc = await Document.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Not found" });
@@ -633,6 +720,7 @@ router.get("/api/download/:id", async (req, res) => {
     res.json({ downloadUrl: url, filename: doc.originalName });
 
   } catch (err) {
+    console.error('Download error:', err);
     res.status(500).json({ error: err.message });
   }
 });
