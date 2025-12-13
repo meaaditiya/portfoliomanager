@@ -1,6 +1,6 @@
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
+const { RedisStore } = require('rate-limit-redis');
 const redis = require('redis');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
@@ -8,6 +8,7 @@ const hpp = require('hpp');
 const compression = require('compression');
 const winston = require('winston');
 const validator = require('validator');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -90,14 +91,10 @@ async function initializeRedis() {
 function createRateLimitStore() {
   if (redisClient && isRedisConnected) {
     return new RedisStore({
-      client: redisClient,
-      prefix: 'rl:',
       sendCommand: (...args) => redisClient.sendCommand(args)
     });
   }
-  return undefined;
 }
-
 function setupHelmet() {
   return helmet({
     contentSecurityPolicy: {
@@ -134,15 +131,16 @@ function setupHelmet() {
 }
 
 function createSmartLimiter(options = {}) {
-  const {
-    windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
-    max = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-    message = 'Too many requests, please try again later',
-    skipSuccessfulRequests = false,
-    skipFailedRequests = false,
-    keyGenerator = (req) => req.ip,
-    skip = () => false
-  } = options;
+const {
+  windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
+  max = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  message = 'Too many requests, please try again later',
+  skipSuccessfulRequests = false,
+  skipFailedRequests = false,
+  keyGenerator = ipKeyGenerator,
+  skip = () => false
+} = options;
+
 
   const config = {
     windowMs,
@@ -185,7 +183,7 @@ function createBurstLimiter() {
     keyGenerator: (req) => {
       const forwarded = req.headers['x-forwarded-for'];
       const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip;
-      return `burst:${ip}`;
+      return `burst:${ipKeyGenerator(req)}`;
     }
   });
 }
@@ -205,7 +203,8 @@ function createStrictLimiter() {
     message: 'Rate limit exceeded for sensitive operations',
     keyGenerator: (req) => {
       const userId = req.user?.id || req.user?._id || 'anonymous';
-      return `strict:${req.ip}:${userId}`;
+      return `strict:${ipKeyGenerator(req)}:${userId}`;
+
     }
   });
 }
@@ -217,8 +216,9 @@ function createAuthLimiter() {
     skipSuccessfulRequests: true,
     message: 'Too many authentication attempts, please try again later',
     keyGenerator: (req) => {
-      const identifier = req.body?.email || req.body?.username || req.ip;
-      return `auth:${identifier}`;
+     const identifier = req.body?.email || req.body?.username || ipKeyGenerator(req);
+return `auth:${identifier}`;
+
     }
   });
 }
@@ -238,8 +238,9 @@ function createUploadLimiter() {
     max: 20,
     message: 'Upload limit exceeded, please try again later',
     keyGenerator: (req) => {
-      const userId = req.user?.id || req.user?._id || req.ip;
-      return `upload:${userId}`;
+    const userId = req.user?.id || req.user?._id || ipKeyGenerator(req);
+return `upload:${userId}`;
+
     }
   });
 }
