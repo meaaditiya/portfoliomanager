@@ -121,18 +121,16 @@ async function initializeApp() {
       redis: security.isRedisConnected() ? 'connected' : 'disconnected'
     });
   });
-
+  app.use(queryRoutes);
   app.use(security.burstLimiter);
   app.use(security.publicLimiter);
 
   app.use('/api', userAuth);
   app.use("/api/admin", security.strictLimiter, adminRoutes);
   app.use(superAdminRoutes);
-
   app.use(embeddingRoutes);
   app.use(BlogSubmission);
   app.use(BlogRoutes);
-  app.use(queryRoutes);
   app.use(ContactRoutes);
   app.use(announcementRoutes);
   app.use(projectRoutes);
