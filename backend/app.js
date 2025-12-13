@@ -1,6 +1,5 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
-const cors = require('cors');
 require('dotenv').config();
 const path = require('path');
 const fs = require("fs");
@@ -10,6 +9,7 @@ const connectDB = require("./Config/db");
 const session = require('express-session');
 const passport = require('./Config/passport');
 const { initializeSecurity, logger } = require('./security/securityService');
+const corsMiddleware = require("./middlewares/corsMiddleware.js");
 
 const adminRoutes = require("./Routes/AdminRoutes.js");
 const queryRoutes = require("./Routes/QueryRoutes.js");
@@ -43,10 +43,32 @@ fs.writeFileSync("./keys/gcs.json", process.env.GCS_JSON);
 
 const security = initializeSecurity(app);
 
-app.use(cors(security.corsConfig));
+
+app.use(corsMiddleware);
+app.options('*', corsMiddleware);
 
 const io = new Server(server, {
-  cors: security.corsConfig,
+  cors: {
+    origin: function(origin, callback) {
+      const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'https://connectwithaaditiya.onrender.com',
+        'https://connectwithaaditiyamg.onrender.com',
+        'https://connectwithaaditiyaadmin.onrender.com',
+        'http://192.168.1.33:5174',
+        'http://192.168.1.33:5173',
+        'https://aaditiyatyagi.vercel.app'
+      ];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST']
+  },
   pingTimeout: 60000,
   pingInterval: 25000
 });
@@ -117,7 +139,7 @@ visitorSocket(io);
 app.use(security.errorLogger);
 
 app.use((err, req, res, next) => {
-  if (err.message === 'Not allowed by CORS') {
+  if (err.message === 'Not allowed by CORS' || err.message === 'CORS: Origin not allowed.') {
     return res.status(403).json({ 
       error: 'CORS policy violation',
       message: 'Origin not allowed'
