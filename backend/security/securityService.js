@@ -5,74 +5,46 @@ const winston = require('winston');
 const morgan = require('morgan');
 
 const config = {
-  // Generous rate limits for non-whitelisted routes
+  // Standard rate limits for regular routes
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300, // 300 requests per 15 min
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 200, // 200 requests per 15 min
   },
   burstLimit: {
     windowMs: parseInt(process.env.BURST_LIMIT_WINDOW_MS) || 60 * 1000, // 1 minute
-    max: parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 60, // 60 requests per minute
+    max: parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 40, // 40 requests per minute
   },
   // Lenient limits for high-traffic public routes
-  publicRateLimit: {
+  lenientRateLimit: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // 1000 requests per 15 min
+    max: 600, // 600 requests per 15 min (reasonable for browsing)
   },
-  publicBurstLimit: {
+  lenientBurstLimit: {
     windowMs: 60 * 1000, // 1 minute
-    max: 200, // 200 requests per minute
+    max: 100, // 100 requests per minute (still reasonable)
   },
   maxUrlLength: 4000,
-  suspicionThreshold: 50, // High threshold
+  suspicionThreshold: 50,
   enableRedis: !!process.env.REDIS_URL,
   
-  // High-traffic public routes with lenient rate limiting
+  // High-traffic routes with lenient limits
   lenientPaths: [
-    // Public API routes
     '/api/blogs',
     '/api/image-posts',
     '/api/gallery',
     '/api/projects',
-    '/api/featured-projects',
-    '/api/profile',
-    '/api/quotes',
-    '/api/community',
-    '/api/announcements',
-    '/api/streams',
-    
-    // Visitor tracking (high frequency)
     '/api/visitors',
-    
-    // Comment and reaction routes (frequent user interactions)
     '/api/comments',
     '/api/reactions',
-    
-    // Document browsing (moderate limits)
     '/api/folder/contents',
     '/api/folder/tree',
     '/api/item/',
-    
-    // User bookmarks and checkmarks (frequent interactions)
     '/api/user/bookmark',
     '/api/user/bookmarks',
-    '/api/user/check-access',
-    '/api/user/access-via-link',
-    '/api/user/my-access-requests',
-    
-    // Search (can be frequent)
     '/api/search',
-    
-    // Health and monitoring
     '/health',
     '/socket.io',
-    
-    // Static files
     '/public',
-    
-    // Media serving
-    '/api/image-posts/',
-    '/api/blogs/',
   ],
 };
 
@@ -101,8 +73,10 @@ const suspicionScores = new Map();
 const honeypotHits = new Set();
 const requestTimestamps = new Map();
 
-let rateLimiterInstance = null;
-let burstLimiterInstance = null;
+let standardRateLimiter = null;
+let lenientRateLimiter = null;
+let standardBurstLimiter = null;
+let lenientBurstLimiter = null;
 let cleanupInterval = null;
 
 if (process.env.NODE_ENV !== 'test') {
@@ -117,7 +91,7 @@ if (process.env.NODE_ENV !== 'test') {
     }
     
     for (const [ip, data] of suspicionScores.entries()) {
-      if (now - data.lastUpdate > 3600000) { // 1 hour
+      if (now - data.lastUpdate > 3600000) {
         suspicionScores.delete(ip);
       }
     }
@@ -130,7 +104,7 @@ if (process.env.NODE_ENV !== 'test') {
         requestTimestamps.set(ip, recent);
       }
     }
-  }, 300000); // Every 5 minutes
+  }, 300000);
 }
 
 let redisClient = null;
@@ -177,12 +151,6 @@ function getClientIP(req) {
   }
   
   return ip;
-}
-
-function isWhitelistedPath(path) {
-  return config.lenientPaths.some(whitelisted => 
-    path.startsWith(whitelisted)
-  );
 }
 
 function isLenientPath(path) {
@@ -253,7 +221,6 @@ async function isIPBlocked(ip) {
   return { blocked: false };
 }
 
-// Precise attack patterns
 const ATTACK_PATTERNS = {
   sqli: [
     /union\s+select/i,
@@ -339,7 +306,7 @@ function ipBlockerMiddleware() {
       logger.warn(`Blocked request from ${ip}: ${blockStatus.reason}`);
       return res.status(403).json({
         error: 'Access forbidden',
-        message: 'Your IP has been temporarily blocked. Please contact support if you believe this is an error.',
+        message: 'Your IP has been temporarily blocked due to suspicious activity. Please try again later.',
       });
     }
     
@@ -347,88 +314,138 @@ function ipBlockerMiddleware() {
   };
 }
 
-function rateLimiterMiddleware() {
-  rateLimiterInstance = rateLimit({
+// Standard rate limiter for regular routes
+function createStandardRateLimiter() {
+  return rateLimit({
     windowMs: config.rateLimit.windowMs,
-    max: (req) => {
-      // Apply lenient limits for public routes
-      if (isLenientPath(req.path)) {
-        return config.publicRateLimit.max;
-      }
-      return config.rateLimit.max;
-    },
+    max: config.rateLimit.max,
     standardHeaders: true,
     legacyHeaders: false,
     store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
       ? new RedisStore({
           client: redisClient,
-          prefix: 'rl:',
+          prefix: 'rl:standard:',
         })
       : undefined,
     handler: (req, res) => {
       const ip = getClientIP(req);
-      const isLenient = isLenientPath(req.path);
-      addSuspicionScore(ip, isLenient ? 3 : 5, 'General rate limit exceeded');
-      logger.warn(`Rate limit exceeded for ${ip} on ${req.path}`);
+      addSuspicionScore(ip, 5, `Rate limit exceeded on ${req.path}`);
+      logger.warn(`Standard rate limit exceeded for ${ip} on ${req.path}`);
       res.status(429).json({
         error: 'Too many requests',
-        message: 'Please slow down and try again in a few minutes',
+        message: `Rate limit exceeded. Please slow down. Limit: ${config.rateLimit.max} requests per 15 minutes.`,
       });
     },
     skipFailedRequests: true,
     skipSuccessfulRequests: false,
   });
-
-  return rateLimiterInstance;
 }
 
-function burstLimiterMiddleware() {
-  burstLimiterInstance = rateLimit({
-    windowMs: config.burstLimit.windowMs,
-    max: (req) => {
-      // Apply lenient limits for public routes
-      if (isLenientPath(req.path)) {
-        return config.publicBurstLimit.max;
-      }
-      return config.burstLimit.max;
-    },
+// Lenient rate limiter for high-traffic routes
+function createLenientRateLimiter() {
+  return rateLimit({
+    windowMs: config.lenientRateLimit.windowMs,
+    max: config.lenientRateLimit.max,
     standardHeaders: true,
     legacyHeaders: false,
     store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
       ? new RedisStore({
           client: redisClient,
-          prefix: 'bl:',
+          prefix: 'rl:lenient:',
         })
       : undefined,
     handler: (req, res) => {
       const ip = getClientIP(req);
-      const isLenient = isLenientPath(req.path);
-      addSuspicionScore(ip, isLenient ? 5 : 8, 'Burst limit exceeded');
-      logger.warn(`Burst limit exceeded for ${ip} on ${req.path}`);
+      addSuspicionScore(ip, 3, `Lenient rate limit exceeded on ${req.path}`);
+      logger.warn(`Lenient rate limit exceeded for ${ip} on ${req.path}`);
       res.status(429).json({
         error: 'Too many requests',
-        message: 'Burst limit exceeded. Please wait a moment before retrying.',
+        message: `You're browsing too fast. Please slow down. Limit: ${config.lenientRateLimit.max} requests per 15 minutes.`,
       });
     },
     skipFailedRequests: true,
     skipSuccessfulRequests: false,
   });
+}
 
-  return burstLimiterInstance;
+// Standard burst limiter
+function createStandardBurstLimiter() {
+  return rateLimit({
+    windowMs: config.burstLimit.windowMs,
+    max: config.burstLimit.max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
+      ? new RedisStore({
+          client: redisClient,
+          prefix: 'bl:standard:',
+        })
+      : undefined,
+    handler: (req, res) => {
+      const ip = getClientIP(req);
+      addSuspicionScore(ip, 8, `Burst limit exceeded on ${req.path}`);
+      logger.warn(`Standard burst limit exceeded for ${ip} on ${req.path}`);
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `Burst limit exceeded. Please wait a moment. Limit: ${config.burstLimit.max} requests per minute.`,
+      });
+    },
+    skipFailedRequests: true,
+    skipSuccessfulRequests: false,
+  });
+}
+
+// Lenient burst limiter
+function createLenientBurstLimiter() {
+  return rateLimit({
+    windowMs: config.lenientBurstLimit.windowMs,
+    max: config.lenientBurstLimit.max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
+      ? new RedisStore({
+          client: redisClient,
+          prefix: 'bl:lenient:',
+        })
+      : undefined,
+    handler: (req, res) => {
+      const ip = getClientIP(req);
+      addSuspicionScore(ip, 5, `Lenient burst limit exceeded on ${req.path}`);
+      logger.warn(`Lenient burst limit exceeded for ${ip} on ${req.path}`);
+      res.status(429).json({
+        error: 'Too many requests',
+        message: `You're clicking too fast. Please slow down. Limit: ${config.lenientBurstLimit.max} requests per minute.`,
+      });
+    },
+    skipFailedRequests: true,
+    skipSuccessfulRequests: false,
+  });
+}
+
+// Smart rate limiter middleware that chooses the right limiter
+function smartRateLimiterMiddleware() {
+  return (req, res, next) => {
+    const isLenient = isLenientPath(req.path);
+    const limiter = isLenient ? lenientRateLimiter : standardRateLimiter;
+    limiter(req, res, next);
+  };
+}
+
+// Smart burst limiter middleware
+function smartBurstLimiterMiddleware() {
+  return (req, res, next) => {
+    const isLenient = isLenientPath(req.path);
+    const limiter = isLenient ? lenientBurstLimiter : standardBurstLimiter;
+    limiter(req, res, next);
+  };
 }
 
 function slowDownMiddleware() {
   return slowDown({
     windowMs: 60 * 1000,
-    delayAfter: (req) => {
-      // Higher threshold for lenient paths
-      if (isLenientPath(req.path)) {
-        return 100; // Allow 100 requests before slowing down
-      }
-      return 50;
-    },
-    delayMs: () => 100,
-    maxDelayMs: 5000,
+    delayAfter: 30, // Start slowing down after 30 requests per minute
+    delayMs: (used) => (used - 30) * 200, // Gradual delay increase
+    maxDelayMs: 10000, // Max 10 second delay
     skip: (req) => {
       return process.env.NODE_ENV === 'test';
     }
@@ -459,14 +476,12 @@ function suspiciousPayloadMiddleware() {
     let suspicionPoints = 0;
     const violations = [];
     
-    // Only scan request data, not headers
     const scanData = JSON.stringify({
       query: req.query,
       params: req.params,
       body: req.body,
     });
     
-    // SQL Injection - require multiple matches
     let sqlMatches = 0;
     for (const pattern of ATTACK_PATTERNS.sqli) {
       if (pattern.test(scanData)) {
@@ -478,7 +493,6 @@ function suspiciousPayloadMiddleware() {
       violations.push('SQL Injection attempt detected');
     }
     
-    // NoSQL Injection
     for (const pattern of ATTACK_PATTERNS.nosqli) {
       if (pattern.test(scanData)) {
         suspicionPoints += 15;
@@ -487,7 +501,6 @@ function suspiciousPayloadMiddleware() {
       }
     }
     
-    // XSS
     let xssMatches = 0;
     for (const pattern of ATTACK_PATTERNS.xss) {
       if (pattern.test(scanData)) {
@@ -499,7 +512,6 @@ function suspiciousPayloadMiddleware() {
       violations.push('XSS attempt detected');
     }
     
-    // Path Traversal
     for (const pattern of ATTACK_PATTERNS.pathTraversal) {
       if (pattern.test(scanData)) {
         suspicionPoints += 15;
@@ -523,7 +535,6 @@ function suspiciousPayloadMiddleware() {
 
 function sanitizerMiddleware() {
   return (req, res, next) => {
-    // Light sanitization
     if (req.query) {
       for (const key in req.query) {
         if (typeof req.query[key] === 'string') {
@@ -562,8 +573,7 @@ function userAgentMiddleware() {
     const userAgent = req.headers['user-agent'] || '';
     const ip = getClientIP(req);
     
-    // Don't penalize missing user agent for whitelisted paths
-    if (!userAgent && process.env.NODE_ENV !== 'test' && !isWhitelistedPath(req.path)) {
+    if (!userAgent && process.env.NODE_ENV !== 'test' && !isLenientPath(req.path)) {
       addSuspicionScore(ip, 1, 'Missing User-Agent header');
     }
     
@@ -641,11 +651,11 @@ function anomalyDetectionMiddleware() {
     recentTimestamps.push(now);
     requestTimestamps.set(ip, recentTimestamps);
     
-    // For lenient paths: allow more requests but still monitor for extreme abuse
-    const threshold = isLenientPath(path) ? 300 : 50;
+    // Different thresholds for different route types
+    const threshold = isLenientPath(path) ? 150 : 40;
     
     if (recentTimestamps.length > threshold && process.env.NODE_ENV !== 'test') {
-      const points = isLenientPath(path) ? 3 : 5;
+      const points = isLenientPath(path) ? 5 : 8;
       addSuspicionScore(ip, points, `Excessive request rate: ${recentTimestamps.length} in 10s on ${path}`);
       logger.warn(`Anomaly: Excessive requests from ${ip} (${recentTimestamps.length} in 10s) on ${path}`);
     }
@@ -659,13 +669,6 @@ function clearSecurityState() {
   suspicionScores.clear();
   honeypotHits.clear();
   requestTimestamps.clear();
-  
-  if (rateLimiterInstance && rateLimiterInstance.store) {
-    rateLimiterInstance.store = undefined;
-  }
-  if (burstLimiterInstance && burstLimiterInstance.store) {
-    burstLimiterInstance.store = undefined;
-  }
 }
 
 function cleanup() {
@@ -681,6 +684,12 @@ module.exports = function(app) {
   
   app.set('trust proxy', true);
   
+  // Initialize all rate limiters
+  standardRateLimiter = createStandardRateLimiter();
+  lenientRateLimiter = createLenientRateLimiter();
+  standardBurstLimiter = createStandardBurstLimiter();
+  lenientBurstLimiter = createLenientBurstLimiter();
+  
   const middlewares = [
     helmetMiddleware(),
     morganMiddleware(),
@@ -688,8 +697,8 @@ module.exports = function(app) {
     forbiddenMethodsMiddleware(),
     urlLengthMiddleware(),
     userAgentMiddleware(),
-    rateLimiterMiddleware(),
-    burstLimiterMiddleware(),
+    smartRateLimiterMiddleware(),
+    smartBurstLimiterMiddleware(),
     slowDownMiddleware(),
     anomalyDetectionMiddleware(),
     suspiciousPayloadMiddleware(),
@@ -699,10 +708,8 @@ module.exports = function(app) {
   honeypotMiddleware(app);
   
   logger.info('Security Service initialized');
-  logger.info(`Standard rate limit: ${config.rateLimit.max} requests per ${config.rateLimit.windowMs/1000}s`);
-  logger.info(`Lenient rate limit: ${config.publicRateLimit.max} requests per ${config.publicRateLimit.windowMs/1000}s`);
-  logger.info(`Standard burst limit: ${config.burstLimit.max} requests per ${config.burstLimit.windowMs/1000}s`);
-  logger.info(`Lenient burst limit: ${config.publicBurstLimit.max} requests per ${config.publicBurstLimit.windowMs/1000}s`);
+  logger.info(`Standard rate limit: ${config.rateLimit.max} req/15min, ${config.burstLimit.max} req/min`);
+  logger.info(`Lenient rate limit: ${config.lenientRateLimit.max} req/15min, ${config.lenientBurstLimit.max} req/min`);
   logger.info(`Suspicion threshold: ${config.suspicionThreshold} points`);
   logger.info(`Lenient paths: ${config.lenientPaths.length} routes`);
   
