@@ -11,45 +11,7 @@ const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const apicache = require("apicache");
 const User = require("../models/userSchema");
-const populateUserData = async (comments) => {
-  // Extract all unique user IDs
-  const userIds = [...new Set(
-    comments
-      .map(c => c.user?.userId)
-      .filter(Boolean)
-  )];
-  
-  if (userIds.length === 0) return comments;
-  
-  // Single bulk query for all users
-  const users = await User.find({ _id: { $in: userIds } })
-    .select('name email profilePicture googleId')
-    .lean();
-  
-  // Create a map for quick lookup
-  const userMap = new Map(users.map(u => [u._id.toString(), u]));
-  
-  // Attach user data to comments
-  for (let comment of comments) {
-    if (comment.user?.userId) {
-      const userData = userMap.get(comment.user.userId.toString());
-      if (userData) {
-        comment.user.profilePicture = userData.profilePicture;
-        comment.user.googleId = userData.googleId;
-      }
-    }
-    
-    // Check for admin profile image
-    if (comment.isAuthorComment && comment.authorAdminId) {
-      comment.authorHasProfileImage = !!(
-        comment.authorAdminId.profileImage && 
-        comment.authorAdminId.profileImage.data
-      );
-    }
-  }
-  
-  return comments;
-};
+
 const clearPostCaches = (postId = null) => {
   
   apicache.clear();
@@ -501,7 +463,6 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
 });
 
 
-
 router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -517,12 +478,13 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
     
+    
     const mediaUrl = `/api/image-posts/${id}/media`;
     const thumbnailUrl = post.mediaType === 'video' && post.video?.thumbnail?.data 
       ? `/api/image-posts/${id}/thumbnail` 
       : null;
     
-    let comments = await ImageComment.find({ 
+    const comments = await ImageComment.find({ 
       post: id,
       status: 'active',
       parentComment: null
@@ -531,17 +493,36 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
     .sort({ isAuthorComment: -1, createdAt: -1 })
     .select('-user.deviceId')
     .lean();
-    
-    // ✅ OPTIMIZED: Single bulk query instead of loop
-    comments = await populateUserData(comments);
-    
+    for (let comment of comments) {
+  if (comment.user?.userId) {
+    try {
+      const userData = await User.findById(comment.user.userId)
+        .select('name email profilePicture googleId')
+        .lean();
+      
+      if (userData) {
+        comment.user.profilePicture = userData.profilePicture;
+        comment.user.googleId = userData.googleId;
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
+  }
+  
+  if (comment.isAuthorComment && comment.authorAdminId) {
+    comment.authorHasProfileImage = !!(
+      comment.authorAdminId.profileImage && 
+      comment.authorAdminId.profileImage.data
+    );
+  }
+}
     res.json({
       post: {
         id: post._id,
         caption: post.caption,
         mediaType: post.mediaType,
-        media: mediaUrl,
-        thumbnail: thumbnailUrl,
+        media: mediaUrl,  
+        thumbnail: thumbnailUrl,  
         videoDuration: post.video?.duration,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -556,6 +537,8 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+
 
 router.get('/api/image-posts/:id/comments', async (req, res) => {
   try {
@@ -577,8 +560,30 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
     .limit(limitNum)
     .lean();
     
-    // ✅ OPTIMIZED: Single bulk query
-    comments = await populateUserData(comments);
+    // ✅ ADD THIS SECTION - Fetch user profile data
+    for (let comment of comments) {
+      if (comment.user?.userId) {
+        try {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
+      }
+      
+      if (comment.isAuthorComment && comment.authorAdminId) {
+        comment.authorHasProfileImage = !!(
+          comment.authorAdminId.profileImage && 
+          comment.authorAdminId.profileImage.data
+        );
+      }
+    }
     
     const total = await ImageComment.countDocuments({
       post: id,
@@ -595,11 +600,12 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
         pages: Math.ceil(total / limitNum)
       }
     });
-  } catch (error){
+  } catch (error) {
     console.error('Error fetching comments:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 
 router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
@@ -621,8 +627,30 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
     .limit(limitNum)
     .lean();
     
-    // ✅ OPTIMIZED: Single bulk query
-    replies = await populateUserData(replies);
+    // ✅ ADD THIS SECTION - Fetch user profile data for replies
+    for (let reply of replies) {
+      if (reply.user?.userId) {
+        try {
+          const userData = await User.findById(reply.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          
+          if (userData) {
+            reply.user.profilePicture = userData.profilePicture;
+            reply.user.googleId = userData.googleId;
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
+      }
+      
+      if (reply.isAuthorComment && reply.authorAdminId) {
+        reply.authorHasProfileImage = !!(
+          reply.authorAdminId.profileImage && 
+          reply.authorAdminId.profileImage.data
+        );
+      }
+    }
     
     const total = await ImageComment.countDocuments({
       parentComment: commentId,
@@ -782,7 +810,7 @@ router.post('/api/image-posts/:id/comments',
       
       clearPostCaches(id);
       
-      let updatedComments = await ImageComment.find({ 
+      const updatedComments = await ImageComment.find({ 
         post: id,
         status: 'active',
         parentComment: parentCommentId || null
@@ -791,13 +819,22 @@ router.post('/api/image-posts/:id/comments',
       .sort({ isAuthorComment: -1, createdAt: -1 })
       .lean();
       
-      // ✅ OPTIMIZED: Single bulk query
-      updatedComments = await populateUserData(updatedComments);
+      for (let comment of updatedComments) {
+        if (comment.user.userId) {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        }
+      }
       
       res.status(201).json({
         message: parentCommentId ? 'Reply added successfully' : 'Comment added successfully',
         comment: newComment,
-        updatedComments: parentCommentId ? null : updatedComments,
+        updatedComments: parentCommentId ? null : updatedComments, 
         timestamp: Date.now() 
       });
     } catch (error) {
@@ -1092,8 +1129,17 @@ router.get('/api/admin/image-posts/:id/comments',
         .limit(limitNum)
         .lean();
       
-      // ✅ OPTIMIZED: Single bulk query for all comments
-      comments = await populateUserData(comments);
+      for (let comment of comments) {
+        if (comment.user.userId) {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        }
+      }
       
       if (includeReplies === 'true') {
         for (let comment of comments) {
@@ -1104,8 +1150,18 @@ router.get('/api/admin/image-posts/:id/comments',
           .sort({ isAuthorComment: -1, createdAt: 1 })
           .lean();
           
-          // ✅ OPTIMIZED: Bulk query for replies
-          replies = await populateUserData(replies);
+          for (let reply of replies) {
+            if (reply.user.userId) {
+              const userData = await User.findById(reply.user.userId)
+                .select('name email profilePicture googleId')
+                .lean();
+              if (userData) {
+                reply.user.profilePicture = userData.profilePicture;
+                reply.user.googleId = userData.googleId;
+              }
+            }
+          }
+          
           comment.replies = replies;
         }
       }
