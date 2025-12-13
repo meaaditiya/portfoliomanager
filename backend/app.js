@@ -125,14 +125,14 @@ async function initializeApp() {
   app.use(security.burstLimiter);
   app.use(security.publicLimiter);
 
+  app.use('/api', security.authLimiter, userAuth);
   app.use('/api/admin', security.strictLimiter, adminRoutes);
-  app.use(userAuth);
+  app.use('/api/superadmin', security.strictLimiter, superAdminRoutes);
 
   app.use(embeddingRoutes);
   app.use(BlogSubmission);
   app.use(BlogRoutes);
   app.use(queryRoutes);
-  app.use(superAdminRoutes);
   app.use(ContactRoutes);
   app.use(announcementRoutes);
   app.use(projectRoutes);
