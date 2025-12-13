@@ -127,7 +127,6 @@ async function initializeApp() {
 
   app.use('/api/admin', security.strictLimiter, adminRoutes);
   app.use(userAuth);
-  app.use(security.uploadLimiter);
 
   app.use(embeddingRoutes);
   app.use(BlogSubmission);
