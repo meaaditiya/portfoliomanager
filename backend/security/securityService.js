@@ -102,6 +102,7 @@ function setupCors() {
     'http://localhost:5174',
     'https://connectwithaaditiya.onrender.com',
     'https://connectwithaaditiyamg.onrender.com',
+    'https://connectwithaaditiyamg2.onrender.com',
     'https://connectwithaaditiyaadmin.onrender.com',
     'http://192.168.1.33:5174',
     'http://192.168.1.33:5173',
@@ -114,7 +115,12 @@ function setupCors() {
 
   return {
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (mobile apps, Postman, curl, server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         logger.warn(`CORS blocked origin: ${origin}`);
@@ -123,9 +129,11 @@ function setupCors() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
-    maxAge: 600
+    maxAge: 600,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   };
 }
 
@@ -135,12 +143,7 @@ function createApiLimiter() {
     max: config.apiRateLimit.max,
     message: { error: config.apiRateLimit.message },
     standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => {
-      return process.env.NODE_ENV === 'test' || 
-             req.path === '/health' || 
-             req.path.startsWith('/public');
-    }
+    legacyHeaders: false
   });
 }
 
@@ -171,10 +174,7 @@ function createPublicLimiter() {
     max: config.publicRateLimit.max,
     message: { error: config.publicRateLimit.message },
     standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => {
-      return process.env.NODE_ENV === 'test' || req.path === '/health';
-    }
+    legacyHeaders: false
   });
 }
 
@@ -189,6 +189,13 @@ function createUploadLimiter() {
 }
 
 function setupRequestLogger() {
+  // Temporarily disabled to test if express-winston is causing issues
+  return (req, res, next) => {
+    logger.http(`${req.method} ${req.url}`);
+    next();
+  };
+  
+  /*
   return expressWinston.logger({
     winstonInstance: logger,
     meta: true,
@@ -199,12 +206,21 @@ function setupRequestLogger() {
       return req.path === '/health' || process.env.NODE_ENV === 'test';
     }
   });
+  */
 }
 
 function setupErrorLogger() {
+  // Temporarily disabled to test if express-winston is causing issues
+  return (err, req, res, next) => {
+    logger.error(`Error: ${err.message}`);
+    next(err);
+  };
+  
+  /*
   return expressWinston.errorLogger({
     winstonInstance: logger
   });
+  */
 }
 
 function urlValidationMiddleware() {
@@ -246,28 +262,23 @@ function initializeSecurity(app) {
 
   app.set('trust proxy', 1);
 
-  app.use(setupHelmet());
-  app.use(securityHeaders());
-  app.use(compression());
-  app.use(urlValidationMiddleware());
-  
-  if (process.env.NODE_ENV !== 'test') {
-    app.use(setupRequestLogger());
-  }
-
-  app.use(...setupSanitization());
-
   logger.info('Security middleware initialized successfully');
   logger.info(`API Rate Limit: ${config.apiRateLimit.max} requests per 15 minutes`);
   logger.info(`Auth Rate Limit: ${config.authRateLimit.max} attempts per 15 minutes`);
   logger.info(`Public Rate Limit: ${config.publicRateLimit.max} requests per 15 minutes`);
 
   return {
-    apiLimiter: createApiLimiter(),
-    strictLimiter: createStrictLimiter(),
-    authLimiter: createAuthLimiter(),
-    publicLimiter: createPublicLimiter(),
-    uploadLimiter: createUploadLimiter(),
+    helmet: setupHelmet(),
+    securityHeaders: securityHeaders(),
+    compression: compression(),
+    urlValidation: urlValidationMiddleware(),
+    requestLogger: setupRequestLogger(),
+    sanitization: setupSanitization(),
+    get apiLimiter() { return createApiLimiter(); },
+    get strictLimiter() { return createStrictLimiter(); },
+    get authLimiter() { return createAuthLimiter(); },
+    get publicLimiter() { return createPublicLimiter(); },
+    get uploadLimiter() { return createUploadLimiter(); },
     errorLogger: setupErrorLogger(),
     corsConfig: setupCors()
   };

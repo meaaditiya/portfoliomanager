@@ -42,8 +42,15 @@ if (!fs.existsSync("./keys")) {
 fs.writeFileSync("./keys/gcs.json", process.env.GCS_JSON);
 
 const security = initializeSecurity(app);
+app.use(security.helmet);
+app.use(security.securityHeaders);
+app.use(security.compression);
+app.use(security.urlValidation);
 
-
+if (process.env.NODE_ENV !== 'test') {
+  app.use(security.requestLogger);
+}
+app.use(...security.sanitization);
 app.use(corsMiddleware);
 app.options('*', corsMiddleware);
 
