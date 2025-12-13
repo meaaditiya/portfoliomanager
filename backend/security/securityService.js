@@ -5,17 +5,75 @@ const winston = require('winston');
 const morgan = require('morgan');
 
 const config = {
+  // Generous rate limits for non-whitelisted routes
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300, // 300 requests per 15 min
   },
   burstLimit: {
-    windowMs: parseInt(process.env.BURST_LIMIT_WINDOW_MS) || 60 * 1000,
-    max: parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 20,
+    windowMs: parseInt(process.env.BURST_LIMIT_WINDOW_MS) || 60 * 1000, // 1 minute
+    max: parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 60, // 60 requests per minute
   },
-  maxUrlLength: 2000,
-  suspicionThreshold: 10,
+  // Lenient limits for high-traffic public routes
+  publicRateLimit: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // 1000 requests per 15 min
+  },
+  publicBurstLimit: {
+    windowMs: 60 * 1000, // 1 minute
+    max: 200, // 200 requests per minute
+  },
+  maxUrlLength: 4000,
+  suspicionThreshold: 50, // High threshold
   enableRedis: !!process.env.REDIS_URL,
+  
+  // High-traffic public routes with lenient rate limiting
+  lenientPaths: [
+    // Public API routes
+    '/api/blogs',
+    '/api/image-posts',
+    '/api/gallery',
+    '/api/projects',
+    '/api/featured-projects',
+    '/api/profile',
+    '/api/quotes',
+    '/api/community',
+    '/api/announcements',
+    '/api/streams',
+    
+    // Visitor tracking (high frequency)
+    '/api/visitors',
+    
+    // Comment and reaction routes (frequent user interactions)
+    '/api/comments',
+    '/api/reactions',
+    
+    // Document browsing (moderate limits)
+    '/api/folder/contents',
+    '/api/folder/tree',
+    '/api/item/',
+    
+    // User bookmarks and checkmarks (frequent interactions)
+    '/api/user/bookmark',
+    '/api/user/bookmarks',
+    '/api/user/check-access',
+    '/api/user/access-via-link',
+    '/api/user/my-access-requests',
+    
+    // Search (can be frequent)
+    '/api/search',
+    
+    // Health and monitoring
+    '/health',
+    '/socket.io',
+    
+    // Static files
+    '/public',
+    
+    // Media serving
+    '/api/image-posts/',
+    '/api/blogs/',
+  ],
 };
 
 const logger = winston.createLogger({
@@ -41,28 +99,38 @@ if (process.env.NODE_ENV !== 'production') {
 const blockedIPs = new Map();
 const suspicionScores = new Map();
 const honeypotHits = new Set();
+const requestTimestamps = new Map();
 
-// Store rate limiter instances for cleanup
 let rateLimiterInstance = null;
 let burstLimiterInstance = null;
-
-// Store cleanup interval reference for proper shutdown
 let cleanupInterval = null;
 
 if (process.env.NODE_ENV !== 'test') {
   cleanupInterval = setInterval(() => {
     const now = Date.now();
+    
     for (const [ip, data] of blockedIPs.entries()) {
       if (data.blockedUntil < now) {
         blockedIPs.delete(ip);
+        logger.info(`IP unblocked: ${ip}`);
       }
     }
+    
     for (const [ip, data] of suspicionScores.entries()) {
-      if (now - data.lastUpdate > 3600000) {
+      if (now - data.lastUpdate > 3600000) { // 1 hour
         suspicionScores.delete(ip);
       }
     }
-  }, 600000);
+    
+    for (const [ip, timestamps] of requestTimestamps.entries()) {
+      const recent = timestamps.filter(ts => now - ts < 60000);
+      if (recent.length === 0) {
+        requestTimestamps.delete(ip);
+      } else {
+        requestTimestamps.set(ip, recent);
+      }
+    }
+  }, 300000); // Every 5 minutes
 }
 
 let redisClient = null;
@@ -111,20 +179,38 @@ function getClientIP(req) {
   return ip;
 }
 
+function isWhitelistedPath(path) {
+  return config.lenientPaths.some(whitelisted => 
+    path.startsWith(whitelisted)
+  );
+}
+
+function isLenientPath(path) {
+  return config.lenientPaths.some(lenient => 
+    path.startsWith(lenient)
+  );
+}
+
 function addSuspicionScore(ip, points, reason) {
   if (process.env.NODE_ENV === 'test' && (ip === '127.0.0.1' || ip === 'localhost')) {
     return;
   }
   
-  const current = suspicionScores.get(ip) || { score: 0, lastUpdate: Date.now() };
+  const current = suspicionScores.get(ip) || { score: 0, lastUpdate: Date.now(), reasons: [] };
   current.score += points;
   current.lastUpdate = Date.now();
+  current.reasons.push({ reason, points, timestamp: Date.now() });
+  
+  if (current.reasons.length > 10) {
+    current.reasons = current.reasons.slice(-10);
+  }
+  
   suspicionScores.set(ip, current);
   
   logger.warn(`Suspicion added to ${ip}: +${points} (${reason}), total: ${current.score}`);
   
   if (current.score >= config.suspicionThreshold) {
-    blockIP(ip, 300000, `Suspicion threshold exceeded: ${current.score} points`);
+    blockIP(ip, 600000, `Suspicion threshold exceeded: ${current.score} points - ${reason}`);
   }
 }
 
@@ -135,7 +221,7 @@ function blockIP(ip, duration, reason) {
   
   const blockedUntil = Date.now() + duration;
   blockedIPs.set(ip, { blockedUntil, reason });
-  logger.error(`IP BLOCKED: ${ip} for ${duration}ms - ${reason}`);
+  logger.error(`IP BLOCKED: ${ip} for ${Math.floor(duration/1000)}s - ${reason}`);
   
   if (redisClient) {
     redisClient.setEx(`blocked:${ip}`, Math.floor(duration / 1000), reason)
@@ -167,48 +253,42 @@ async function isIPBlocked(ip) {
   return { blocked: false };
 }
 
+// Precise attack patterns
 const ATTACK_PATTERNS = {
   sqli: [
-    /(\bor\b|\band\b).*?[=<>]/i,
-    /union.*select/i,
-    /select.*from/i,
-    /insert.*into/i,
-    /delete.*from/i,
-    /update.*set/i,
-    /drop.*table/i,
-    /exec(\s|\()/i,
-    /script.*src/i,
-    /javascript:/i,
-    /'\s*(or|and)\s*'?\d/i,
-    /--/,
-    /;.*drop/i,
+    /union\s+select/i,
+    /;\s*drop\s+table/i,
+    /;\s*delete\s+from/i,
+    /exec\s*\(/i,
+    /'\s*or\s+'1'\s*=\s*'1/i,
+    /'\s*or\s+1\s*=\s*1/i,
+    /--\s*$/,
+    /\/\*.*\*\//,
+    /benchmark\s*\(/i,
+    /sleep\s*\(/i,
+    /waitfor\s+delay/i,
   ],
   nosqli: [
-    /\$where/i,
-    /\$ne/,
-    /\$gt/,
-    /\$lt/,
-    /\$regex/,
-    /\$or/,
-    /\$and/,
+    /\{\s*['"]\$where['"]\s*:/i,
+    /\{\s*['"]\$ne['"]\s*:\s*null\s*\}/i,
+    /\{\s*['"]\$gt['"]\s*:\s*["']\s*["']\s*\}/i,
   ],
   xss: [
-    /<script[^>]*>.*?<\/script>/gi,
-    /javascript:/gi,
-    /on\w+\s*=/gi,
-    /<iframe/gi,
-    /<object/gi,
-    /<embed/gi,
-    /eval\(/gi,
-    /expression\(/gi,
+    /<script[^>]*>[\s\S]*?<\/script>/gi,
+    /<iframe[^>]*src=/gi,
+    /javascript:\s*alert\s*\(/gi,
+    /onerror\s*=\s*["'][^"']*["']/gi,
+    /onclick\s*=\s*["'][^"']*["']/gi,
+    /<embed[^>]*>/gi,
+    /eval\s*\(\s*["'][^"']*["']\s*\)/gi,
   ],
   pathTraversal: [
-    /\.\.\//g,
-    /\.\.\\/g,
-    /%2e%2e/gi,
+    /\.\.[\/\\]{2,}/g,
+    /[\/\\]\.\.([\/\\]\.\.)+/g,
+    /%2e%2e[\/\\]/gi,
     /\/etc\/passwd/i,
-    /\/proc\//i,
-    /c:\\windows/i,
+    /\/proc\/self/i,
+    /c:[\\\/]windows[\\\/]system32/i,
   ],
 };
 
@@ -217,14 +297,14 @@ function helmetMiddleware() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+        connectSrc: ["'self'", 'https:', 'wss:', 'ws:'],
+        fontSrc: ["'self'", 'data:', 'https:'],
         objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameSrc: ["'none'"],
+        mediaSrc: ["'self'", 'https:', 'blob:'],
+        frameSrc: ["'self'", 'https:'],
       },
     },
     hsts: {
@@ -234,7 +314,7 @@ function helmetMiddleware() {
     },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     noSniff: true,
-    xssFilter: true,
+    xssFilter: false,
     hidePoweredBy: true,
   });
 }
@@ -259,7 +339,7 @@ function ipBlockerMiddleware() {
       logger.warn(`Blocked request from ${ip}: ${blockStatus.reason}`);
       return res.status(403).json({
         error: 'Access forbidden',
-        message: 'Your IP has been blocked due to suspicious activity',
+        message: 'Your IP has been temporarily blocked. Please contact support if you believe this is an error.',
       });
     }
     
@@ -270,7 +350,13 @@ function ipBlockerMiddleware() {
 function rateLimiterMiddleware() {
   rateLimiterInstance = rateLimit({
     windowMs: config.rateLimit.windowMs,
-    max: config.rateLimit.max,
+    max: (req) => {
+      // Apply lenient limits for public routes
+      if (isLenientPath(req.path)) {
+        return config.publicRateLimit.max;
+      }
+      return config.rateLimit.max;
+    },
     standardHeaders: true,
     legacyHeaders: false,
     store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
@@ -281,14 +367,15 @@ function rateLimiterMiddleware() {
       : undefined,
     handler: (req, res) => {
       const ip = getClientIP(req);
-      addSuspicionScore(ip, 2, 'Rate limit exceeded');
-      logger.warn(`Rate limit exceeded for ${ip}`);
+      const isLenient = isLenientPath(req.path);
+      addSuspicionScore(ip, isLenient ? 3 : 5, 'General rate limit exceeded');
+      logger.warn(`Rate limit exceeded for ${ip} on ${req.path}`);
       res.status(429).json({
         error: 'Too many requests',
-        message: 'Please slow down and try again later',
+        message: 'Please slow down and try again in a few minutes',
       });
     },
-    skipFailedRequests: false,
+    skipFailedRequests: true,
     skipSuccessfulRequests: false,
   });
 
@@ -298,7 +385,13 @@ function rateLimiterMiddleware() {
 function burstLimiterMiddleware() {
   burstLimiterInstance = rateLimit({
     windowMs: config.burstLimit.windowMs,
-    max: config.burstLimit.max,
+    max: (req) => {
+      // Apply lenient limits for public routes
+      if (isLenientPath(req.path)) {
+        return config.publicBurstLimit.max;
+      }
+      return config.burstLimit.max;
+    },
     standardHeaders: true,
     legacyHeaders: false,
     store: redisClient && RedisStore && process.env.NODE_ENV !== 'test'
@@ -309,26 +402,36 @@ function burstLimiterMiddleware() {
       : undefined,
     handler: (req, res) => {
       const ip = getClientIP(req);
-      addSuspicionScore(ip, 3, 'Burst limit exceeded');
-      logger.warn(`Burst limit exceeded for ${ip}`);
+      const isLenient = isLenientPath(req.path);
+      addSuspicionScore(ip, isLenient ? 5 : 8, 'Burst limit exceeded');
+      logger.warn(`Burst limit exceeded for ${ip} on ${req.path}`);
       res.status(429).json({
         error: 'Too many requests',
-        message: 'Burst limit exceeded. Please wait before retrying.',
+        message: 'Burst limit exceeded. Please wait a moment before retrying.',
       });
     },
-    skipFailedRequests: false,
+    skipFailedRequests: true,
     skipSuccessfulRequests: false,
   });
 
   return burstLimiterInstance;
 }
+
 function slowDownMiddleware() {
   return slowDown({
     windowMs: 60 * 1000,
-    delayAfter: 10,
-    delayMs: () => 500,
-    maxDelayMs: 20000,
-    skip: () => process.env.NODE_ENV === 'test'
+    delayAfter: (req) => {
+      // Higher threshold for lenient paths
+      if (isLenientPath(req.path)) {
+        return 100; // Allow 100 requests before slowing down
+      }
+      return 50;
+    },
+    delayMs: () => 100,
+    maxDelayMs: 5000,
+    skip: (req) => {
+      return process.env.NODE_ENV === 'test';
+    }
   });
 }
 
@@ -338,7 +441,7 @@ function urlLengthMiddleware() {
     
     if (urlLength > config.maxUrlLength) {
       const ip = getClientIP(req);
-      addSuspicionScore(ip, 5, `Excessive URL length: ${urlLength}`);
+      addSuspicionScore(ip, 10, `Excessive URL length: ${urlLength}`);
       logger.warn(`URL too long from ${ip}: ${urlLength} chars`);
       return res.status(414).json({
         error: 'URI Too Long',
@@ -356,40 +459,50 @@ function suspiciousPayloadMiddleware() {
     let suspicionPoints = 0;
     const violations = [];
     
+    // Only scan request data, not headers
     const scanData = JSON.stringify({
       query: req.query,
       params: req.params,
       body: req.body,
-      headers: req.headers,
     });
     
+    // SQL Injection - require multiple matches
+    let sqlMatches = 0;
     for (const pattern of ATTACK_PATTERNS.sqli) {
       if (pattern.test(scanData)) {
-        suspicionPoints += 5;
-        violations.push('SQL Injection pattern detected');
-        break;
+        sqlMatches++;
       }
     }
+    if (sqlMatches >= 2) {
+      suspicionPoints += 15;
+      violations.push('SQL Injection attempt detected');
+    }
     
+    // NoSQL Injection
     for (const pattern of ATTACK_PATTERNS.nosqli) {
       if (pattern.test(scanData)) {
-        suspicionPoints += 5;
-        violations.push('NoSQL Injection pattern detected');
+        suspicionPoints += 15;
+        violations.push('NoSQL Injection attempt detected');
         break;
       }
     }
     
+    // XSS
+    let xssMatches = 0;
     for (const pattern of ATTACK_PATTERNS.xss) {
       if (pattern.test(scanData)) {
-        suspicionPoints += 4;
-        violations.push('XSS pattern detected');
-        break;
+        xssMatches++;
       }
     }
+    if (xssMatches >= 1) {
+      suspicionPoints += 12;
+      violations.push('XSS attempt detected');
+    }
     
+    // Path Traversal
     for (const pattern of ATTACK_PATTERNS.pathTraversal) {
       if (pattern.test(scanData)) {
-        suspicionPoints += 5;
+        suspicionPoints += 15;
         violations.push('Path traversal attempt detected');
         break;
       }
@@ -410,12 +523,11 @@ function suspiciousPayloadMiddleware() {
 
 function sanitizerMiddleware() {
   return (req, res, next) => {
+    // Light sanitization
     if (req.query) {
       for (const key in req.query) {
         if (typeof req.query[key] === 'string') {
-          req.query[key] = req.query[key]
-            .replace(/[<>"']/g, '')
-            .trim();
+          req.query[key] = req.query[key].trim();
         }
       }
     }
@@ -423,9 +535,7 @@ function sanitizerMiddleware() {
     if (req.body && typeof req.body === 'object') {
       for (const key in req.body) {
         if (typeof req.body[key] === 'string') {
-          req.body[key] = req.body[key]
-            .replace(/[<>]/g, '')
-            .trim();
+          req.body[key] = req.body[key].trim();
         }
       }
     }
@@ -441,26 +551,29 @@ function userAgentMiddleware() {
     /nmap/i,
     /masscan/i,
     /metasploit/i,
-    /burp/i,
+    /burp.*intruder/i,
     /havij/i,
     /acunetix/i,
+    /w3af/i,
+    /paros/i,
   ];
   
   return (req, res, next) => {
     const userAgent = req.headers['user-agent'] || '';
     const ip = getClientIP(req);
     
-    if (!userAgent && process.env.NODE_ENV !== 'test') {
-      addSuspicionScore(ip, 1, 'Missing User-Agent');
+    // Don't penalize missing user agent for whitelisted paths
+    if (!userAgent && process.env.NODE_ENV !== 'test' && !isWhitelistedPath(req.path)) {
+      addSuspicionScore(ip, 1, 'Missing User-Agent header');
     }
     
     for (const pattern of suspiciousAgents) {
       if (pattern.test(userAgent)) {
-        addSuspicionScore(ip, 8, `Suspicious User-Agent: ${userAgent}`);
+        addSuspicionScore(ip, 20, `Attack tool detected: ${userAgent}`);
         logger.error(`Attack tool detected from ${ip}: ${userAgent}`);
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'Suspicious user agent detected',
+          message: 'Access denied',
         });
       }
     }
@@ -470,12 +583,12 @@ function userAgentMiddleware() {
 }
 
 function forbiddenMethodsMiddleware() {
-  const forbiddenMethods = ['TRACE', 'TRACK', 'DEBUG'];
+  const forbiddenMethods = ['TRACE', 'TRACK', 'DEBUG', 'CONNECT'];
   
   return (req, res, next) => {
     if (forbiddenMethods.includes(req.method.toUpperCase())) {
       const ip = getClientIP(req);
-      addSuspicionScore(ip, 3, `Forbidden method: ${req.method}`);
+      addSuspicionScore(ip, 8, `Forbidden method: ${req.method}`);
       logger.warn(`Forbidden method ${req.method} from ${ip}`);
       return res.status(405).json({
         error: 'Method Not Allowed',
@@ -489,14 +602,15 @@ function forbiddenMethodsMiddleware() {
 
 function honeypotMiddleware(app) {
   const honeypotPaths = [
-    '/admin',
     '/phpmyadmin',
     '/wp-admin',
     '/wp-login.php',
     '/.env',
     '/.git/config',
     '/config.php',
-    '/backup',
+    '/backup.sql',
+    '/.aws/credentials',
+    '/phpinfo.php',
   ];
   
   honeypotPaths.forEach(path => {
@@ -512,50 +626,48 @@ function honeypotMiddleware(app) {
   return (req, res, next) => next();
 }
 
-const requestTimestamps = new Map();
-
 function anomalyDetectionMiddleware() {
   return (req, res, next) => {
     const ip = getClientIP(req);
     const now = Date.now();
+    const path = req.path;
     
     if (!requestTimestamps.has(ip)) {
       requestTimestamps.set(ip, []);
     }
     
     const timestamps = requestTimestamps.get(ip);
-    
     const recentTimestamps = timestamps.filter(ts => now - ts < 10000);
     recentTimestamps.push(now);
     requestTimestamps.set(ip, recentTimestamps);
     
-    if (recentTimestamps.length >= 10 && process.env.NODE_ENV !== 'test') {
-      addSuspicionScore(ip, 2, 'Rapid refresh pattern detected');
-      logger.warn(`Anomaly: Rapid requests from ${ip} (${recentTimestamps.length} in 10s)`);
+    // For lenient paths: allow more requests but still monitor for extreme abuse
+    const threshold = isLenientPath(path) ? 300 : 50;
+    
+    if (recentTimestamps.length > threshold && process.env.NODE_ENV !== 'test') {
+      const points = isLenientPath(path) ? 3 : 5;
+      addSuspicionScore(ip, points, `Excessive request rate: ${recentTimestamps.length} in 10s on ${path}`);
+      logger.warn(`Anomaly: Excessive requests from ${ip} (${recentTimestamps.length} in 10s) on ${path}`);
     }
     
     next();
   };
 }
 
-// Export a function to clear state for testing
 function clearSecurityState() {
   blockedIPs.clear();
   suspicionScores.clear();
   honeypotHits.clear();
   requestTimestamps.clear();
   
-  // Reset rate limiter stores
-  if (rateLimiterInstance && rateLimiterInstance.resetKey) {
-    // Clear all keys - this is a hack but necessary for testing
+  if (rateLimiterInstance && rateLimiterInstance.store) {
     rateLimiterInstance.store = undefined;
   }
-  if (burstLimiterInstance && burstLimiterInstance.resetKey) {
+  if (burstLimiterInstance && burstLimiterInstance.store) {
     burstLimiterInstance.store = undefined;
   }
 }
 
-// Cleanup function for proper shutdown
 function cleanup() {
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
@@ -567,7 +679,6 @@ function cleanup() {
 module.exports = function(app) {
   logger.info('Initializing Security Service...');
   
-  // Enable trust proxy to handle X-Forwarded-For
   app.set('trust proxy', true);
   
   const middlewares = [
@@ -587,7 +698,13 @@ module.exports = function(app) {
   
   honeypotMiddleware(app);
   
-  logger.info('Security Service initialized with all layers active');
+  logger.info('Security Service initialized');
+  logger.info(`Standard rate limit: ${config.rateLimit.max} requests per ${config.rateLimit.windowMs/1000}s`);
+  logger.info(`Lenient rate limit: ${config.publicRateLimit.max} requests per ${config.publicRateLimit.windowMs/1000}s`);
+  logger.info(`Standard burst limit: ${config.burstLimit.max} requests per ${config.burstLimit.windowMs/1000}s`);
+  logger.info(`Lenient burst limit: ${config.publicBurstLimit.max} requests per ${config.publicBurstLimit.windowMs/1000}s`);
+  logger.info(`Suspicion threshold: ${config.suspicionThreshold} points`);
+  logger.info(`Lenient paths: ${config.lenientPaths.length} routes`);
   
   return middlewares;
 };
@@ -599,3 +716,7 @@ module.exports.closeLogger = function() {
 
 module.exports.clearSecurityState = clearSecurityState;
 module.exports.cleanup = cleanup;
+module.exports.getClientIP = getClientIP;
+module.exports.addSuspicionScore = addSuspicionScore;
+module.exports.blockIP = blockIP;
+module.exports.isIPBlocked = isIPBlocked;
