@@ -14,7 +14,7 @@ const Home = () => {
           Login to manage your content or register for a new account.
         </p>
         <div className="home-actions">
-          <Link to="/login" className="btn-primary">Login</Link>
+          <Link to="/login" className="btn3 btn-analytics1">Login</Link>
         </div>
       </div>
     </div>
