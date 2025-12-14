@@ -989,7 +989,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
             <>
               <h1>Blog Management</h1>
               <button 
-                className="btn btn-primary"
+                className="btn3 btn-analytics1"
                 onClick={handleNew}
               >
                 Add New Post
