@@ -21,7 +21,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const jwt = require('jsonwebtoken');
 const User = require("../models/userSchema");
 const calculateReadTime = require('../utils/calculateReadTime');
-
+const BlacklistedToken = require('../models/blacklistedtoken.js');
 const { 
   generateQueryEmbedding, 
   cosineSimilarity,
@@ -277,6 +277,14 @@ const extractAuthFromToken = async (req, res, next) => {
       
       else if (decoded.user_id) {  
         try {
+          // Check if user token is blacklisted
+          const blacklisted = await BlacklistedToken.findOne({ token });
+          if (blacklisted) {
+            console.log('❌ User token is blacklisted');
+            req.user = { isAuthenticated: false };
+            return next();
+          }
+
           const user = await User.findById(decoded.user_id);
           
           if (user) {
@@ -315,6 +323,7 @@ const extractAuthFromToken = async (req, res, next) => {
     next();
   }
 };
+
 
 
 

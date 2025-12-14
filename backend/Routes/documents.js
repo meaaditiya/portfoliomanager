@@ -13,7 +13,7 @@ const router = express.Router();
 const ADMIN_EMAIL= process.env.FROM_EMAIL;
 const crypto = require('crypto');
 const https = require('https');
-
+const BlacklistedToken = require("../models/blacklistedtoken");
 
 const verifyTurnstile = async (token) => {
   return new Promise((resolve, reject) => {
@@ -84,23 +84,45 @@ const verifyTurnstileToken = async (req, res, next) => {
 };
 const optionalAuth = async (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
       
+      const blacklisted = await BlacklistedToken.findOne({ token });
+      if (blacklisted) {
+        req.user = { isAuthenticated: false };
+        return next();
+      }
+      
       const userId = decoded.user_id || decoded.admin_id;
       
       if (userId) {
-        req.user = { 
-          id: String(userId),
-          _id: String(userId),
-          isAdmin: decoded.role === 'admin' || !!decoded.admin_id
-        };
+        const user = await User.findById(userId);
+        
+        if (user) {
+          req.user = {
+            id: String(userId),
+            _id: String(userId),
+            email: user.email,
+            name: user.name,
+            isAdmin: decoded.role === 'admin' || !!decoded.admin_id,
+            isAuthenticated: true,
+            type: decoded.admin_id ? 'admin' : 'user'
+          };
+        } else {
+          req.user = { isAuthenticated: false };
+        }
+      } else {
+        req.user = { isAuthenticated: false };
       }
     } catch (err) {
-      console.error('Token verification failed:', err.message);
+      req.user = { isAuthenticated: false };
     }
+  } else {
+    req.user = { isAuthenticated: false };
   }
+  
   next();
 };
 const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = false) => {

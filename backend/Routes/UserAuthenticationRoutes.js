@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const passport = require('passport');
 const User = require("../models/userSchema");
+const BlacklistedToken = require("../models/blacklistedtoken.js");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
 const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
@@ -142,6 +143,29 @@ router.post('/user/login', async (req, res) => {
   }
 });
 
+router.post('/user/logout', UserAuthMiddleware, async (req, res) => {
+  try {
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (token) {
+      const blacklistedToken = new BlacklistedToken({ token });
+      await blacklistedToken.save();
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'None' : 'Lax',
+      path: '/'
+    });
+    
+    res.json({ message: 'Logout successful' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/user/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -252,6 +276,15 @@ router.get('/verify', async (req, res) => {
     if (!token) {
       return res.status(401).json({ 
         message: 'No token provided',
+        isValid: false 
+      });
+    }
+
+    // Check if token is blacklisted
+    const blacklisted = await BlacklistedToken.findOne({ token });
+    if (blacklisted) {
+      return res.status(403).json({ 
+        message: 'Token has been revoked',
         isValid: false 
       });
     }
