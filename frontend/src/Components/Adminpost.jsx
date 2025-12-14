@@ -54,7 +54,7 @@ const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const token = localStorage.getItem('token');
 
   // API Base URL
-  const API_BASE_URL = 'https://connectwithaaditiyamg2.onrender.com';
+  const API_BASE_URL = 'https://aadibgmg.onrender.com';
 
   // Fetch posts on mount and when pagination changes
   useEffect(() => {

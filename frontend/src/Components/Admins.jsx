@@ -43,7 +43,7 @@ const SuperAdminPanel = () => {
     }
   });
 
-  const API_URL = 'https://connectwithaaditiyamg2.onrender.com/api';
+  const API_URL = 'https://aadibgmg.onrender.com/api';
 
   const getToken = () => {
     return localStorage.getItem('token');

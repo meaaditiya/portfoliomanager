@@ -16,7 +16,7 @@ const AdminQueryManager = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const API_BASE = 'https://connectwithaaditiyamg2.onrender.com/api';
+  const API_BASE = 'https://aadibgmg.onrender.com/api';
   const token = localStorage.getItem('token');
 
   useEffect(() => {

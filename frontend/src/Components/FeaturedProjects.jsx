@@ -24,7 +24,7 @@ const AdminProjects = () => {
     order: 0
   });
 
-  const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
+  const API_URL = 'https://aadibgmg.onrender.com';
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');

@@ -32,7 +32,7 @@ const AudioAdminDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [notification, setNotification] = useState(null);
   const [isAudioView, setIsAudioView] = useState(false);
-  const API_BASE = 'https://connectwithaaditiyamg2.onrender.com';
+  const API_BASE = 'https://aadibgmg.onrender.com';
   const token = localStorage.getItem('token'); // Retrieve token from localStorage
 
   // Helper functions

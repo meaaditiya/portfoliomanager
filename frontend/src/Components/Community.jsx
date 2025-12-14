@@ -31,7 +31,7 @@ const AdminCommunity = () => {
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  const API_BASE = 'https://connectwithaaditiyamg2.onrender.com/api'; // Adjust as needed
+  const API_BASE = 'https://aadibgmg.onrender.com/api'; // Adjust as needed
 
   const getToken = () => localStorage.getItem('token');
 

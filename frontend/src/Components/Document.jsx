@@ -57,7 +57,7 @@ export default function FileManager() {
     { id: 'heart', label: 'Heart', icon: Heart }
   ];
 
-  const API_URL = 'http://localhost:5000';
+  const API_URL = 'https://aadibgmg.onrender.com';
   const token = localStorage.getItem('token');
 
  const loadFolder = async (folderId = null) => {

@@ -39,7 +39,7 @@ const Messages = () => {
     replied: 0
   });
 
-  const API_BASE = 'https://connectwithaaditiyamg2.onrender.com';
+  const API_BASE = 'https://aadibgmg.onrender.com';
 
   useEffect(() => {
     fetchConversations();
