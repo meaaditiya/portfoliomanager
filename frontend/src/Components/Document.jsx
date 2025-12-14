@@ -57,37 +57,41 @@ export default function FileManager() {
     { id: 'heart', label: 'Heart', icon: Heart }
   ];
 
-  const API_URL = 'https://connectwithaaditiyamg2.onrender.com';
+  const API_URL = 'http://localhost:5000';
   const token = localStorage.getItem('token');
 
-  // Load folder contents
-  const loadFolder = async (folderId = null) => {
-    try {
-      const url = folderId 
-        ? `${API_URL}/api/folder/contents?parentId=${folderId}`
-        : `${API_URL}/api/folder/contents`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      setItems(data.items || []);
-      setCurrentFolder(data.currentFolder);
-      
-      if (folderId) {
-        const breadcrumbRes = await fetch(`${API_URL}/api/item/${folderId}/breadcrumb`);
-        const breadcrumbData = await breadcrumbRes.json();
-        setBreadcrumb([{ id: null, name: 'Root', type: 'folder' }, ...breadcrumbData.breadcrumb]);
-      } else {
-        setBreadcrumb([{ id: null, name: 'Root', type: 'folder' }]);
-      }
-      
-      setSearchResults(null);
-      setViewingExcel(null);
-      setExcelData(null);
-    } catch (err) {
-      console.error('Error loading folder:', err);
+ const loadFolder = async (folderId = null) => {
+  try {
+    const url = folderId 
+      ? `${API_URL}/api/folder/contents?parentId=${folderId}`
+      : `${API_URL}/api/folder/contents`;
+    
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  };
+    
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    
+    setItems(data.items || []);
+    setCurrentFolder(data.currentFolder);
+    
+    if (folderId) {
+      const breadcrumbRes = await fetch(`${API_URL}/api/item/${folderId}/breadcrumb`, { headers });
+      const breadcrumbData = await breadcrumbRes.json();
+      setBreadcrumb([{ id: null, name: 'Root', type: 'folder' }, ...breadcrumbData.breadcrumb]);
+    } else {
+      setBreadcrumb([{ id: null, name: 'Root', type: 'folder' }]);
+    }
+    
+    setSearchResults(null);
+    setViewingExcel(null);
+    setExcelData(null);
+  } catch (err) {
+    console.error('Error loading folder:', err);
+  }
+};
 
   // Load folder tree for move modal
   const loadFolderTree = async () => {
@@ -290,30 +294,42 @@ export default function FileManager() {
       showMessage('Error moving', 'error');
     }
   };
+const performSearch = async () => {
+  if (!searchQuery.trim()) return;
 
-  // Search
-  const performSearch = async () => {
-    if (!searchQuery.trim()) return;
-
-    try {
-      const res = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(searchQuery)}`);
-      const data = await res.json();
-      setSearchResults(data);
-    } catch (err) {
-      showMessage('Error searching', 'error');
+  try {
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  };
-
-  // Download file
-  const downloadFile = async (item) => {
-    try {
-      const res = await fetch(`${API_URL}/api/download/${item._id}`);
-      const data = await res.json();
-      window.open(data.downloadUrl, '_blank');
-    } catch (err) {
-      showMessage('Error downloading', 'error');
+    
+    const res = await fetch(`${API_URL}/api/search?q=${encodeURIComponent(searchQuery)}`, { headers });
+    const data = await res.json();
+    setSearchResults(data);
+  } catch (err) {
+    showMessage('Error searching', 'error');
+  }
+};
+const downloadFile = async (item) => {
+  try {
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  };
+    
+    const res = await fetch(`${API_URL}/api/download/${item._id}`, { headers });
+    const data = await res.json();
+    
+    if (data.requiresTurnstile) {
+      showMessage('Please verify to download', 'error');
+      return;
+    }
+    
+    window.open(data.downloadUrl, '_blank');
+  } catch (err) {
+    showMessage('Error downloading', 'error');
+  }
+};
 
   // Drag and drop
   const handleDragStart = (e, item) => {
@@ -967,15 +983,26 @@ setHeaderValue('');
 }
 };
 const loadExcelData = async (excelItem) => {
-try {
-const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`);
-const data = await res.json();
-  setExcelData(data);
-  setViewingExcel(excelItem);
-  setSelectedSheet(data.sheetNames?.[0] || null);
-} catch (err) {
-  showMessage('Error loading Excel data', 'error');
-}
+  try {
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const res = await fetch(`${API_URL}/api/excel/${excelItem._id}/data`, { headers });
+    const data = await res.json();
+    
+    if (!data.id) {
+      showMessage('Error loading Excel data', 'error');
+      return;
+    }
+    
+    setExcelData(data);
+    setViewingExcel(excelItem);
+    setSelectedSheet(data.sheetNames?.[0] || null);
+  } catch (err) {
+    showMessage('Error loading Excel data', 'error');
+  }
 };
 const closeExcelView = () => {
 setExcelData(null);

@@ -3,9 +3,7 @@ const BlacklistedToken = require("../models/blacklistedtoken");
 
 const authenticateToken = async (req, res, next) => {
   try {
-    
     let token = req.cookies.token;
-    
     
     if (!token && req.headers.authorization) {
       const authHeader = req.headers.authorization;
@@ -18,15 +16,14 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    
     const isBlacklisted = await BlacklistedToken.findOne({ token });
     if (isBlacklisted) {
       return res.status(401).json({ message: 'Token has been invalidated' });
     }
 
-    
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
     req.user = decoded;
+    req.isAdmin = decoded.role === 'admin' || decoded.admin_id;
     next();
   } catch (error) {
     console.error('Auth error:', error.message);
@@ -34,5 +31,4 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-  
 module.exports = authenticateToken;

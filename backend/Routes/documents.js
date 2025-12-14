@@ -82,30 +82,32 @@ const verifyTurnstileToken = async (req, res, next) => {
 
   next();
 };
-const optionalAuth = (req, res, next) => {
+const optionalAuth = async (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
       
-      
-      const userId = decoded.user_id;
+      const userId = decoded.user_id || decoded.admin_id;
       
       if (userId) {
-        
         req.user = { 
           id: String(userId),
-          _id: String(userId)
+          _id: String(userId),
+          isAdmin: decoded.role === 'admin' || !!decoded.admin_id
         };
       }
     } catch (err) {
-      
       console.error('Token verification failed:', err.message);
     }
   }
   next();
 };
-const checkFullPathAccess = async (documentId, userId, linkId = null) => {
+const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = false) => {
+  if (isAdmin) {
+    return { hasAccess: true };
+  }
+
   const doc = await Document.findById(documentId);
   if (!doc) return { hasAccess: false, reason: 'Document not found' };
 
@@ -446,9 +448,31 @@ router.get("/api/item/:id/breadcrumb", async (req, res) => {
   }
 });
 
-router.get("/api/excel/:id/data", optionalAuth, verifyTurnstileToken, async (req, res) => {
+router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
   try {
-    const { key } = req.query; 
+    const { key } = req.query;
+    
+    const isAdmin = req.user?.isAdmin || false;
+    
+    if (!isAdmin) {
+      const turnstileToken = req.headers['x-turnstile-token'] || req.body.turnstileToken || req.query.turnstileToken;
+      
+      if (!turnstileToken) {
+        return res.status(403).json({ 
+          message: 'Turnstile verification required',
+          requiresTurnstile: true 
+        });
+      }
+
+      const isValid = await verifyTurnstile(turnstileToken);
+      
+      if (!isValid) {
+        return res.status(403).json({ 
+          message: 'Turnstile verification failed',
+          requiresTurnstile: true 
+        });
+      }
+    }
     
     const doc = await Document.findById(req.params.id);
     
@@ -459,7 +483,7 @@ router.get("/api/excel/:id/data", optionalAuth, verifyTurnstileToken, async (req
 
     const userIdString = req.user ? String(req.user.id) : null;
     
-    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key);
+    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin);
 
     if (!accessCheck.hasAccess) {
       return res.status(403).json({
@@ -495,7 +519,8 @@ router.get("/api/excel/:id/data", optionalAuth, verifyTurnstileToken, async (req
       checkmarkFields: doc.excelCheckmarkFields || [],
       userCheckmarks: userIdString ? (doc.rowCheckmarks?.[userIdString] || {}) : {},
       isAuthenticated: !!req.user,
-      accessLevel: doc.accessLevel
+      accessLevel: doc.accessLevel,
+      isAdmin
     };
 
     res.json(response);
@@ -507,14 +532,14 @@ router.get("/api/excel/:id/data", optionalAuth, verifyTurnstileToken, async (req
 });
 
 
-
 router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
     const { parentId, key } = req.query;
     const userIdString = req.user ? String(req.user.id) : null;
+    const isAdmin = req.user?.isAdmin || false;
 
-    if (parentId) {
-      const accessCheck = await checkFullPathAccess(parentId, userIdString, key);
+    if (parentId && !isAdmin) {
+      const accessCheck = await checkFullPathAccess(parentId, userIdString, key, isAdmin);
       
       if (!accessCheck.hasAccess) {
         return res.status(403).json({
@@ -536,78 +561,79 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
       currentFolder = await Document.findById(parentId)
         .select("-embedding -jsonData -rowCheckmarks");
     }
-const itemsWithAccess = await Promise.all(items.map(async (item) => {
-  const itemObj = item.toObject();
-  
-  const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key);
-  
-  const isBookmarked = req.user 
-    ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
-    : false;
 
-  if (!itemAccessCheck.hasAccess) {
-    return {
-      _id: itemObj._id,
-      name: itemObj.name,
-      type: itemObj.type,
-      size: itemObj.size,
-      accessLevel: item.accessLevel,
-      createdAt: itemObj.createdAt,
-      hasAccess: false,
-      canRequestAccess: true,
-      accessDeniedReason: itemAccessCheck.reason
-    };
-  }
+    const itemsWithAccess = await Promise.all(items.map(async (item) => {
+      const itemObj = item.toObject();
+      
+      const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key, isAdmin);
+      
+      const isBookmarked = req.user 
+        ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
+        : false;
 
-  return {
-    _id: itemObj._id,
-    name: itemObj.name,
-    originalName: itemObj.originalName,
-    type: itemObj.type,
-    url: itemObj.url,
-    mimeType: itemObj.mimeType,
-    size: itemObj.size,
-    rowCount: itemObj.rowCount,
-    parent: itemObj.parent,
-    path: itemObj.path,
-    createdAt: itemObj.createdAt,
-    updatedAt: itemObj.updatedAt,
-    bookmarkEnabled: item.bookmarkEnabled || false,
-    isBookmarked,
-    hasAccess: true,
-    accessLevel: item.accessLevel,
-    bookmarkCount: item.bookmarks?.length || 0
-  };
-}));
+      if (!itemAccessCheck.hasAccess) {
+        return {
+          _id: itemObj._id,
+          name: itemObj.name,
+          type: itemObj.type,
+          size: itemObj.size,
+          accessLevel: item.accessLevel,
+          createdAt: itemObj.createdAt,
+          hasAccess: false,
+          canRequestAccess: true,
+          accessDeniedReason: itemAccessCheck.reason
+        };
+      }
 
-let currentFolderResponse = null;
-if (currentFolder) {
-  currentFolderResponse = {
-    _id: currentFolder._id,
-    name: currentFolder.name,
-    type: currentFolder.type,
-    parent: currentFolder.parent,
-    path: currentFolder.path,
-    createdAt: currentFolder.createdAt,
-    updatedAt: currentFolder.updatedAt,
-    bookmarkEnabled: currentFolder.bookmarkEnabled || false,
-    accessLevel: currentFolder.accessLevel
-  };
-}
+      return {
+        _id: itemObj._id,
+        name: itemObj.name,
+        originalName: itemObj.originalName,
+        type: itemObj.type,
+        url: itemObj.url,
+        mimeType: itemObj.mimeType,
+        size: itemObj.size,
+        rowCount: itemObj.rowCount,
+        parent: itemObj.parent,
+        path: itemObj.path,
+        createdAt: itemObj.createdAt,
+        updatedAt: itemObj.updatedAt,
+        bookmarkEnabled: item.bookmarkEnabled || false,
+        isBookmarked,
+        hasAccess: true,
+        accessLevel: item.accessLevel,
+        bookmarkCount: item.bookmarks?.length || 0
+      };
+    }));
 
-res.json({
-  currentFolder: currentFolderResponse,
-  items: itemsWithAccess,
-  path: currentFolder ? currentFolder.path : "/",
-  isAuthenticated: !!req.user
-});
+    let currentFolderResponse = null;
+    if (currentFolder) {
+      currentFolderResponse = {
+        _id: currentFolder._id,
+        name: currentFolder.name,
+        type: currentFolder.type,
+        parent: currentFolder.parent,
+        path: currentFolder.path,
+        createdAt: currentFolder.createdAt,
+        updatedAt: currentFolder.updatedAt,
+        bookmarkEnabled: currentFolder.bookmarkEnabled || false,
+        accessLevel: currentFolder.accessLevel
+      };
+    }
+
+    res.json({
+      currentFolder: currentFolderResponse,
+      items: itemsWithAccess,
+      path: currentFolder ? currentFolder.path : "/",
+      isAuthenticated: !!req.user,
+      isAdmin
+    });
 
   } catch (err) {
     console.error("Folder contents error:", err);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 
 router.get("/api/item/:id", optionalAuth, async (req, res) => {
@@ -621,7 +647,8 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
     if (!item) return res.status(404).json({ message: "Not found" });
 
     const userIdString = req.user ? String(req.user.id) : null;
-    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key);
+    const isAdmin = req.user?.isAdmin || false;
+    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin);
 
     const itemObj = item.toObject();
     const isBookmarked = req.user 
@@ -651,7 +678,8 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
       isAuthenticated: !!req.user,
       bookmarks: undefined,
       hasAccess: true,
-      accessLevel: item.accessLevel
+      accessLevel: item.accessLevel,
+      isAdmin
     };
 
     if (item.type === "excel") {
@@ -666,25 +694,26 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
   }
 });
 
-// Remove verifyTurnstileToken from download route temporarily
-router.get("/api/download/:id", async (req, res) => {
+router.get("/api/download/:id", optionalAuth, async (req, res) => {
   try {
-    const { key, userId, turnstileToken } = req.query;
+    const { key, turnstileToken } = req.query;
+    const isAdmin = req.user?.isAdmin || false;
     
-    // Manual turnstile check for download
-    if (turnstileToken) {
-      const isValid = await verifyTurnstile(turnstileToken);
-      if (!isValid) {
+    if (!isAdmin) {
+      if (turnstileToken) {
+        const isValid = await verifyTurnstile(turnstileToken);
+        if (!isValid) {
+          return res.status(403).json({ 
+            message: 'Verification failed',
+            requiresTurnstile: true 
+          });
+        }
+      } else {
         return res.status(403).json({ 
-          message: 'Verification failed',
+          message: 'Turnstile verification required',
           requiresTurnstile: true 
         });
       }
-    } else {
-      return res.status(403).json({ 
-        message: 'Turnstile verification required',
-        requiresTurnstile: true 
-      });
     }
     
     const doc = await Document.findById(req.params.id);
@@ -693,7 +722,8 @@ router.get("/api/download/:id", async (req, res) => {
       return res.status(400).json({ message: "Cannot download this item type" });
     }
 
-    const accessCheck = await checkFullPathAccess(req.params.id, userId, key);
+    const userId = req.user ? String(req.user.id) : null;
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin);
 
     if (!accessCheck.hasAccess) {
       return res.status(403).json({ 
@@ -740,9 +770,10 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     }
 
     const userIdString = req.user ? String(req.user.id) : null;
+    const isAdmin = req.user?.isAdmin || false;
 
-    if (parentId) {
-      const accessCheck = await checkFullPathAccess(parentId, userIdString, key);
+    if (parentId && !isAdmin) {
+      const accessCheck = await checkFullPathAccess(parentId, userIdString, key, isAdmin);
       
       if (!accessCheck.hasAccess) {
         return res.status(403).json({
@@ -839,7 +870,7 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     const results = await Promise.all(topResults.map(async (item) => {
       const doc = item.doc;
       
-      const accessCheck = await checkFullPathAccess(doc._id, userIdString, key);
+      const accessCheck = await checkFullPathAccess(doc._id, userIdString, key, isAdmin);
       
       const isBookmarked = userIdString 
         ? doc.bookmarks?.some(b => String(b.userId) === userIdString)
@@ -892,7 +923,8 @@ router.get("/api/search", optionalAuth, async (req, res) => {
         totalResults: results.length,
         processingTime: `${processingTime}ms`,
         searchType: 'hybrid_vector_text',
-        inFolder: !!parentId
+        inFolder: !!parentId,
+        isAdmin
       }
     });
 
