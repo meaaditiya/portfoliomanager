@@ -22,6 +22,7 @@ import Admins from './Components/Admins';
 import BlogSubmissions from './Components/BlogSubmissions';
 import Document from './Components/Document';
 import FeaturedProjects from './Components/FeaturedProjects';
+import ManageUsers from './Components/manageUsers';
 function AppContent() {
   const [activeSection, setActiveSection] = useState('/adminpost'); // Initialize with default path
   const [redirectMessage, setRedirectMessage] = useState(null);
@@ -93,6 +94,7 @@ function AppContent() {
           <Route path="/blogsubmissions" element={<BlogSubmissions/>}/>
           <Route path="/document" element={<Document/>}/>
           <Route path="/featured-projects" element={<FeaturedProjects/>}/>
+          <Route path="/manage-users" element={<ManageUsers/>}/>
         </Routes>
       </main>
     </div>

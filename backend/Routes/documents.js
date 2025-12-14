@@ -107,6 +107,7 @@ const optionalAuth = async (req, res, next) => {
             email: user.email,
             name: user.name,
             isAdmin: decoded.role === 'admin' || !!decoded.admin_id,
+            isPremium: user.isPremium,
             isAuthenticated: true,
             type: decoded.admin_id ? 'admin' : 'user'
           };
@@ -125,8 +126,8 @@ const optionalAuth = async (req, res, next) => {
   
   next();
 };
-const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = false) => {
-  if (isAdmin) {
+const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = false, isPremium = false) => {
+  if (isAdmin || isPremium) {
     return { hasAccess: true };
   }
 
@@ -475,8 +476,8 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
     const { key } = req.query;
     
     const isAdmin = req.user?.isAdmin || false;
-    
-    if (!isAdmin) {
+    const isPremium = req.user?.isPremium || false;
+    if (!isAdmin && !isPremium) {
       const turnstileToken = req.headers['x-turnstile-token'] || req.body.turnstileToken || req.query.turnstileToken;
       
       if (!turnstileToken) {
@@ -505,7 +506,7 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
 
     const userIdString = req.user ? String(req.user.id) : null;
     
-    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin);
+  const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin, isPremium);
 
     if (!accessCheck.hasAccess) {
       return res.status(403).json({
@@ -559,8 +560,8 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
     const { parentId, key } = req.query;
     const userIdString = req.user ? String(req.user.id) : null;
     const isAdmin = req.user?.isAdmin || false;
-
-    if (parentId && !isAdmin) {
+const isPremium = req.user?.isPremium || false;
+   if (parentId && !isAdmin && !isPremium) {
       const accessCheck = await checkFullPathAccess(parentId, userIdString, key, isAdmin);
       
       if (!accessCheck.hasAccess) {
@@ -587,7 +588,7 @@ router.get("/api/folder/contents", optionalAuth, async (req, res) => {
     const itemsWithAccess = await Promise.all(items.map(async (item) => {
       const itemObj = item.toObject();
       
-      const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key, isAdmin);
+    const itemAccessCheck = await checkFullPathAccess(item._id, userIdString, key, isAdmin, isPremium);
       
       const isBookmarked = req.user 
         ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
@@ -670,8 +671,8 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
 
     const userIdString = req.user ? String(req.user.id) : null;
     const isAdmin = req.user?.isAdmin || false;
-    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin);
-
+    const isPremium = req.user?.isPremium || false;
+    const accessCheck = await checkFullPathAccess(req.params.id, userIdString, key, isAdmin, isPremium);
     const itemObj = item.toObject();
     const isBookmarked = req.user 
       ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
@@ -720,8 +721,8 @@ router.get("/api/download/:id", optionalAuth, async (req, res) => {
   try {
     const { key, turnstileToken } = req.query;
     const isAdmin = req.user?.isAdmin || false;
-    
-    if (!isAdmin) {
+    const isPremium = req.user?.isPremium || false;
+    if (!isAdmin && !isPremium) {
       if (turnstileToken) {
         const isValid = await verifyTurnstile(turnstileToken);
         if (!isValid) {
@@ -745,7 +746,7 @@ router.get("/api/download/:id", optionalAuth, async (req, res) => {
     }
 
     const userId = req.user ? String(req.user.id) : null;
-    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin);
+   const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
 
     if (!accessCheck.hasAccess) {
       return res.status(403).json({ 
@@ -793,9 +794,9 @@ router.get("/api/search", optionalAuth, async (req, res) => {
 
     const userIdString = req.user ? String(req.user.id) : null;
     const isAdmin = req.user?.isAdmin || false;
-
-    if (parentId && !isAdmin) {
-      const accessCheck = await checkFullPathAccess(parentId, userIdString, key, isAdmin);
+    const isPremium = req.user?.isPremium || false;
+   if (parentId && !isAdmin && !isPremium) {
+     const accessCheck = await checkFullPathAccess(parentId, userIdString, key, isAdmin, isPremium);
       
       if (!accessCheck.hasAccess) {
         return res.status(403).json({
@@ -891,8 +892,8 @@ router.get("/api/search", optionalAuth, async (req, res) => {
     
     const results = await Promise.all(topResults.map(async (item) => {
       const doc = item.doc;
-      
-      const accessCheck = await checkFullPathAccess(doc._id, userIdString, key, isAdmin);
+      const accessCheck = await checkFullPathAccess(doc._id, userIdString, key, isAdmin, isPremium);
+     
       
       const isBookmarked = userIdString 
         ? doc.bookmarks?.some(b => String(b.userId) === userIdString)

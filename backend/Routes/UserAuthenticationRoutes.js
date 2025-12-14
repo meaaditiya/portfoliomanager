@@ -8,7 +8,7 @@ const BlacklistedToken = require("../models/blacklistedtoken.js");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
 const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
-
+const authenticateToken = require("../middlewares/authMiddleware.js")
 router.post('/user/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -114,7 +114,8 @@ router.post('/user/login', async (req, res) => {
       {
         user_id: user._id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        isPremium: user.isPremium 
       },
       process.env.JWT_SECRET || 'your_jwt_secret',
       { expiresIn: '24h' }
@@ -135,7 +136,8 @@ router.post('/user/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        isPremium: user.isPremium 
       }
     });
   } catch (error) {
@@ -305,10 +307,10 @@ router.get('/verify', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        isPremium: user.isPremium
       }
     });
-
   } catch (error) {
     console.error('Token verification error:', error.message);
     res.status(403).json({ 
@@ -389,9 +391,12 @@ router.get('/google/callback',
         {
           user_id: req.user._id,
           email: req.user.email,
-          name: req.user.name
+          name: req.user.name,
+          isPremium: req.user.isPremium 
+          
         },
         process.env.JWT_SECRET || 'your_jwt_secret',
+
         { expiresIn: '24h' }
       );
 
@@ -411,5 +416,139 @@ router.get('/google/callback',
     }
   }
 );
+router.get('/admin/users', authenticateToken, async (req, res) => {
+  try {
+    if (!req.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
 
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    let searchQuery = {};
+    if (search) {
+      searchQuery = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    const totalUsers = await User.countDocuments(searchQuery);
+    const users = await User.find(searchQuery)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+
+    res.json({
+      message: 'Users retrieved successfully',
+      users,
+      pagination: {
+        total: totalUsers,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalUsers / limitNum)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+router.patch('/admin/users/:id/verify', authenticateToken, async (req, res) => {
+  try {
+    if (!req.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const { isVerified } = req.body;
+
+    if (typeof isVerified !== 'boolean') {
+      return res.status(400).json({ message: 'isVerified must be true or false' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isVerified = isVerified;
+    await user.save();
+
+    res.json({
+      message: `User verification status updated to ${isVerified}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+router.patch('/admin/users/:id/premium', authenticateToken, async (req, res) => {
+  try {
+    if (!req.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const { isPremium } = req.body;
+
+    if (typeof isPremium !== 'boolean') {
+      return res.status(400).json({ message: 'isPremium must be true or false' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isPremium = isPremium;
+    await user.save();
+
+    res.json({
+      message: `User premium status updated to ${isPremium}`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isPremium: user.isPremium
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+router.delete('/admin/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const deletedUserEmail = user.email;
+    const deletedUserName = user.name;
+
+    await User.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: 'User account deleted successfully',
+      deletedUser: {
+        id: user._id,
+        name: deletedUserName,
+        email: deletedUserEmail
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 module.exports = router;

@@ -30,6 +30,7 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
 
   const adminNavItems = [
     { name: 'Posts', path: '/adminpost' },
+    {name: 'Manage Users' , path: '/manage-users'},
     { name: 'Community Posts', path: '/admincommunitypost' },
     { name: 'Blog Editor', path: '/blog-editor' },
     { name: 'Messages', path: '/message' },
