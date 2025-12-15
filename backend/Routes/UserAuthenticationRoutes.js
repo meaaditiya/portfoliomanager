@@ -551,11 +551,11 @@ router.delete('/admin/users/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-router.get('/github',
+router.get('/auth/github',
   passport.authenticate('github', { scope: ['user:email'] })
 );
 
-router.get('/github/callback',
+router.get('/auth/github/callback',
   passport.authenticate('github', {
     failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=github_auth_failed`,
     session: false
