@@ -7,7 +7,9 @@ const http = require('http');
 const { Server } = require('socket.io');    
 const connectDB = require("./Config/db");
 const session = require('express-session');
-const passport = require('./Config/passport');
+const passport = require('passport');
+require('./Config/passport');
+require('./Config/passportGithub');
 const { initializeSecurity, logger } = require('./security/securityService');
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
 

@@ -25,7 +25,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null
     },
-  
+  githubId: {
+  type: String,
+  default: null
+},
     profilePicture: {
       type: String,
       default: null

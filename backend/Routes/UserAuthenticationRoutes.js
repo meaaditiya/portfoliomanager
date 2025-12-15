@@ -551,4 +551,48 @@ router.delete('/admin/users/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+router.get('/github',
+  passport.authenticate('github', { scope: ['user:email'] })
+);
+
+router.get('/github/callback',
+  passport.authenticate('github', {
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=github_auth_failed`,
+    session: false
+  }),
+  async (req, res) => {
+    try {
+      if (req.user.profilePicture) {
+        await User.findByIdAndUpdate(req.user._id, {
+          profilePicture: req.user.profilePicture
+        });
+      }
+
+      const token = jwt.sign(
+        {
+          user_id: req.user._id,
+          email: req.user.email,
+          name: req.user.name,
+          isPremium: req.user.isPremium
+        },
+        process.env.JWT_SECRET || 'your_jwt_secret',
+        { expiresIn: '24h' }
+      );
+
+      const isProduction = process.env.NODE_ENV === 'production';
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'None' : 'Lax',
+        maxAge: 24 * 60 * 60 * 1000,
+        path: '/'
+      });
+
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&github_login=success`);
+    } catch (error) {
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=auth_failed`);
+    }
+  }
+);
+
 module.exports = router;
