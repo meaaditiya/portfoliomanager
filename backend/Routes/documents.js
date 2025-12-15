@@ -91,37 +91,76 @@ const optionalAuth = async (req, res, next) => {
       
       const blacklisted = await BlacklistedToken.findOne({ token });
       if (blacklisted) {
-        req.user = { isAuthenticated: false };
+        req.user = { 
+          isAuthenticated: false,
+          isAdmin: false,
+          isPremium: false
+        };
         return next();
       }
       
-      const userId = decoded.user_id || decoded.admin_id;
+      // Check if this is an admin token
+      const isAdminToken = !!decoded.admin_id || decoded.role === 'admin';
       
-      if (userId) {
-        const user = await User.findById(userId);
-        
-        if (user) {
-          req.user = {
-            id: String(userId),
-            _id: String(userId),
-            email: user.email,
-            name: user.name,
-            isAdmin: decoded.role === 'admin' || !!decoded.admin_id,
-            isPremium: user.isPremium,
-            isAuthenticated: true,
-            type: decoded.admin_id ? 'admin' : 'user'
-          };
-        } else {
-          req.user = { isAuthenticated: false };
-        }
+      if (isAdminToken) {
+        // Admin token - don't look up in User collection
+        req.user = {
+          id: String(decoded.admin_id),
+          _id: String(decoded.admin_id),
+          email: decoded.email,
+          name: decoded.name,
+          isAdmin: true,
+          isPremium: true, // Admins always count as premium
+          isAuthenticated: true,
+          type: 'admin'
+        };
       } else {
-        req.user = { isAuthenticated: false };
+        // Regular user token - look up in User collection
+        const userId = decoded.user_id;
+        
+        if (userId) {
+          const user = await User.findById(userId);
+          
+          if (user) {
+            req.user = {
+              id: String(userId),
+              _id: String(userId),
+              email: user.email,
+              name: user.name,
+              isAdmin: false,
+              isPremium: user.isPremium || false,
+              isAuthenticated: true,
+              type: 'user'
+            };
+          } else {
+            req.user = { 
+              isAuthenticated: false,
+              isAdmin: false,
+              isPremium: false
+            };
+          }
+        } else {
+          req.user = { 
+            isAuthenticated: false,
+            isAdmin: false,
+            isPremium: false
+          };
+        }
       }
     } catch (err) {
-      req.user = { isAuthenticated: false };
+      console.error('Token verification failed:', err.message);
+      req.user = { 
+        isAuthenticated: false,
+        isAdmin: false,
+        isPremium: false
+      };
     }
   } else {
-    req.user = { isAuthenticated: false };
+    req.user = { 
+      isAuthenticated: false,
+      isAdmin: false,
+      isPremium: false
+    };
   }
   
   next();

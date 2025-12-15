@@ -14,7 +14,7 @@ export default function AdminManageUsers() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const API_BASE = 'http://localhost:5000/api';
+  const API_BASE = 'https://aadibgmg.onrender.com/api';
   const token = localStorage.getItem('token');
 
   useEffect(() => {
