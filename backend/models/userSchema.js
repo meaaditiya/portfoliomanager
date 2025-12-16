@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema(
   type: String,
   default: null
 },
+discordId: {
+  type: String,
+  default: null
+},
     profilePicture: {
       type: String,
       default: null

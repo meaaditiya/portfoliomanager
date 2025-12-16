@@ -10,6 +10,7 @@ const session = require('express-session');
 const passport = require('passport');
 require('./Config/passport');
 require('./Config/passportGithub');
+require('./Config/discord.js');
 const { initializeSecurity, logger } = require('./security/securityService');
 const corsMiddleware = require("./middlewares/corsMiddleware.js");
 
