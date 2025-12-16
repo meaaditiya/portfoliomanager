@@ -1564,21 +1564,18 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    
     let comments = await Comment.find({ 
       blog: blogId,
       status: 'approved',
       parentComment: null
     })
-   .populate('authorAdminId', 'name email profileImage designation location bio socialLinks')
+    .populate('authorAdminId', 'name email profileImage designation location bio socialLinks')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean();
     
-    
     for (let comment of comments) {
-      
       if (comment.user.userId) {
         const userData = await User.findById(comment.user.userId)
           .select('name email profilePicture googleId')
@@ -1589,17 +1586,16 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
           comment.user.googleId = userData.googleId;
         }
       }
+
       if (comment.isAuthorComment && comment.authorAdminId) {
-  comment.authorHasProfileImage = !!(
-    comment.authorAdminId.profileImage && 
-    (comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url)
-  );
-  if (comment.authorHasProfileImage) {
-    comment.authorProfileImageUrl = comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url;
-  }
-}
-      
-      
+        comment.authorHasProfileImage = !!(
+          comment.authorAdminId.profileImage && 
+          (comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url)
+        );
+        if (comment.authorHasProfileImage) {
+          comment.authorProfileImageUrl = comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url;
+        }
+      }
       
       comment.repliesCount = await Comment.countDocuments({
         parentComment: comment._id,
@@ -1644,7 +1640,6 @@ router.post(
       const { blogId } = req.params;
       let { name, email, content } = req.body;
 
-      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       let userId = null;
       let isAuthenticated = false;
@@ -1652,9 +1647,7 @@ router.post(
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          
           userId = decoded.user_id;
-          
           
           const user = await User.findById(userId);
           if (user) {
@@ -1671,8 +1664,6 @@ router.post(
       if (!blog) {
         return res.status(404).json({ message: 'Blog not found' });
       }
-
-      const fingerprint = getFingerprintFromRequest(req);
 
       console.log(`🔍 Moderating comment from ${name}...`);
       const moderation = await moderateContent(content, name);
@@ -1693,24 +1684,20 @@ router.post(
 
       console.log(`✅ Content approved for ${name}`);
 
-      
       const commentStatus = isAuthenticated ? 'approved' : 'pending';
 
-      
       const newComment = new Comment({
         blog: blogId,
         user: { 
           name, 
           email,
-          userId: userId || null  
+          userId: userId || null
         },
         content,
-        fingerprint,
         status: commentStatus
       });
 
       await newComment.save();
-      
       
       if (commentStatus === 'approved') {
         await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
@@ -1735,64 +1722,6 @@ router.post(
 );
 
 
-router.post('/api/comments/:commentId/verify-ownership', async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    const { email } = req.body;
-    
-    
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    
-    const comment = await Comment.findById(commentId);
-    if (!comment) {
-      return res.status(404).json({ canDelete: false, message: 'Comment not found' });
-    }
-    
-    
-    if (comment.isAuthorComment) {
-      return res.status(200).json({ canDelete: false, reason: 'author_comment' });
-    }
-    
-    let canDelete = false;
-    let verificationMethod = 'none';
-    
-    
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-        const user = await User.findById(decoded.userId);
-        
-        if (user && user.email === comment.user.email) {
-          canDelete = true;
-          verificationMethod = 'jwt_authenticated';
-        }
-      } catch (err) {
-        console.log('Token verification failed');
-      }
-    }
-    
-    
-    if (!canDelete && email) {
-      const requestFingerprint = getFingerprintFromRequest(req);
-      
-      
-      if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
-        canDelete = true;
-        verificationMethod = 'fingerprint_match';
-      }
-    }
-    
-    res.status(200).json({ 
-      canDelete,
-      verificationMethod,
-      commentId: comment._id
-    });
-    
-  } catch (error) {
-    console.error('Error verifying comment ownership:', error);
-    res.status(500).json({ canDelete: false, message: 'Server error' });
-  }
-});
 router.delete('/api/comments/:commentId/user', 
   [
     body('email').isEmail().withMessage('Valid email is required')
@@ -1812,64 +1741,74 @@ router.delete('/api/comments/:commentId/user',
         return res.status(404).json({ message: 'Comment not found' });
       }
 
-      
       if (comment.isAuthorComment) {
         return res.status(403).json({ message: 'Author comments cannot be deleted through this route' });
       }
 
-      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       
       let isAuthorized = false;
+      let isAuthenticatedUser = false;
       
-      
+      // Check if authenticated user
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          const user = await User.findById(decoded.userId);
+          const userId = decoded.user_id;
+          isAuthenticatedUser = true;
           
-          if (user && user.email === comment.user.email) {
+          // Auth user rule: Can delete if userId matches OR email matches (guest comment with same email)
+          if (comment.user.userId && comment.user.userId.toString() === userId.toString()) {
+            // Own auth comment
             isAuthorized = true;
-            console.log('✅ Deletion authorized via JWT authentication');
+            console.log('✅ Deletion authorized: Auth user deleting own comment');
+          } else if (!comment.user.userId && comment.user.email === email) {
+            // Guest comment with same email as auth user
+            isAuthorized = true;
+            console.log('✅ Deletion authorized: Auth user deleting guest comment with their email');
           }
         } catch (err) {
-          console.log('Token verification failed, checking fingerprint...');
+          console.log('Token verification failed');
+          isAuthenticatedUser = false;
         }
       }
       
-      
-      if (!isAuthorized) {
-        const requestFingerprint = getFingerprintFromRequest(req);
-        
-        
-        if (comment.user.email === email && comment.fingerprint === requestFingerprint) {
+      // Guest user rule: Can ONLY delete guest comments with matching email
+      if (!isAuthenticatedUser) {
+        if (comment.user.userId) {
+          // This is an auth user's comment
+          console.log('❌ Guest user cannot delete authenticated user comments');
+          return res.status(403).json({ 
+            message: 'You cannot delete comments posted by authenticated users.',
+            hint: 'This comment was posted by a registered user account.'
+          });
+        } else if (!comment.user.userId && comment.user.email === email) {
+          // This is a guest comment with matching email
           isAuthorized = true;
-          console.log('✅ Deletion authorized via fingerprint match');
-        } else {
-          console.log('❌ Authorization failed - Email or fingerprint mismatch');
-          console.log('Comment email:', comment.user.email);
-          console.log('Request email:', email);
-          console.log('Comment fingerprint:', comment.fingerprint);
-          console.log('Request fingerprint:', requestFingerprint);
+          console.log('✅ Deletion authorized: Guest user deleting own guest comment');
         }
       }
       
       if (!isAuthorized) {
         return res.status(403).json({ 
-          message: 'You can only delete your own comments. Verification failed.',
-          hint: 'This comment was created from a different device or browser session.'
+          message: 'You can only delete your own comments.',
+          hint: isAuthenticatedUser 
+            ? 'You can only delete comments you posted with your account.'
+            : 'Use the same email you provided when posting this comment.'
         });
       }
 
-      
+      // Delete reply count from parent
       if (comment.parentComment) {
         await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
       }
       
+      // Update blog comment count
       if (comment.status === 'approved' && !comment.parentComment) {
         await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
       }
 
+      // Delete all replies if main comment
       if (!comment.parentComment) {
         const repliesToDelete = await Comment.find({ parentComment: commentId });
         for (const reply of repliesToDelete) {
@@ -1930,138 +1869,7 @@ router.delete('/api/comments/:commentId/user',
   });
   
   
-  router.patch('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
-    try {
-      const { commentId } = req.params;
-      const { status } = req.body;
-      
-      if (!['pending', 'approved', 'rejected'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status value' });
-      }
-      
-      const comment = await Comment.findById(commentId);
-      if (!comment) {
-        return res.status(404).json({ message: 'Comment not found' });
-      }
-      
-      
-      if (comment.status !== 'approved' && status === 'approved') {
-        await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: 1 } });
-      }
-      
-      
-      if (comment.status === 'approved' && status !== 'approved') {
-        await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
-      }
-      
-      comment.status = status;
-      await comment.save();
-      
-      res.status(200).json({ 
-        message: 'Comment status updated',
-        comment
-      });
-    } catch (error) {
-      console.error('Error updating comment status:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  });
-  
-  
-  router.delete('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
-    try {
-      const { commentId } = req.params;
-      
-      const comment = await Comment.findById(commentId);
-      if (!comment) {
-        return res.status(404).json({ message: 'Comment not found' });
-      }
-      
-      
-      if (comment.status === 'approved') {
-        await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
-      }
-      
-      await Comment.deleteOne({ _id: commentId });
-      
-      res.status(200).json({ message: 'Comment deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  });
 
-
-router.post(
-  '/api/blogs/:blogId/comments',
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('content').trim().notEmpty().withMessage('Comment content is required')
-      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    try {
-      const { blogId } = req.params;
-      const { name, email, content } = req.body;
-
-      const blog = await Blog.findById(blogId);
-      if (!blog) {
-        return res.status(404).json({ message: 'Blog not found' });
-      }
-
-      
-      const fingerprint = getFingerprintFromRequest(req);
-
-      console.log(`🔍 Moderating comment from ${name}...`);
-      const moderation = await moderateContent(content, name);
-      
-      if (!moderation.approved) {
-        console.log(`✅ Content moderation blocked comment from ${name} - Reason: ${moderation.reason}`);
-        
-        return res.status(422).json({
-          message: 'Your comment cannot be posted as it strongly violates our community guidelines. Please be respectful and constructive in your contributions.',
-          code: 'CONTENT_POLICY_VIOLATION',
-          severity: moderation.severity,
-          moderationId: `MOD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          hint: moderation.systemError 
-            ? 'Your comment is under review. Please try again later.' 
-            : 'Please review our community guidelines and post respectful, constructive content.'
-        });
-      }
-
-      console.log(`✅ Content approved for ${name}`);
-
-      const newComment = new Comment({
-        blog: blogId,
-        user: { name, email },
-        content,
-        fingerprint
-      });
-
-      await newComment.save();
-      
-      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
-
-      res.status(201).json({ 
-        message: 'Comment added successfully',
-        comment: newComment
-      });
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      res.status(500).json({ 
-        message: 'Server error', 
-        error: error.message,
-        code: 'INTERNAL_SERVER_ERROR'
-      });
-    }
-  }
-);
 
 
 router.post(
@@ -2082,19 +1890,20 @@ router.post(
       const { commentId } = req.params;
       let { name, email, content } = req.body;
 
-      
       const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
       let userId = null;
+      let isAuthenticated = false;
       
       if (token) {
         try {
           const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-          userId = decoded.user_id;  
+          userId = decoded.user_id;
           
           const user = await User.findById(userId);
           if (user) {
             name = user.name;
             email = user.email;
+            isAuthenticated = true;
           }
         } catch (err) {
           console.log('Invalid token, treating as guest');
@@ -2113,8 +1922,6 @@ router.post(
         });
       }
 
-      const fingerprint = getFingerprintFromRequest(req);
-
       console.log(`🔍 Moderating reply from ${name}...`);
       const moderation = await moderateContent(content, name);
       
@@ -2125,17 +1932,18 @@ router.post(
         });
       }
 
-      
+      const replyStatus = isAuthenticated ? 'approved' : 'pending';
+
       const newReply = new Comment({
         blog: parentComment.blog,
         user: { 
           name, 
           email,
-          userId: userId || null  
+          userId: userId || null
         },
         content,
         parentComment: commentId,
-        fingerprint
+        status: replyStatus
       });
 
       await newReply.save();
@@ -2155,6 +1963,7 @@ router.post(
     }
   }
 );
+
 router.get('/api/comments/:commentId/replies', async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -2162,7 +1971,6 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    
     
     let replies = await Comment.find({ 
       parentComment: commentId,
@@ -2174,9 +1982,7 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
     .limit(limit)
     .lean();
     
-    
     for (let reply of replies) {
-      
       if (reply.user.userId) {
         const userData = await User.findById(reply.user.userId)
           .select('name email profilePicture googleId')
@@ -2188,16 +1994,15 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
         }
       }
       
-      
-     if (reply.isAuthorComment && reply.authorAdminId) {
-  reply.authorHasProfileImage = !!(
-    reply.authorAdminId.profileImage && 
-    (reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url)
-  );
-  if (reply.authorHasProfileImage) {
-    reply.authorProfileImageUrl = reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url;
-  }
-}
+      if (reply.isAuthorComment && reply.authorAdminId) {
+        reply.authorHasProfileImage = !!(
+          reply.authorAdminId.profileImage && 
+          (reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url)
+        );
+        if (reply.authorHasProfileImage) {
+          reply.authorProfileImageUrl = reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url;
+        }
+      }
     }
     
     const total = await Comment.countDocuments({
@@ -2220,206 +2025,11 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
 });
 
 
-router.post(
-  '/api/comments/:commentId/reactions',
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      const { commentId } = req.params;
-      let { name, email, type } = req.body;
-
-      
-      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-      let userId = null;
-     if (token) {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    userId = decoded.user_id;
-    
-    const user = await User.findById(userId);
-    if (user) {
-      name = user.name;
-      email = user.email;
-    }
-  } catch (err) {
-    console.log('Invalid token, using form data');
-  }
-}
-
-      const comment = await Comment.findOne({ 
-        _id: commentId, 
-        status: 'approved' 
-      }).session(session);
-      
-      if (!comment) {
-        await session.abortTransaction();
-        return res.status(404).json({ 
-          message: 'Comment not found or not approved' 
-        });
-      }
-
-      const fingerprint = getFingerprintFromRequest(req);
-
-      const existingReaction = await CommentReaction.findOne({
-        comment: commentId,
-        'user.email': email
-      }).session(session);
-
-      let reactionRemoved = false;
-      let oldType = null;
-
-      if (existingReaction) {
-        oldType = existingReaction.type;
-        
-        if (existingReaction.type === type) {
-          await CommentReaction.deleteOne({ 
-            _id: existingReaction._id 
-          }).session(session);
-          
-          await Comment.findByIdAndUpdate(
-            commentId,
-            { 
-              $inc: { 
-                [`reactionCounts.${type}s`]: -1 
-              } 
-            },
-            { session }
-          );
-          
-          reactionRemoved = true;
-          
-        } else {
-          existingReaction.type = type;
-          existingReaction.fingerprint = fingerprint;
-          await existingReaction.save({ session });
-          
-          await Comment.findByIdAndUpdate(
-            commentId,
-            { 
-              $inc: { 
-                [`reactionCounts.${oldType}s`]: -1,
-                [`reactionCounts.${type}s`]: 1
-              } 
-            },
-            { session }
-          );
-        }
-        
-      } else {
-        const newReaction = new CommentReaction({
-          comment: commentId,
-          type,
-          user: { name, email,userId: userId || null  },
-          fingerprint
-        });
-        
-        await newReaction.save({ session });
-        
-        await Comment.findByIdAndUpdate(
-          commentId,
-          { 
-            $inc: { 
-              [`reactionCounts.${type}s`]: 1 
-            } 
-          },
-          { session }
-        );
-      }
-
-      await session.commitTransaction();
-      
-      const updatedComment = await Comment.findById(commentId)
-        .select('reactionCounts');
-
-      res.status(200).json({
-        message: reactionRemoved ? `${type} removed successfully` : 
-                 oldType ? `Reaction changed to ${type}` : 
-                 `${type} added successfully`,
-        reactionRemoved,
-        reaction: existingReaction || null,
-        counts: updatedComment.reactionCounts
-      });
-
-    } catch (error) {
-      await session.abortTransaction();
-      
-      console.error('Error processing comment reaction:', error);
-      
-      if (error.code === 11000) {
-        return res.status(409).json({ 
-          message: 'Reaction conflict detected. Please try again.' 
-        });
-      }
-      
-      res.status(500).json({ 
-        message: 'Server error processing reaction',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    } finally {
-      session.endSession();
-    }
-  }
-);
-
-router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    const { email } = req.query;
-    
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-    
-    const reaction = await CommentReaction.findOne({
-      comment: commentId,
-      'user.email': email
-    });
-    
-    if (!reaction) {
-      return res.status(200).json({ hasReacted: false });
-    }
-    
-    res.status(200).json({
-      hasReacted: true,
-      reactionType: reaction.type
-    });
-  } catch (error) {
-    console.error('Error fetching user comment reaction:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
 
 
-router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    
-    const comment = await Comment.findById(commentId, 'reactionCounts');
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
-    }
-    
-    res.status(200).json({
-      likes: comment.reactionCounts.likes || 0,
-      dislikes: comment.reactionCounts.dislikes || 0
-    });
-  } catch (error) {
-    console.error('Error fetching comment reaction counts:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+
+
+
 
 router.get('/api/blogs/:blogId/reactions/users', async (req, res) => {
   try {
@@ -2473,330 +2083,16 @@ router.get('/api/comments/:commentId/reactions/users', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-router.post(
-  '/api/blogs/:blogId/author-comment',
-  authenticateToken, 
-  [
-    body('content').trim().notEmpty().withMessage('Comment content is required')
-      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    try {
-      const { blogId } = req.params;
-      const { content } = req.body;
-
-      const blog = await Blog.findById(blogId);
-      if (!blog) {
-        return res.status(404).json({ message: 'Blog not found' });
-      }
-
-      
-      const newComment = new Comment({
-        blog: blogId,
-        user: { 
-          name: req.user.name || 'Aaditiya Tyagi', 
-          email: req.user.email 
-        },
-        content,
-        isAuthorComment: true,
-        authorAdminId: req.user.admin_id, 
-        status: 'approved'
-      });
-
-      await newComment.save();
-      
-      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
-
-      res.status(201).json({ 
-        message: 'Author comment added successfully',
-        comment: newComment
-      });
-    } catch (error) {
-      console.error('Error adding author comment:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  }
-);
-
-router.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, res) => {
-  try {
-    const { blogId } = req.params;
-    
-    
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    
-    const comments = await Comment.find({ 
-      blog: blogId,
-      isAuthorComment: true
-    })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
-    
-    const total = await Comment.countDocuments({
-      blog: blogId,
-      isAuthorComment: true
-    });
-    
-    res.status(200).json({
-      comments,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching author comments:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
 
 
-router.delete('/api/author-comments/:commentId', authenticateToken, async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    
-    const comment = await Comment.findById(commentId);
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
-    }
 
-    
-    if (!comment.isAuthorComment) {
-      return res.status(403).json({ message: 'Not an author comment' });
-    }
 
-    
-    if (comment.parentComment) {
-      await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
-    }
-    
-    
-    if (!comment.parentComment) {
-      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
-      
-      
-      const repliesToDelete = await Comment.find({ parentComment: commentId });
-      for (const reply of repliesToDelete) {
-        
-        await CommentReaction.deleteMany({ comment: reply._id });
-      }
-      await Comment.deleteMany({ parentComment: commentId });
-    }
 
-    
-    await CommentReaction.deleteMany({ comment: commentId });
-    
-    await Comment.deleteOne({ _id: commentId });
-    
-    res.status(200).json({ message: 'Author comment deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting author comment:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+
   
 
-
-router.post(
-  '/api/blogs/:blogId/reactions',
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      const { blogId } = req.params;
-      let { name, email, type } = req.body;
-
-      
-      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-      let userId = null;
-      if (token) {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-    userId = decoded.user_id;
-    
-    const user = await User.findById(userId);
-    if (user) {
-      name = user.name;
-      email = user.email;
-    }
-  } catch (err) {
-    console.log('Invalid token, using form data');
-  }
-}
-      const blog = await Blog.findById(blogId).session(session);
-      if (!blog) {
-        await session.abortTransaction();
-        return res.status(404).json({ message: 'Blog not found' });
-      }
-
-      const fingerprint = getFingerprintFromRequest(req);
-
-      const existingReaction = await Reaction.findOne({
-        blog: blogId,
-        'user.email': email
-      }).session(session);
-
-      let reactionRemoved = false;
-      let oldType = null;
-
-      if (existingReaction) {
-        oldType = existingReaction.type;
-        
-        if (existingReaction.type === type) {
-          await Reaction.deleteOne({ _id: existingReaction._id }).session(session);
-          
-          await Blog.findByIdAndUpdate(
-            blogId,
-            { 
-              $inc: { 
-                [`reactionCounts.${type}s`]: -1 
-              } 
-            },
-            { session }
-          );
-          
-          reactionRemoved = true;
-          
-        } else {
-          existingReaction.type = type;
-          existingReaction.fingerprint = fingerprint;
-          await existingReaction.save({ session });
-          
-          await Blog.findByIdAndUpdate(
-            blogId,
-            { 
-              $inc: { 
-                [`reactionCounts.${oldType}s`]: -1,
-                [`reactionCounts.${type}s`]: 1
-              } 
-            },
-            { session }
-          );
-        }
-        
-      } else {
-        const newReaction = new Reaction({
-          blog: blogId,
-          type,
-          user: { name, email, userId: userId || null},
-          fingerprint
-        });
-        
-        await newReaction.save({ session });
-        
-        await Blog.findByIdAndUpdate(
-          blogId,
-          { 
-            $inc: { 
-              [`reactionCounts.${type}s`]: 1 
-            } 
-          },
-          { session }
-        );
-      }
-
-      await session.commitTransaction();
-      
-      const updatedBlog = await Blog.findById(blogId).select('reactionCounts');
-
-      res.status(200).json({ 
-        message: reactionRemoved ? `${type} removed successfully` : 
-                 oldType ? `Reaction changed to ${type}` : 
-                 `${type} added successfully`,
-        reactionRemoved,
-        reaction: existingReaction || null,
-        counts: updatedBlog.reactionCounts
-      });
-
-    } catch (error) {
-      await session.abortTransaction();
-      
-      console.error('Error processing blog reaction:', error);
-      
-      if (error.code === 11000) {
-        return res.status(409).json({ 
-          message: 'Reaction conflict detected. Please try again.' 
-        });
-      }
-      
-      res.status(500).json({ 
-        message: 'Server error processing reaction',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    } finally {
-      session.endSession();
-    }
-  }
-);
   
-  router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {
-    try {
-      const { blogId } = req.params;
-      const { email } = req.query;
-      
-      if (!email) {
-        return res.status(400).json({ message: 'Email is required' });
-      }
-      
-      const reaction = await Reaction.findOne({
-        blog: blogId,
-        'user.email': email
-      });
-      
-      if (!reaction) {
-        return res.status(200).json({ hasReacted: false });
-      }
-      
-      res.status(200).json({
-        hasReacted: true,
-        reactionType: reaction.type
-      });
-    } catch (error) {
-      console.error('Error fetching user reaction:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  });
-  
-  
-  router.get('/api/blogs/:blogId/reactions/count', async (req, res) => {
-    try {
-      const { blogId } = req.params;
-      
-      const blog = await Blog.findById(blogId, 'reactionCounts');
-      if (!blog) {
-        return res.status(404).json({ message: 'Blog not found' });
-      }
-      
-      res.status(200).json({
-        likes: blog.reactionCounts.likes || 0,
-        dislikes: blog.reactionCounts.dislikes || 0
-      });
-    } catch (error) {
-      console.error('Error fetching reaction counts:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  });
+ 
   
   
   router.get('/api/admin/blogs/:blogId/reactions', authenticateToken, async (req, res) => {
@@ -2822,60 +2118,7 @@ router.post(
     }
   });
   
-router.post(
-  '/api/comments/:commentId/author-reply',
-  authenticateToken,
-  [
-    body('content').trim().notEmpty().withMessage('Reply content is required')
-      .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
 
-    try {
-      const { commentId } = req.params;
-      const { content } = req.body;
-
-      const parentComment = await Comment.findById(commentId);
-      if (!parentComment) {
-        return res.status(404).json({ message: 'Parent comment not found' });
-      }
-
-      if (parentComment.status !== 'approved') {
-        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
-      }
-
-      
-      const newReply = new Comment({
-        blog: parentComment.blog,
-        user: { 
-          name: req.user.name || 'Aaditiya Tyagi',
-          email: req.user.email
-        },
-        content,
-        parentComment: commentId,
-        isAuthorComment: true,
-        authorAdminId: req.user.admin_id, 
-        status: 'approved'
-      });
-
-      await newReply.save();
-      
-      await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
-
-      res.status(201).json({ 
-        message: 'Author reply added successfully',
-        reply: newReply
-      });
-    } catch (error) {
-      console.error('Error adding author reply:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  }
-);
 function getRelevanceLevel(score) {
   if (score >= 0.8) return 'very_high';
   if (score >= 0.6) return 'high';
@@ -3268,6 +2511,647 @@ router.get('/api/search/analytics', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch analytics' });
   }
 });
+// 1. POST - Create Author Comment
+router.post(
+  '/api/blogs/:blogId/author-comment',
+  authenticateToken, 
+  [
+    body('content').trim().notEmpty().withMessage('Comment content is required')
+      .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { blogId } = req.params;
+      const { content } = req.body;
+
+      const blog = await Blog.findById(blogId);
+      if (!blog) {
+        return res.status(404).json({ message: 'Blog not found' });
+      }
+
+      const newComment = new Comment({
+        blog: blogId,
+        user: { 
+          name: req.user.name || 'Aaditiya Tyagi', 
+          email: req.user.email,
+          userId: req.user.admin_id
+        },
+        content,
+        isAuthorComment: true,
+        authorAdminId: req.user.admin_id, 
+        status: 'approved'
+      });
+
+      await newComment.save();
+      
+      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Author comment added successfully',
+        comment: newComment
+      });
+    } catch (error) {
+      console.error('Error adding author comment:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
+
+// 2. GET - Get Author Comments
+router.get('/api/blogs/:blogId/author-comments', authenticateToken, async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    const comments = await Comment.find({ 
+      blog: blogId,
+      isAuthorComment: true
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+    
+    const total = await Comment.countDocuments({
+      blog: blogId,
+      isAuthorComment: true
+    });
+    
+    res.status(200).json({
+      comments,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching author comments:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 3. DELETE - Delete Author Comment
+router.delete('/api/author-comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    if (!comment.isAuthorComment) {
+      return res.status(403).json({ message: 'Not an author comment' });
+    }
+
+    if (comment.parentComment) {
+      await Comment.findByIdAndUpdate(comment.parentComment, { $inc: { repliesCount: -1 } });
+    }
+    
+    if (!comment.parentComment) {
+      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+      
+      const repliesToDelete = await Comment.find({ parentComment: commentId });
+      for (const reply of repliesToDelete) {
+        await CommentReaction.deleteMany({ comment: reply._id });
+      }
+      await Comment.deleteMany({ parentComment: commentId });
+    }
+
+    await CommentReaction.deleteMany({ comment: commentId });
+    
+    await Comment.deleteOne({ _id: commentId });
+    
+    res.status(200).json({ message: 'Author comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting author comment:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 4. POST - Comment Reactions
+router.post(
+  '/api/comments/:commentId/reactions',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const { commentId } = req.params;
+      let { name, email, type } = req.body;
+
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      let userId = null;
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          userId = decoded.user_id;
+          
+          const user = await User.findById(userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
+
+      const comment = await Comment.findOne({ 
+        _id: commentId, 
+        status: 'approved' 
+      }).session(session);
+      
+      if (!comment) {
+        await session.abortTransaction();
+        return res.status(404).json({ 
+          message: 'Comment not found or not approved' 
+        });
+      }
+
+      const existingReaction = await CommentReaction.findOne({
+        comment: commentId,
+        'user.email': email
+      }).session(session);
+
+      let reactionRemoved = false;
+      let oldType = null;
+
+      if (existingReaction) {
+        oldType = existingReaction.type;
+        
+        if (existingReaction.type === type) {
+          await CommentReaction.deleteOne({ 
+            _id: existingReaction._id 
+          }).session(session);
+          
+          await Comment.findByIdAndUpdate(
+            commentId,
+            { 
+              $inc: { 
+                [`reactionCounts.${type}s`]: -1 
+              } 
+            },
+            { session }
+          );
+          
+          reactionRemoved = true;
+          
+        } else {
+          existingReaction.type = type;
+          await existingReaction.save({ session });
+          
+          await Comment.findByIdAndUpdate(
+            commentId,
+            { 
+              $inc: { 
+                [`reactionCounts.${oldType}s`]: -1,
+                [`reactionCounts.${type}s`]: 1
+              } 
+            },
+            { session }
+          );
+        }
+        
+      } else {
+        const newReaction = new CommentReaction({
+          comment: commentId,
+          type,
+          user: { name, email, userId: userId || null },
+          createdAt: new Date()
+        });
+        
+        await newReaction.save({ session });
+        
+        await Comment.findByIdAndUpdate(
+          commentId,
+          { 
+            $inc: { 
+              [`reactionCounts.${type}s`]: 1 
+            } 
+          },
+          { session }
+        );
+      }
+
+      await session.commitTransaction();
+      
+      const updatedComment = await Comment.findById(commentId)
+        .select('reactionCounts');
+
+      res.status(200).json({
+        message: reactionRemoved ? `${type} removed successfully` : 
+                 oldType ? `Reaction changed to ${type}` : 
+                 `${type} added successfully`,
+        reactionRemoved,
+        reaction: existingReaction || null,
+        counts: updatedComment.reactionCounts
+      });
+
+    } catch (error) {
+      await session.abortTransaction();
+      
+      console.error('Error processing comment reaction:', error);
+      
+      if (error.code === 11000) {
+        return res.status(409).json({ 
+          message: 'Reaction conflict detected. Please try again.' 
+        });
+      }
+      
+      res.status(500).json({ 
+        message: 'Server error processing reaction',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } finally {
+      session.endSession();
+    }
+  }
+);
+
+
+// 5. GET - User Comment Reaction
+router.get('/api/comments/:commentId/reactions/user', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    const reaction = await CommentReaction.findOne({
+      comment: commentId,
+      'user.email': email
+    });
+    
+    if (!reaction) {
+      return res.status(200).json({ hasReacted: false });
+    }
+    
+    res.status(200).json({
+      hasReacted: true,
+      reactionType: reaction.type
+    });
+  } catch (error) {
+    console.error('Error fetching user comment reaction:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 6. GET - Comment Reaction Count
+router.get('/api/comments/:commentId/reactions/count', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await Comment.findById(commentId, 'reactionCounts');
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    res.status(200).json({
+      likes: comment.reactionCounts.likes || 0,
+      dislikes: comment.reactionCounts.dislikes || 0
+    });
+  } catch (error) {
+    console.error('Error fetching comment reaction counts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 7. POST - Blog Reactions
+router.post(
+  '/api/blogs/:blogId/reactions',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('type').isIn(['like', 'dislike']).withMessage('Type must be like or dislike')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const { blogId } = req.params;
+      let { name, email, type } = req.body;
+
+      const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+      let userId = null;
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+          userId = decoded.user_id;
+          
+          const user = await User.findById(userId);
+          if (user) {
+            name = user.name;
+            email = user.email;
+          }
+        } catch (err) {
+          console.log('Invalid token, using form data');
+        }
+      }
+
+      const blog = await Blog.findById(blogId).session(session);
+      if (!blog) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Blog not found' });
+      }
+
+      const existingReaction = await Reaction.findOne({
+        blog: blogId,
+        'user.email': email
+      }).session(session);
+
+      let reactionRemoved = false;
+      let oldType = null;
+
+      if (existingReaction) {
+        oldType = existingReaction.type;
+        
+        if (existingReaction.type === type) {
+          await Reaction.deleteOne({ _id: existingReaction._id }).session(session);
+          
+          await Blog.findByIdAndUpdate(
+            blogId,
+            { 
+              $inc: { 
+                [`reactionCounts.${type}s`]: -1 
+              } 
+            },
+            { session }
+          );
+          
+          reactionRemoved = true;
+          
+        } else {
+          existingReaction.type = type;
+          await existingReaction.save({ session });
+          
+          await Blog.findByIdAndUpdate(
+            blogId,
+            { 
+              $inc: { 
+                [`reactionCounts.${oldType}s`]: -1,
+                [`reactionCounts.${type}s`]: 1
+              } 
+            },
+            { session }
+          );
+        }
+        
+      } else {
+        const newReaction = new Reaction({
+          blog: blogId,
+          type,
+          user: { name, email, userId: userId || null },
+          createdAt: new Date()
+        });
+        
+        await newReaction.save({ session });
+        
+        await Blog.findByIdAndUpdate(
+          blogId,
+          { 
+            $inc: { 
+              [`reactionCounts.${type}s`]: 1 
+            } 
+          },
+          { session }
+        );
+      }
+
+      await session.commitTransaction();
+      
+      const updatedBlog = await Blog.findById(blogId).select('reactionCounts');
+
+      res.status(200).json({ 
+        message: reactionRemoved ? `${type} removed successfully` : 
+                 oldType ? `Reaction changed to ${type}` : 
+                 `${type} added successfully`,
+        reactionRemoved,
+        reaction: existingReaction || null,
+        counts: updatedBlog.reactionCounts
+      });
+
+    } catch (error) {
+      await session.abortTransaction();
+      
+      console.error('Error processing blog reaction:', error);
+      
+      if (error.code === 11000) {
+        return res.status(409).json({ 
+          message: 'Reaction conflict detected. Please try again.' 
+        });
+      }
+      
+      res.status(500).json({ 
+        message: 'Server error processing reaction',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    } finally {
+      session.endSession();
+    }
+  }
+);
+
+
+// 8. GET - User Blog Reaction
+router.get('/api/blogs/:blogId/reactions/user', async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    const reaction = await Reaction.findOne({
+      blog: blogId,
+      'user.email': email
+    });
+    
+    if (!reaction) {
+      return res.status(200).json({ hasReacted: false });
+    }
+    
+    res.status(200).json({
+      hasReacted: true,
+      reactionType: reaction.type
+    });
+  } catch (error) {
+    console.error('Error fetching user reaction:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 9. GET - Blog Reaction Count
+router.get('/api/blogs/:blogId/reactions/count', async (req, res) => {
+  try {
+    const { blogId } = req.params;
+    
+    const blog = await Blog.findById(blogId, 'reactionCounts');
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog not found' });
+    }
+    
+    res.status(200).json({
+      likes: blog.reactionCounts.likes || 0,
+      dislikes: blog.reactionCounts.dislikes || 0
+    });
+  } catch (error) {
+    console.error('Error fetching reaction counts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 10. PATCH - Admin Update Comment Status
+router.patch('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { status } = req.body;
+    
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+    
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    if (comment.status !== 'approved' && status === 'approved') {
+      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: 1 } });
+    }
+    
+    if (comment.status === 'approved' && status !== 'approved') {
+      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+    }
+    
+    comment.status = status;
+    await comment.save();
+    
+    res.status(200).json({ 
+      message: 'Comment status updated',
+      comment
+    });
+  } catch (error) {
+    console.error('Error updating comment status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 11. DELETE - Admin Delete Comment
+router.delete('/api/admin/comments/:commentId', authenticateToken, async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    
+    if (comment.status === 'approved') {
+      await Blog.findByIdAndUpdate(comment.blog, { $inc: { commentsCount: -1 } });
+    }
+    
+    await Comment.deleteOne({ _id: commentId });
+    
+    res.status(200).json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+// 12. POST - Author Reply
+router.post(
+  '/api/comments/:commentId/author-reply',
+  authenticateToken,
+  [
+    body('content').trim().notEmpty().withMessage('Reply content is required')
+      .isLength({ max: 1000 }).withMessage('Reply cannot exceed 1000 characters')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { commentId } = req.params;
+      const { content } = req.body;
+
+      const parentComment = await Comment.findById(commentId);
+      if (!parentComment) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+
+      if (parentComment.status !== 'approved') {
+        return res.status(400).json({ message: 'Cannot reply to unapproved comment' });
+      }
+
+      const newReply = new Comment({
+        blog: parentComment.blog,
+        user: { 
+          name: req.user.name || 'Aaditiya Tyagi',
+          email: req.user.email,
+          userId: req.user.admin_id
+        },
+        content,
+        parentComment: commentId,
+        isAuthorComment: true,
+        authorAdminId: req.user.admin_id, 
+        status: 'approved'
+      });
+
+      await newReply.save();
+      
+      await Comment.findByIdAndUpdate(commentId, { $inc: { repliesCount: 1 } });
+
+      res.status(201).json({ 
+        message: 'Author reply added successfully',
+        reply: newReply
+      });
+    } catch (error) {
+      console.error('Error adding author reply:', error);
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  }
+);
+
 
 
 module.exports = router;

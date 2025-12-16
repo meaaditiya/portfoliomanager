@@ -119,7 +119,6 @@ const announcementSchema = new mongoose.Schema({
     contentType: String,
     filename: String
   },
-  
   document: {
     data: Buffer,
     contentType: String,

@@ -21,10 +21,6 @@ const CommentSchema = new mongoose.Schema({
       default: null
     }
   },
-  fingerprint: {
-    type: String,
-    default: null
-  },
   content: {
     type: String,
     required: true,
@@ -40,7 +36,6 @@ const CommentSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
   authorAdminId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',

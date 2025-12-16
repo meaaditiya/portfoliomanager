@@ -13,5 +13,4 @@ const emailSchema = new mongoose.Schema({
   sentBy: { type: String, required: true },
   status: { type: String, enum: ['sent', 'failed'], default: 'sent' }
 });
-
 module.exports = mongoose.model('Email', emailSchema);

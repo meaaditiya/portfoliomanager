@@ -49,5 +49,4 @@ const audioRecordingSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
 module.exports= mongoose.model('AudioRecording', audioRecordingSchema);
