@@ -1570,7 +1570,7 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
       status: 'approved',
       parentComment: null
     })
-    .populate('authorAdminId', 'name email profileImage') 
+   .populate('authorAdminId', 'name email profileImage designation location bio socialLinks')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
@@ -1589,14 +1589,17 @@ router.get('/api/blogs/:blogId/comments', async (req, res) => {
           comment.user.googleId = userData.googleId;
         }
       }
-      
-      
       if (comment.isAuthorComment && comment.authorAdminId) {
-        comment.authorHasProfileImage = !!(
-          comment.authorAdminId.profileImage && 
-          comment.authorAdminId.profileImage.data
-        );
-      }
+  comment.authorHasProfileImage = !!(
+    comment.authorAdminId.profileImage && 
+    (comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url)
+  );
+  if (comment.authorHasProfileImage) {
+    comment.authorProfileImageUrl = comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url;
+  }
+}
+      
+      
       
       comment.repliesCount = await Comment.countDocuments({
         parentComment: comment._id,
@@ -2186,12 +2189,15 @@ router.get('/api/comments/:commentId/replies', async (req, res) => {
       }
       
       
-      if (reply.isAuthorComment && reply.authorAdminId) {
-        reply.authorHasProfileImage = !!(
-          reply.authorAdminId.profileImage && 
-          reply.authorAdminId.profileImage.data
-        );
-      }
+     if (reply.isAuthorComment && reply.authorAdminId) {
+  reply.authorHasProfileImage = !!(
+    reply.authorAdminId.profileImage && 
+    (reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url)
+  );
+  if (reply.authorHasProfileImage) {
+    reply.authorProfileImageUrl = reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url;
+  }
+}
     }
     
     const total = await Comment.countDocuments({

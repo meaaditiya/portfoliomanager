@@ -496,12 +496,15 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
         }
       }
       
-      if (comment.isAuthorComment && comment.authorAdminId) {
-        comment.authorHasProfileImage = !!(
-          comment.authorAdminId.profileImage && 
-          comment.authorAdminId.profileImage.data
-        );
-      }
+     if (comment.isAuthorComment && comment.authorAdminId) {
+  comment.authorHasProfileImage = !!(
+    comment.authorAdminId.profileImage && 
+    (comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url)
+  );
+  if (comment.authorHasProfileImage) {
+    comment.authorProfileImageUrl = comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url;
+  }
+}
     }
     
     res.json({
@@ -563,13 +566,15 @@ router.get('/api/image-posts/:id/comments', async (req, res) => {
           console.error('Error fetching user profile:', err);
         }
       }
-      
-      if (comment.isAuthorComment && comment.authorAdminId) {
-        comment.authorHasProfileImage = !!(
-          comment.authorAdminId.profileImage && 
-          comment.authorAdminId.profileImage.data
-        );
-      }
+     if (comment.isAuthorComment && comment.authorAdminId) {
+  comment.authorHasProfileImage = !!(
+    comment.authorAdminId.profileImage && 
+    (comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url)
+  );
+  if (comment.authorHasProfileImage) {
+    comment.authorProfileImageUrl = comment.authorAdminId.profileImage.secureUrl || comment.authorAdminId.profileImage.url;
+  }
+}
     }
     
     const total = await ImageComment.countDocuments({
@@ -631,12 +636,15 @@ router.get('/api/image-posts/comments/:commentId/replies', async (req, res) => {
         }
       }
       
-      if (reply.isAuthorComment && reply.authorAdminId) {
-        reply.authorHasProfileImage = !!(
-          reply.authorAdminId.profileImage && 
-          reply.authorAdminId.profileImage.data
-        );
-      }
+     if (reply.isAuthorComment && reply.authorAdminId) {
+  reply.authorHasProfileImage = !!(
+    reply.authorAdminId.profileImage && 
+    (reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url)
+  );
+  if (reply.authorHasProfileImage) {
+    reply.authorProfileImageUrl = reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url;
+  }
+}
     }
     
     const total = await ImageComment.countDocuments({
@@ -1147,6 +1155,16 @@ router.get('/api/admin/image-posts/:id/comments',
                 reply.user.googleId = userData.googleId;
               }
             }
+            if (reply.isAuthorComment && reply.authorAdminId) {
+    reply.authorHasProfileImage = !!(
+      reply.authorAdminId.profileImage && 
+      (reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url)
+    );
+    if (reply.authorHasProfileImage) {
+      reply.authorProfileImageUrl = reply.authorAdminId.profileImage.secureUrl || reply.authorAdminId.profileImage.url;
+    }
+  }
+
           }
           
           comment.replies = replies;
