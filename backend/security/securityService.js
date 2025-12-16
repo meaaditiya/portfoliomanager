@@ -95,6 +95,7 @@ function createRateLimitStore() {
     });
   }
 }
+
 function setupHelmet() {
   return helmet({
     contentSecurityPolicy: {
@@ -131,16 +132,15 @@ function setupHelmet() {
 }
 
 function createSmartLimiter(options = {}) {
-const {
-  windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
-  max = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message = 'Too many requests, please try again later',
-  skipSuccessfulRequests = false,
-  skipFailedRequests = false,
-  keyGenerator = ipKeyGenerator,
-  skip = () => false
-} = options;
-
+  const {
+    windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
+    max = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    message = 'Too many requests, please try again later',
+    skipSuccessfulRequests = false,
+    skipFailedRequests = false,
+    keyGenerator = ipKeyGenerator,
+    skip = () => false
+  } = options;
 
   const config = {
     windowMs,
@@ -174,7 +174,7 @@ const {
 
 function createBurstLimiter() {
   const windowMs = parseInt(process.env.BURST_LIMIT_WINDOW_MS) || 60000;
-  const max = parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 35;
+  const max = parseInt(process.env.BURST_LIMIT_MAX_REQUESTS) || 150;
 
   return createSmartLimiter({
     windowMs,
@@ -191,7 +191,7 @@ function createBurstLimiter() {
 function createApiLimiter() {
   return createSmartLimiter({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 300,
     message: 'API rate limit exceeded'
   });
 }
@@ -204,7 +204,6 @@ function createStrictLimiter() {
     keyGenerator: (req) => {
       const userId = req.user?.id || req.user?._id || 'anonymous';
       return `strict:${ipKeyGenerator(req)}:${userId}`;
-
     }
   });
 }
@@ -216,17 +215,16 @@ function createAuthLimiter() {
     skipSuccessfulRequests: true,
     message: 'Too many authentication attempts, please try again later',
     keyGenerator: (req) => {
-     const identifier = req.body?.email || req.body?.username || ipKeyGenerator(req);
-return `auth:${identifier}`;
-
+      const identifier = req.body?.email || req.body?.username || ipKeyGenerator(req);
+      return `auth:${identifier}`;
     }
   });
 }
 
 function createPublicLimiter() {
   return createSmartLimiter({
-    windowMs: 900000,
-    max: 200,
+    windowMs: parseInt(process.env.PUBLIC_RATE_LIMIT_WINDOW_MS) || 900000,
+    max: parseInt(process.env.PUBLIC_RATE_LIMIT_MAX_REQUESTS) || 500,
     message: 'Public API rate limit exceeded',
     skip: (req) => req.path === '/health' || req.path === '/api/health'
   });
@@ -238,9 +236,8 @@ function createUploadLimiter() {
     max: 20,
     message: 'Upload limit exceeded, please try again later',
     keyGenerator: (req) => {
-    const userId = req.user?.id || req.user?._id || ipKeyGenerator(req);
-return `upload:${userId}`;
-
+      const userId = req.user?.id || req.user?._id || ipKeyGenerator(req);
+      return `upload:${userId}`;
     }
   });
 }
@@ -386,8 +383,8 @@ function errorLogger() {
 
 function suspiciousActivityDetector() {
   const suspiciousRequests = new Map();
-  const THRESHOLD = 50;
-  const WINDOW = 60000;
+  const THRESHOLD = parseInt(process.env.SUSPICIOUS_ACTIVITY_THRESHOLD) || 100;
+  const WINDOW = parseInt(process.env.SUSPICIOUS_ACTIVITY_WINDOW_MS) || 60000;
 
   return (req, res, next) => {
     const key = req.ip;
@@ -423,8 +420,9 @@ async function initializeSecurity(app) {
 
   logger.info('Security middleware initialized successfully');
   logger.info(`Redis status: ${isRedisConnected ? 'Connected' : 'Disconnected (using memory store)'}`);
-  logger.info(`Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 100} req/${(process.env.RATE_LIMIT_WINDOW_MS || 900000)/1000}s`);
-  logger.info(`Burst limiting: ${process.env.BURST_LIMIT_MAX_REQUESTS || 35} req/${(process.env.BURST_LIMIT_WINDOW_MS || 60000)/1000}s`);
+  logger.info(`Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 300} req/${(process.env.RATE_LIMIT_WINDOW_MS || 900000)/1000}s`);
+  logger.info(`Burst limiting: ${process.env.BURST_LIMIT_MAX_REQUESTS || 150} req/${(process.env.BURST_LIMIT_WINDOW_MS || 60000)/1000}s`);
+  logger.info(`Public limiting: ${process.env.PUBLIC_RATE_LIMIT_MAX_REQUESTS || 500} req/${(process.env.PUBLIC_RATE_LIMIT_WINDOW_MS || 900000)/1000}s`);
 
   return {
     helmet: setupHelmet(),
