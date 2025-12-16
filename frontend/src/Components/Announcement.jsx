@@ -102,16 +102,39 @@ const AnnouncementAdmin = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    if (files && files[0]) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: files[0]
-      }));
+ 
+const handleFileChange = (e) => {
+  const { name, files } = e.target;
+  if (files && files[0]) {
+    const file = files[0];
+    
+    if (file.size > 100 * 1024 * 1024) {
+      setError('File size exceeds 100MB limit');
+      return;
     }
-  };
-
+    
+    if (name === 'image') {
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+      if (!validImageTypes.includes(file.type)) {
+        setError('Invalid image format. Allowed: JPG, PNG, WEBP, GIF, SVG');
+        return;
+      }
+    }
+    
+    if (name === 'document') {
+      const validDocTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+      if (!validDocTypes.includes(file.type)) {
+        setError('Invalid document format. Allowed: PDF, DOC, DOCX, TXT');
+        return;
+      }
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: file
+    }));
+  }
+};
   // Cleanup functions for images and videos
   const cleanupCaptionImages = (caption, captionImages) => {
     if (!caption || !Array.isArray(captionImages) || captionImages.length === 0) {
@@ -623,7 +646,8 @@ const AnnouncementAdmin = () => {
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         body: formDataToSend
       });
@@ -692,29 +716,35 @@ const AnnouncementAdmin = () => {
     setShowModal(true);
   };
 
-  const handleToggleActive = async (id) => {
-    try {
-      const response = await fetch(`${API_BASE}/admin/announcement/${id}/toggle`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSuccessMessage(data.message);
-        fetchAnnouncements();
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setError(data.error || 'Toggle failed');
+ const handleToggleActive = async (id) => {
+  try {
+    setLoading(true);
+    const response = await fetch(`${API_BASE}/admin/announcement/${id}/toggle`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Toggle failed');
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Toggle failed');
     }
-  };
+
+    const data = await response.json();
+    
+    setSuccessMessage(data.message);
+    await fetchAnnouncements();
+    setTimeout(() => setSuccessMessage(''), 3000);
+  } catch (error) {
+    console.error('Error toggling announcement:', error);
+    setError(error.message || 'Failed to toggle announcement status');
+    setTimeout(() => setError(null), 3000);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this announcement?')) {
@@ -725,7 +755,8 @@ const AnnouncementAdmin = () => {
       const response = await fetch(`${API_BASE}/admin/announcement/${id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -753,7 +784,8 @@ const AnnouncementAdmin = () => {
       const response = await fetch(`${API_BASE}/admin/announcement`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -996,7 +1028,18 @@ const AnnouncementAdmin = () => {
                 )}
               </div>
             </div>
-
+{announcement.imageUrl && (
+  <div className="annc-admin-card-image">
+    <img 
+      src={announcement.imageUrl} 
+      alt={announcement.title}
+      onError={(e) => {
+        e.target.onerror = null;
+        e.target.style.display = 'none';
+      }}
+    />
+  </div>
+)}
             {announcement.caption && (
               <div className="annc-admin-card-caption">
                 {announcement.captionFormat === 'markdown' ? (
@@ -1031,16 +1074,18 @@ const AnnouncementAdmin = () => {
             </div>
 
             <div className="annc-admin-card-attachments-list">
-              {announcement.hasImage && (
-                <div className="annc-admin-attachment-item-badge">
-                  <ImageIcon size={16} /> {announcement.imageFilename}
-                </div>
-              )}
+  
+
+{announcement.hasImage && (
+  <div className="annc-admin-attachment-item-badge">
+    <ImageIcon size={16} /> Featured Image
+  </div>
+)}
               {announcement.hasDocument && (
-                <div className="annc-admin-attachment-item-badge">
-                  <FileText size={16} /> {announcement.documentFilename}
-                </div>
-              )}
+  <div className="annc-admin-attachment-item-badge">
+    <FileText size={16} /> Document
+  </div>
+)}
               {announcement.captionImagesCount > 0 && (
                 <div className="annc-admin-attachment-item-badge">
                   <ImageIcon size={16} /> {announcement.captionImagesCount} inline image{announcement.captionImagesCount !== 1 ? 's' : ''}

@@ -1,13 +1,16 @@
 const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware"); 
-const upload = require("../middlewares/upload");
+const upload = require("../middlewares/cloudinaryUpload");
 const Announcement = require("../models/announcementSchema");
 const calculateExpiryDate = require("../utils/calculateExpiryDate");
 const cleanupUnusedImages = require("../utils/cleanupUnusedImages");
 const cleanupUnusedVideos = require("../utils/cleanupUnusedVideos");
 const extractVideoInfo = require("../utils/extractVideoInfo");
 const processContent = require("../utils/processContent");
+const cloudinary = require('../Config/cloudinarystorage');
+
+
 
 
 router.post('/api/admin/announcement', authenticateToken, upload.fields([
@@ -35,7 +38,6 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       return res.status(400).json({ error: 'Title and caption are required' });
     }
 
-    
     const cleanedImages = cleanupUnusedImages(caption, captionImages ? JSON.parse(captionImages) : []);
     const cleanedVideos = cleanupUnusedVideos(caption, captionVideos ? JSON.parse(captionVideos) : []);
 
@@ -55,7 +57,6 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       createdBy: req.user.admin_id
     };
 
-    
     if (expiryType) {
       const expiryDate = calculateExpiryDate(expiryType, expiryValue, expiresAt);
       if (expiryDate) {
@@ -63,22 +64,20 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
       }
     }
 
-    
     if (req.files && req.files.image) {
       const imageFile = req.files.image[0];
       announcementData.image = {
-        data: imageFile.buffer,
-        contentType: imageFile.mimetype,
+        url: imageFile.path,
+        publicId: imageFile.filename,
         filename: imageFile.originalname
       };
     }
 
-    
     if (req.files && req.files.document) {
       const docFile = req.files.document[0];
       announcementData.document = {
-        data: docFile.buffer,
-        contentType: docFile.mimetype,
+        url: docFile.path,
+        publicId: docFile.filename,
         filename: docFile.originalname
       };
     }
@@ -86,7 +85,6 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
     const announcement = new Announcement(announcementData);
     await announcement.save();
 
-    
     const processedCaption = processContent(
       announcement.caption, 
       announcement.captionImages, 
@@ -108,8 +106,8 @@ router.post('/api/admin/announcement', authenticateToken, upload.fields([
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-       hasImage: !!(announcement.image && announcement.image.data),
-hasDocument: !!(announcement.document && announcement.document.data),
+        hasImage: !!(announcement.image && announcement.image.url),
+        hasDocument: !!(announcement.document && announcement.document.url),
         captionImagesCount: announcement.captionImages.length,
         captionVideosCount: announcement.captionVideos.length,
         createdAt: announcement.createdAt
@@ -120,8 +118,6 @@ hasDocument: !!(announcement.document && announcement.document.data),
     res.status(500).json({ error: error.message });
   }
 });
-
-
 
 
 router.post('/api/admin/announcement/:id/caption-images', authenticateToken, async (req, res) => {
@@ -443,7 +439,6 @@ router.get('/api/announcement/active', async (req, res) => {
       isActive: true,
       isExpired: false
     })
-    .select('-image.data -document.data')
     .sort({ priority: -1, createdAt: -1 });
 
     const announcementsWithInfo = announcements.map(ann => {
@@ -466,8 +461,10 @@ router.get('/api/announcement/active', async (req, res) => {
         link: ann.link,
         priority: ann.priority,
         expiresAt: ann.expiresAt,
-  hasImage: !!(ann.image && ann.image.filename),
-hasDocument: !!(ann.document && ann.document.filename),
+        hasImage: !!(ann.image && ann.image.url),
+        hasDocument: !!(ann.document && ann.document.url),
+        imageUrl: ann.image?.url,
+        documentUrl: ann.document?.url,
         captionImagesCount: ann.captionImages.length,
         captionVideosCount: ann.captionVideos.length,
         createdAt: ann.createdAt
@@ -481,13 +478,11 @@ hasDocument: !!(ann.document && ann.document.filename),
   }
 });
 
-
 router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
   try {
     await Announcement.expireOldAnnouncements();
 
     const announcements = await Announcement.find()
-      .select('-image.data -document.data')
       .populate('createdBy', 'name email')
       .sort({ priority: -1, createdAt: -1 });
 
@@ -513,8 +508,10 @@ router.get('/api/admin/announcement', authenticateToken, async (req, res) => {
         isActive: ann.isActive,
         expiresAt: ann.expiresAt,
         isExpired: ann.isExpired,
-      hasImage: !!(ann.image && ann.image.filename),
-hasDocument: !!(ann.document && ann.document.filename),
+        hasImage: !!(ann.image && ann.image.url),
+        hasDocument: !!(ann.document && ann.document.url),
+        imageUrl: ann.image?.url,
+        documentUrl: ann.document?.url,
         imageFilename: ann.image?.filename,
         documentFilename: ann.document?.filename,
         captionImagesCount: ann.captionImages.length,
@@ -532,11 +529,9 @@ hasDocument: !!(ann.document && ann.document.filename),
   }
 });
 
-
 router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id)
-      .select('-image.data -document.data')
       .populate('createdBy', 'name email');
 
     if (!announcement) {
@@ -570,8 +565,10 @@ router.get('/api/admin/announcement/:id', authenticateToken, async (req, res) =>
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-      hasImage: !!(announcement.image && announcement.image.filename),
-hasDocument: !!(announcement.document && announcement.document.filename),
+        hasImage: !!(announcement.image && announcement.image.url),
+        hasDocument: !!(announcement.document && announcement.document.url),
+        imageUrl: announcement.image?.url,
+        documentUrl: announcement.document?.url,
         imageFilename: announcement.image?.filename,
         documentFilename: announcement.document?.filename,
         createdBy: announcement.createdBy,
@@ -585,41 +582,38 @@ hasDocument: !!(announcement.document && announcement.document.filename),
   }
 });
 
-
-
 router.get('/api/announcement/:id/image', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
 
-    if (!announcement || !announcement.image || !announcement.image.data) {
+    if (!announcement || !announcement.image || !announcement.image.url) {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    res.set('Content-Type', announcement.image.contentType);
-    res.send(announcement.image.data);
+    res.redirect(announcement.image.url);
   } catch (error) {
     console.error('Error fetching announcement image:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-
 router.get('/api/announcement/:id/document', async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
 
-    if (!announcement || !announcement.document || !announcement.document.data) {
+    if (!announcement || !announcement.document || !announcement.document.url) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    res.set('Content-Type', announcement.document.contentType);
-    res.set('Content-Disposition', `attachment; filename="${announcement.document.filename}"`);
-    res.send(announcement.document.data);
+    res.redirect(announcement.document.url);
   } catch (error) {
     console.error('Error fetching announcement document:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
+
+
 
 
 router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
@@ -653,9 +647,9 @@ router.put('/api/admin/announcement/:id', authenticateToken, upload.fields([
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
-if (!req.user || !req.user.admin_id) {
-  return res.status(401).json({ error: 'Unauthorized - Invalid user session' });
-}
+    if (!req.user || !req.user.admin_id) {
+      return res.status(401).json({ error: 'Unauthorized - Invalid user session' });
+    }
 
     if (announcement.createdBy.toString() !== req.user.admin_id) {
       return res.status(403).json({ error: 'Not authorized to update this announcement' });
@@ -665,7 +659,6 @@ if (!req.user || !req.user.admin_id) {
     if (titleColor !== undefined) announcement.titleColor = titleColor;
     if (caption !== undefined) {
       announcement.caption = caption;
-      
       
       if (captionImages) {
         announcement.captionImages = cleanupUnusedImages(
@@ -682,7 +675,6 @@ if (!req.user || !req.user.admin_id) {
     }
     if (captionFormat !== undefined) announcement.captionFormat = captionFormat;
     
-    
     if (linkUrl !== undefined) announcement.link.url = linkUrl;
     if (linkName !== undefined) announcement.link.name = linkName;
     if (linkOpenInNewTab !== undefined) {
@@ -692,7 +684,6 @@ if (!req.user || !req.user.admin_id) {
     if (priority !== undefined) announcement.priority = priority;
     if (isActive !== undefined) announcement.isActive = isActive === 'true' || isActive === true;
 
-    
     if (removeExpiry === 'true' || removeExpiry === true) {
       announcement.expiresAt = null;
       announcement.isExpired = false;
@@ -704,28 +695,38 @@ if (!req.user || !req.user.admin_id) {
       }
     }
 
-    
     if (removeImage === 'true' || removeImage === true) {
+      if (announcement.image && announcement.image.publicId) {
+        await cloudinary.uploader.destroy(announcement.image.publicId);
+      }
       announcement.image = undefined;
     }
     if (req.files && req.files.image) {
+      if (announcement.image && announcement.image.publicId) {
+        await cloudinary.uploader.destroy(announcement.image.publicId);
+      }
       const imageFile = req.files.image[0];
       announcement.image = {
-        data: imageFile.buffer,
-        contentType: imageFile.mimetype,
+        url: imageFile.path,
+        publicId: imageFile.filename,
         filename: imageFile.originalname
       };
     }
 
-    
     if (removeDocument === 'true' || removeDocument === true) {
+      if (announcement.document && announcement.document.publicId) {
+        await cloudinary.uploader.destroy(announcement.document.publicId);
+      }
       announcement.document = undefined;
     }
     if (req.files && req.files.document) {
+      if (announcement.document && announcement.document.publicId) {
+        await cloudinary.uploader.destroy(announcement.document.publicId);
+      }
       const docFile = req.files.document[0];
       announcement.document = {
-        data: docFile.buffer,
-        contentType: docFile.mimetype,
+        url: docFile.path,
+        publicId: docFile.filename,
         filename: docFile.originalname
       };
     }
@@ -753,8 +754,8 @@ if (!req.user || !req.user.admin_id) {
         isActive: announcement.isActive,
         expiresAt: announcement.expiresAt,
         isExpired: announcement.isExpired,
-       hasImage: !!(announcement.image && announcement.image.data),
-hasDocument: !!(announcement.document && announcement.document.data),
+        hasImage: !!(announcement.image && announcement.image.url),
+        hasDocument: !!(announcement.document && announcement.document.url),
         captionImagesCount: announcement.captionImages.length,
         captionVideosCount: announcement.captionVideos.length,
         updatedAt: announcement.updatedAt
@@ -812,6 +813,14 @@ router.delete('/api/admin/announcement/:id', authenticateToken, async (req, res)
 
     if (announcement.createdBy.toString() !== req.user.admin_id) {
       return res.status(403).json({ error: 'Not authorized to delete this announcement' });
+    }
+
+    if (announcement.image && announcement.image.publicId) {
+      await cloudinary.uploader.destroy(announcement.image.publicId);
+    }
+
+    if (announcement.document && announcement.document.publicId) {
+      await cloudinary.uploader.destroy(announcement.document.publicId);
     }
 
     await Announcement.findByIdAndDelete(req.params.id);
