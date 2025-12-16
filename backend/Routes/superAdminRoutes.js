@@ -2,10 +2,11 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const cloudinary = require("../Config/cloudinarystorage");
 const Admin = require("../models/admin");          
 const authenticateToken = require("../middlewares/authMiddleware"); 
 const isSuperAdmin = require("../middlewares/isSuperAdmin");        
-const upload = require("../middlewares/upload");                    
+const upload = require("../middlewares/cloudinaryUpload");                    
 
 router.post('/api/admins', authenticateToken, isSuperAdmin, upload.single('profileImage'), async (req, res) => {
   try {
@@ -23,30 +24,20 @@ router.post('/api/admins', authenticateToken, isSuperAdmin, upload.single('profi
       socialLinks
     } = req.body;
     
-    // Validate required fields
     if (!name || !email || !password) {
+      if (req.file) await cloudinary.uploader.destroy(req.file.filename);
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
     
-    // Check if admin already exists
     const existingAdmin = await Admin.findOne({ email });
     if (existingAdmin) {
+      if (req.file) await cloudinary.uploader.destroy(req.file.filename);
       return res.status(400).json({ message: 'Admin with this email already exists' });
     }
     
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Prepare profile image data
-    let profileImageData = null;
-    if (req.file) {
-      profileImageData = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
-      };
-    }
-    
-    const newAdmin = new Admin({
+    const adminData = {
       name,
       email,
       password: hashedPassword,
@@ -58,33 +49,34 @@ router.post('/api/admins', authenticateToken, isSuperAdmin, upload.single('profi
       expertise: expertise ? (typeof expertise === 'string' ? JSON.parse(expertise) : expertise) : [],
       interests: interests ? (typeof interests === 'string' ? JSON.parse(interests) : interests) : [],
       socialLinks: socialLinks ? (typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks) : {},
-      profileImage: profileImageData,
       status: 'active'
-    });
-    
-    await newAdmin.save();
-    
-    // Remove password and image buffer from response
-    const adminResponse = newAdmin.toObject();
-    delete adminResponse.password;
-    if (adminResponse.profileImage) {
-      adminResponse.profileImage = {
-        contentType: adminResponse.profileImage.contentType,
-        hasImage: true
+    };
+
+    if (req.file) {
+      adminData.profileImage = {
+        publicId: req.file.filename,
+        url: req.file.path,
+        secureUrl: req.file.path
       };
     }
+    
+    const newAdmin = new Admin(adminData);
+    await newAdmin.save();
+    
+    const adminResponse = newAdmin.toObject();
+    delete adminResponse.password;
     
     res.status(201).json({
       message: 'Admin created successfully',
       admin: adminResponse
     });
   } catch (error) {
+    if (req.file) await cloudinary.uploader.destroy(req.file.filename);
     console.error('Error creating admin:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Get all admins (Super Admin only)
 router.get('/api/admins', authenticateToken, isSuperAdmin, async (req, res) => {
   try {
     const { status, role, page = 1, limit = 10 } = req.query;
@@ -99,24 +91,12 @@ router.get('/api/admins', authenticateToken, isSuperAdmin, async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
     
-    // Convert image data to indicate presence only (not sending full buffer)
-    const adminsResponse = admins.map(admin => {
-      const adminObj = admin.toObject();
-      if (adminObj.profileImage && adminObj.profileImage.data) {
-        adminObj.profileImage = {
-          contentType: adminObj.profileImage.contentType,
-          hasImage: true
-        };
-      }
-      return adminObj;
-    });
-    
     const count = await Admin.countDocuments(query);
     
     res.json({
-      admins: adminsResponse,
+      admins,
       totalPages: Math.ceil(count / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       totalAdmins: count
     });
   } catch (error) {
@@ -125,7 +105,6 @@ router.get('/api/admins', authenticateToken, isSuperAdmin, async (req, res) => {
   }
 });
 
-// Get single admin by ID (Super Admin only)
 router.get('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, res) => {
   try {
     const admin = await Admin.findById(req.params.id).select('-password');
@@ -134,41 +113,13 @@ router.get('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, res) 
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    const adminObj = admin.toObject();
-    if (adminObj.profileImage && adminObj.profileImage.data) {
-      adminObj.profileImage = {
-        contentType: adminObj.profileImage.contentType,
-        hasImage: true
-      };
-    }
-    
-    res.json({ admin: adminObj });
+    res.json({ admin });
   } catch (error) {
     console.error('Error fetching admin:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Get admin profile image
-router.get('/api/admins/:id/image', async (req, res) => {
-  try {
-    const admin = await Admin.findById(req.params.id).select('profileImage');
-    
-    if (!admin || !admin.profileImage || !admin.profileImage.data) {
-      return res.status(404).json({ message: 'Image not found' });
-    }
-    
-    res.set('Content-Type', admin.profileImage.contentType);
-    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
-    res.send(admin.profileImage.data);
-  } catch (error) {
-    console.error('Error fetching image:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
-// Delete admin (Super Admin only)
 router.delete('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -182,6 +133,10 @@ router.delete('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, re
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
+
+    if (admin.profileImage?.publicId) {
+      await cloudinary.uploader.destroy(admin.profileImage.publicId);
+    }
     
     await Admin.findByIdAndDelete(id);
     
@@ -192,11 +147,6 @@ router.delete('/api/admins/:id', authenticateToken, isSuperAdmin, async (req, re
   }
 });
 
-// ============================================
-// REGULAR ADMIN ROUTES - Self Profile Management
-// ============================================
-
-// Get own profile
 router.get('/api/profile', authenticateToken, async (req, res) => {
   try {
     const admin = await Admin.findById(req.user.admin_id).select('-password');
@@ -205,22 +155,13 @@ router.get('/api/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    const adminObj = admin.toObject();
-    if (adminObj.profileImage && adminObj.profileImage.data) {
-      adminObj.profileImage = {
-        contentType: adminObj.profileImage.contentType,
-        hasImage: true
-      };
-    }
-    
-    res.json({ admin: adminObj });
+    res.json({ admin });
   } catch (error) {
     console.error('Error fetching profile:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Update admin (Super Admin only) - WITH IMAGE UPLOAD
 router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('profileImage'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -243,14 +184,15 @@ router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('pr
     const admin = await Admin.findById(id);
     
     if (!admin) {
+      if (req.file) await cloudinary.uploader.destroy(req.file.filename);
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    // Update fields
     if (name) admin.name = name;
     if (email) {
       const existingAdmin = await Admin.findOne({ email, _id: { $ne: id } });
       if (existingAdmin) {
+        if (req.file) await cloudinary.uploader.destroy(req.file.filename);
         return res.status(400).json({ message: 'Email already in use' });
       }
       admin.email = email;
@@ -274,49 +216,42 @@ router.put('/api/admins/:id', authenticateToken, isSuperAdmin, upload.single('pr
       admin.socialLinks = { ...admin.socialLinks, ...parsedLinks };
     }
     
-    // Handle profile image - FIX: Better logic for image handling
     if (removeImage === 'true' || removeImage === true) {
-      // User explicitly wants to remove the image
-      admin.profileImage = null;
-      console.log('Image removed');
+      if (admin.profileImage?.publicId) {
+        await cloudinary.uploader.destroy(admin.profileImage.publicId);
+      }
+      admin.profileImage = undefined;
     } else if (req.file) {
-      // New file uploaded - save it
+      if (admin.profileImage?.publicId) {
+        await cloudinary.uploader.destroy(admin.profileImage.publicId);
+      }
       admin.profileImage = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
+        publicId: req.file.filename,
+        url: req.file.path,
+        secureUrl: req.file.path
       };
-      console.log('New image uploaded', req.file.filename);
     }
-    // If neither, keep existing image (don't modify admin.profileImage)
     
-    // Update password if provided
     if (password) {
       admin.password = await bcrypt.hash(password, 10);
     }
     
     await admin.save();
     
-    // Remove password and image buffer from response
     const adminResponse = admin.toObject();
     delete adminResponse.password;
-    if (adminResponse.profileImage && adminResponse.profileImage.data) {
-      adminResponse.profileImage = {
-        contentType: adminResponse.profileImage.contentType,
-        hasImage: true
-      };
-    }
     
     res.json({
       message: 'Admin updated successfully',
       admin: adminResponse
     });
   } catch (error) {
+    if (req.file) await cloudinary.uploader.destroy(req.file.filename);
     console.error('Error updating admin:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Update own profile - WITH IMAGE UPLOAD
 router.put('/api/profile', authenticateToken, upload.single('profileImage'), async (req, res) => {
   try {
     const {
@@ -333,10 +268,10 @@ router.put('/api/profile', authenticateToken, upload.single('profileImage'), asy
     const admin = await Admin.findById(req.user.admin_id);
     
     if (!admin) {
+      if (req.file) await cloudinary.uploader.destroy(req.file.filename);
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    // Update allowed fields
     if (name) admin.name = name;
     if (bio !== undefined) admin.bio = bio;
     if (designation !== undefined) admin.designation = designation;
@@ -352,41 +287,38 @@ router.put('/api/profile', authenticateToken, upload.single('profileImage'), asy
       admin.socialLinks = { ...admin.socialLinks, ...parsedLinks };
     }
     
-    // Handle profile image - FIX: Better logic
     if (removeImage === 'true' || removeImage === true) {
-      admin.profileImage = null;
-      console.log('Profile image removed');
+      if (admin.profileImage?.publicId) {
+        await cloudinary.uploader.destroy(admin.profileImage.publicId);
+      }
+      admin.profileImage = undefined;
     } else if (req.file) {
+      if (admin.profileImage?.publicId) {
+        await cloudinary.uploader.destroy(admin.profileImage.publicId);
+      }
       admin.profileImage = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
+        publicId: req.file.filename,
+        url: req.file.path,
+        secureUrl: req.file.path
       };
-      console.log('Profile image uploaded');
     }
     
     await admin.save();
     
-    // Remove password and image buffer from response
     const adminResponse = admin.toObject();
     delete adminResponse.password;
-    if (adminResponse.profileImage && adminResponse.profileImage.data) {
-      adminResponse.profileImage = {
-        contentType: adminResponse.profileImage.contentType,
-        hasImage: true
-      };
-    }
     
     res.json({
       message: 'Profile updated successfully',
       admin: adminResponse
     });
   } catch (error) {
+    if (req.file) await cloudinary.uploader.destroy(req.file.filename);
     console.error('Error updating profile:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Update own password
 router.put('/api/profile/password', authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -405,13 +337,11 @@ router.put('/api/profile/password', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    // Verify current password
     const isValidPassword = await bcrypt.compare(currentPassword, admin.password);
     if (!isValidPassword) {
       return res.status(401).json({ message: 'Current password is incorrect' });
     }
     
-    // Hash and update new password
     admin.password = await bcrypt.hash(newPassword, 10);
     await admin.save();
     
@@ -422,7 +352,6 @@ router.put('/api/profile/password', authenticateToken, async (req, res) => {
   }
 });
 
-// Update profile image only
 router.put('/api/profile/image', authenticateToken, upload.single('profileImage'), async (req, res) => {
   try {
     if (!req.file) {
@@ -432,26 +361,32 @@ router.put('/api/profile/image', authenticateToken, upload.single('profileImage'
     const admin = await Admin.findById(req.user.admin_id);
     
     if (!admin) {
+      await cloudinary.uploader.destroy(req.file.filename);
       return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    if (admin.profileImage?.publicId) {
+      await cloudinary.uploader.destroy(admin.profileImage.publicId);
     }
     
     admin.profileImage = {
-      data: req.file.buffer,
-      contentType: req.file.mimetype
+      publicId: req.file.filename,
+      url: req.file.path,
+      secureUrl: req.file.path
     };
     await admin.save();
     
     res.json({
       message: 'Profile image updated successfully',
-      hasImage: true
+      profileImage: admin.profileImage
     });
   } catch (error) {
+    if (req.file) await cloudinary.uploader.destroy(req.file.filename);
     console.error('Error updating profile image:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Delete profile image
 router.delete('/api/profile/image', authenticateToken, async (req, res) => {
   try {
     const admin = await Admin.findById(req.user.admin_id);
@@ -459,8 +394,12 @@ router.delete('/api/profile/image', authenticateToken, async (req, res) => {
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
+
+    if (admin.profileImage?.publicId) {
+      await cloudinary.uploader.destroy(admin.profileImage.publicId);
+    }
     
-    admin.profileImage = null;
+    admin.profileImage = undefined;
     await admin.save();
     
     res.json({ message: 'Profile image removed successfully' });
@@ -470,7 +409,6 @@ router.delete('/api/profile/image', authenticateToken, async (req, res) => {
   }
 });
 
-// Update social links
 router.put('/api/profile/social-links', authenticateToken, async (req, res) => {
   try {
     const { socialLinks } = req.body;
@@ -498,7 +436,6 @@ router.put('/api/profile/social-links', authenticateToken, async (req, res) => {
   }
 });
 
-// Update expertise
 router.put('/api/profile/expertise', authenticateToken, async (req, res) => {
   try {
     const { expertise } = req.body;
@@ -526,7 +463,6 @@ router.put('/api/profile/expertise', authenticateToken, async (req, res) => {
   }
 });
 
-// Update interests
 router.put('/api/profile/interests', authenticateToken, async (req, res) => {
   try {
     const { interests } = req.body;
@@ -554,11 +490,6 @@ router.put('/api/profile/interests', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================
-// PUBLIC ROUTES - Admin Public Profile
-// ============================================
-
-// Get public profile of a specific admin by ID
 router.get('/api/admins/:id/public', async (req, res) => {
   try {
     const admin = await Admin.findById(req.params.id).select(
@@ -569,20 +500,12 @@ router.get('/api/admins/:id/public', async (req, res) => {
       return res.status(404).json({ message: 'Admin not found' });
     }
     
-    // Only return profile if admin is active
     if (admin.status !== 'active') {
       return res.status(404).json({ message: 'Admin profile not available' });
     }
     
     const adminObj = admin.toObject();
     delete adminObj.status;
-    
-    if (adminObj.profileImage && adminObj.profileImage.data) {
-      adminObj.profileImage = {
-        contentType: adminObj.profileImage.contentType,
-        hasImage: true
-      };
-    }
     
     res.json({ admin: adminObj });
   } catch (error) {
@@ -591,7 +514,6 @@ router.get('/api/admins/:id/public', async (req, res) => {
   }
 });
 
-// Get public profiles of all active admins (for team page, etc.)
 router.get('/api/admins/public/all', async (req, res) => {
   try {
     const { limit = 10, page = 1 } = req.query;
@@ -602,23 +524,12 @@ router.get('/api/admins/public/all', async (req, res) => {
       .limit(limit * 1)
       .skip((page - 1) * limit);
     
-    const adminsResponse = admins.map(admin => {
-      const adminObj = admin.toObject();
-      if (adminObj.profileImage && adminObj.profileImage.data) {
-        adminObj.profileImage = {
-          contentType: adminObj.profileImage.contentType,
-          hasImage: true
-        };
-      }
-      return adminObj;
-    });
-    
     const count = await Admin.countDocuments({ status: 'active' });
     
     res.json({
-      admins: adminsResponse,
+      admins,
       totalPages: Math.ceil(count / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       totalAdmins: count
     });
   } catch (error) {
@@ -626,4 +537,5 @@ router.get('/api/admins/public/all', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 module.exports = router;

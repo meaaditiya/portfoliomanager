@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
+const cloudinary = require('../Config/cloudinarystorage');
 const authenticateToken = require('../middlewares/authMiddleware');
-const upload = require('../middlewares/upload');
+const upload = require('../middlewares/cloudinaryUpload');
 const ProfileImage = require('../models/profileImageSchema');
+
 router.post(
   '/api/profile-image/upload',
   authenticateToken,
@@ -14,32 +16,31 @@ router.post(
   ],
   async (req, res) => {
     try {
-      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        if (req.file) await cloudinary.uploader.destroy(req.file.filename);
         return res.status(400).json({ errors: errors.array() });
       }
 
-      
       if (!req.file) {
         return res.status(400).json({ message: 'Profile image file is required' });
       }
 
-      
       const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
       if (!allowedImageTypes.includes(req.file.mimetype)) {
+        await cloudinary.uploader.destroy(req.file.filename);
         return res.status(400).json({ message: 'Invalid file type. Only images are allowed.' });
       }
 
-      
       await ProfileImage.updateMany(
         { isActive: true },
         { isActive: false }
       );
 
-      
       const newProfileImage = new ProfileImage({
-        imageData: req.file.buffer,
+        publicId: req.file.filename,
+        url: req.file.path,
+        secureUrl: req.file.path,
         contentType: req.file.mimetype,
         filename: req.body.filename || req.file.originalname,
         size: req.file.size,
@@ -59,17 +60,18 @@ router.post(
           filename: newProfileImage.filename,
           contentType: newProfileImage.contentType,
           size: newProfileImage.size,
+          url: newProfileImage.secureUrl,
           uploadedAt: newProfileImage.uploadedAt
         }
       });
 
     } catch (error) {
+      if (req.file) await cloudinary.uploader.destroy(req.file.filename);
       console.error('Error uploading profile image:', error);
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   }
 );
-
 
 router.get('/api/profile-image/active', async (req, res) => {
   try {
@@ -79,20 +81,21 @@ router.get('/api/profile-image/active', async (req, res) => {
       return res.status(404).json({ message: 'No active profile image found' });
     }
 
-    res.set({
-      'Content-Type': profileImage.contentType,
-      'Content-Length': profileImage.imageData.length,
-      'Cache-Control': 'public, max-age=3600'
+    res.json({
+      profileImage: {
+        id: profileImage._id,
+        url: profileImage.secureUrl,
+        filename: profileImage.filename,
+        contentType: profileImage.contentType,
+        uploadedAt: profileImage.uploadedAt
+      }
     });
-
-    res.send(profileImage.imageData);
 
   } catch (error) {
     console.error('Error fetching profile image:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
 
 router.get('/api/profile-image/:id', async (req, res) => {
   try {
@@ -104,13 +107,15 @@ router.get('/api/profile-image/:id', async (req, res) => {
       return res.status(404).json({ message: 'Profile image not found' });
     }
 
-    res.set({
-      'Content-Type': profileImage.contentType,
-      'Content-Length': profileImage.imageData.length,
-      'Cache-Control': 'public, max-age=3600'
+    res.json({
+      profileImage: {
+        id: profileImage._id,
+        url: profileImage.secureUrl,
+        filename: profileImage.filename,
+        contentType: profileImage.contentType,
+        uploadedAt: profileImage.uploadedAt
+      }
     });
-
-    res.send(profileImage.imageData);
 
   } catch (error) {
     console.error('Error fetching profile image:', error);
@@ -118,11 +123,9 @@ router.get('/api/profile-image/:id', async (req, res) => {
   }
 });
 
-
 router.get('/api/profile-images', authenticateToken, async (req, res) => {
   try {
     const profileImages = await ProfileImage.find()
-      .select('-imageData') 
       .sort({ uploadedAt: -1 });
 
     res.json({
@@ -136,16 +139,21 @@ router.get('/api/profile-images', authenticateToken, async (req, res) => {
   }
 });
 
-
 router.delete('/api/profile-image/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const profileImage = await ProfileImage.findByIdAndDelete(id);
+    const profileImage = await ProfileImage.findById(id);
     
     if (!profileImage) {
       return res.status(404).json({ message: 'Profile image not found' });
     }
+
+    if (profileImage.publicId) {
+      await cloudinary.uploader.destroy(profileImage.publicId);
+    }
+
+    await ProfileImage.findByIdAndDelete(id);
 
     res.json({
       message: 'Profile image deleted successfully'
@@ -161,13 +169,11 @@ router.patch('/api/profile-image/:id/activate', authenticateToken, async (req, r
   try {
     const { id } = req.params;
 
-    
     await ProfileImage.updateMany(
       { isActive: true },
       { isActive: false }
     );
 
-    
     const profileImage = await ProfileImage.findByIdAndUpdate(
       id,
       { isActive: true },
@@ -185,6 +191,7 @@ router.patch('/api/profile-image/:id/activate', authenticateToken, async (req, r
         filename: profileImage.filename,
         contentType: profileImage.contentType,
         size: profileImage.size,
+        url: profileImage.secureUrl,
         uploadedAt: profileImage.uploadedAt,
         isActive: profileImage.isActive,
       },
@@ -194,4 +201,5 @@ router.patch('/api/profile-image/:id/activate', authenticateToken, async (req, r
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-module.exports= router;
+
+module.exports = router;

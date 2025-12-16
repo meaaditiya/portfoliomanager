@@ -1,7 +1,16 @@
 const mongoose = require('mongoose');
+
 const profileImageSchema = new mongoose.Schema({
-  imageData: {
-    type: Buffer,
+  publicId: {
+    type: String,
+    required: true
+  },
+  url: {
+    type: String,
+    required: true
+  },
+  secureUrl: {
+    type: String,
     required: true
   },
   contentType: {
@@ -36,6 +45,5 @@ const profileImageSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
 
 module.exports = mongoose.model('ProfileImage', profileImageSchema);

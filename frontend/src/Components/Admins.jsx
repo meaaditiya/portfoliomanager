@@ -52,10 +52,9 @@ const SuperAdminPanel = () => {
   const getHeaders = () => ({
     'Authorization': `Bearer ${getToken()}`
   });
-
-  const getImageUrl = (adminId) => {
-    return `${API_URL}/admins/${adminId}/image`;
-  };
+const getImageUrl = (admin) => {
+  return admin.profileImage?.secureUrl || admin.profileImage?.url || null;
+};
 
   useEffect(() => {
     fetchAdmins();
@@ -317,42 +316,42 @@ const SuperAdminPanel = () => {
     }
   };
 
-  const handleEditClick = (admin) => {
-    setEditingAdmin(admin);
-    setFormData({
-      name: admin.name || '',
-      email: admin.email || '',
-      password: '',
-      role: admin.role || 'admin',
-      isSuperAdmin: admin.isSuperAdmin || false,
-      status: admin.status || 'active',
-      bio: admin.bio || '',
-      designation: admin.designation || '',
-      location: admin.location || '',
-      expertise: admin.expertise ? admin.expertise.join(', ') : '',
-      interests: admin.interests ? admin.interests.join(', ') : '',
-      socialLinks: {
-        twitter: admin.socialLinks?.twitter || '',
-        linkedin: admin.socialLinks?.linkedin || '',
-        github: admin.socialLinks?.github || '',
-        portfolio: admin.socialLinks?.portfolio || '',
-        instagram: admin.socialLinks?.instagram || '',
-        personalWebsite: admin.socialLinks?.personalWebsite || '',
-        youtube: admin.socialLinks?.youtube || '',
-        medium: admin.socialLinks?.medium || ''
-      }
-    });
-    
-    if (admin.profileImage?.hasImage) {
-      setImagePreview(getImageUrl(admin._id));
-    } else {
-      setImagePreview(null);
+ const handleEditClick = (admin) => {
+  setEditingAdmin(admin);
+  setFormData({
+    name: admin.name || '',
+    email: admin.email || '',
+    password: '',
+    role: admin.role || 'admin',
+    isSuperAdmin: admin.isSuperAdmin || false,
+    status: admin.status || 'active',
+    bio: admin.bio || '',
+    designation: admin.designation || '',
+    location: admin.location || '',
+    expertise: admin.expertise ? admin.expertise.join(', ') : '',
+    interests: admin.interests ? admin.interests.join(', ') : '',
+    socialLinks: {
+      twitter: admin.socialLinks?.twitter || '',
+      linkedin: admin.socialLinks?.linkedin || '',
+      github: admin.socialLinks?.github || '',
+      portfolio: admin.socialLinks?.portfolio || '',
+      instagram: admin.socialLinks?.instagram || '',
+      personalWebsite: admin.socialLinks?.personalWebsite || '',
+      youtube: admin.socialLinks?.youtube || '',
+      medium: admin.socialLinks?.medium || ''
     }
-    
-    setImageFile(null);
-    setRemoveImage(false);
-    setShowCreateForm(true);
-  };
+  });
+  
+  if (admin.profileImage?.secureUrl || admin.profileImage?.url) {
+    setImagePreview(admin.profileImage.secureUrl || admin.profileImage.url);
+  } else {
+    setImagePreview(null);
+  }
+  
+  setImageFile(null);
+  setRemoveImage(false);
+  setShowCreateForm(true);
+};
 
   const handleToggleStatus = async (admin) => {
     const newStatus = admin.status === 'active' ? 'inactive' : 'active';
@@ -722,30 +721,30 @@ const SuperAdminPanel = () => {
         <div className="admn-admins-grid">
           {admins.map(admin => (
             <div key={admin._id} className="admn-admin-card">
-              <div className="admn-admin-header">
-                {admin.profileImage?.hasImage ? (
-                  <img 
-                    src={getImageUrl(admin._id)} 
-                    alt={admin.name} 
-                    className="admn-admin-avatar"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <div 
-                  className="admn-admin-avatar-placeholder"
-                  style={{ display: admin.profileImage?.hasImage ? 'none' : 'flex' }}
-                >
-                  {admin.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="admn-admin-info">
-                  <h3>{admin.name}</h3>
-                  <p className="admn-admin-email">{admin.email}</p>
-                  {admin.designation && <p className="admn-admin-designation">{admin.designation}</p>}
-                </div>
-              </div>
+             <div className="admn-admin-header">
+  {admin.profileImage?.secureUrl || admin.profileImage?.url ? (
+    <img 
+      src={admin.profileImage.secureUrl || admin.profileImage.url}
+      alt={admin.name} 
+      className="admn-admin-avatar"
+      onError={(e) => {
+        e.target.style.display = 'none';
+        e.target.nextSibling.style.display = 'flex';
+      }}
+    />
+  ) : null}
+  <div 
+    className="admn-admin-avatar-placeholder"
+    style={{ display: (admin.profileImage?.secureUrl || admin.profileImage?.url) ? 'none' : 'flex' }}
+  >
+    {admin.name.charAt(0).toUpperCase()}
+  </div>
+  <div className="admn-admin-info">
+    <h3>{admin.name}</h3>
+    <p className="admn-admin-email">{admin.email}</p>
+    {admin.designation && <p className="admn-admin-designation">{admin.designation}</p>}
+  </div>
+</div>
 
               <div className="admn-admin-details">
                 {admin.bio && <p className="admn-admin-bio">{admin.bio}</p>}

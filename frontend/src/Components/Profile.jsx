@@ -23,22 +23,24 @@ const AdminDashboard = () => {
     fetchQuote();
   }, []);
 
-  const fetchProfileImage = async () => {
-    try {
-      // Add cache-busting query parameter to prevent stale images
-      const response = await fetch(`${API_BASE}/api/profile-image/active?t=${Date.now()}`);
-      if (response.ok) {
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
-        setProfileImage(imageUrl);
-      } else {
-        setProfileImage(null);
-      }
-    } catch (error) {
-      console.error('Error fetching profile image:', error);
-      setError('Failed to load profile image');
+const fetchProfileImage = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/api/profile-image/active?t=${Date.now()}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setProfileImage(data.profileImage.url);
+    } else {
+      setProfileImage(null);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching profile image:', error);
+    setError('Failed to load profile image');
+  }
+};
 
   const fetchAllProfileImages = async () => {
     try {
@@ -329,40 +331,40 @@ const AdminDashboard = () => {
         <div className="profile-images-history">
           <h3>Uploaded Images</h3>
           {profileImages.length > 0 ? (
-            <div className="profile-images-grid">
-              {profileImages.map((img) => (
-                <div key={img._id} className="profile-image-item">
-                  <img
-                    src={`${API_BASE}/api/profile-image/${img._id}?t=${Date.now()}`}
-                    alt={img.filename}
-                    className="profile-image-thumbnail"
-                  />
-                  <div className="image-meta">
-                    <p>{img.filename}</p>
-                    <p>Size: {(img.size / 1024).toFixed(2)} KB</p>
-                    <p>Uploaded: {new Date(img.uploadedAt).toLocaleDateString()}</p>
-                    <p>Status: {img.isActive ? 'Active' : 'Inactive'}</p>
-                  </div>
-                  <div className="image-actions">
-                    {!img.isActive && (
-                      <button
-                        onClick={() => handleSetActiveProfileImage(img._id)}
-                        className="set-active-button"
-                      >
-                        Set as Active
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteProfileImage(img._id)}
-                      className="delete-button12"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="profile-images-grid">
+  {profileImages.map((img) => (
+    <div key={img._id} className="profile-image-item">
+      <img
+        src={img.secureUrl || img.url}
+        alt={img.filename}
+        className="profile-image-thumbnail"
+      />
+      <div className="image-meta">
+        <p>{img.filename}</p>
+        <p>Size: {(img.size / 1024).toFixed(2)} KB</p>
+        <p>Uploaded: {new Date(img.uploadedAt).toLocaleDateString()}</p>
+        <p>Status: {img.isActive ? 'Active' : 'Inactive'}</p>
+      </div>
+      <div className="image-actions">
+        {!img.isActive && (
+          <button
+            onClick={() => handleSetActiveProfileImage(img._id)}
+            className="set-active-button"
+          >
+            Set as Active
+          </button>
+        )}
+        <button
+          onClick={() => handleDeleteProfileImage(img._id)}
+          className="delete-button12"
+        >
+          <Trash2 size={16} />
+          Delete
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
           ) : (
             <p>No images uploaded yet.</p>
           )}
