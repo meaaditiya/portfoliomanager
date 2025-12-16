@@ -1,7 +1,8 @@
+
+
 const mongoose = require('mongoose');
 const marked = require('marked');
 const DOMPurify = require('isomorphic-dompurify');
-
 
 marked.setOptions({
   breaks: true,
@@ -52,7 +53,6 @@ const announcementSchema = new mongoose.Schema({
     imageId: {
       type: String,
       required: true,
-      
     }
   }],
   
@@ -94,7 +94,6 @@ const announcementSchema = new mongoose.Schema({
     embedId: {
       type: String,
       required: true,
-      
     }
   }],
   
@@ -115,13 +114,13 @@ const announcementSchema = new mongoose.Schema({
   },
   
   image: {
-    data: Buffer,
-    contentType: String,
+    url: String,
+    publicId: String,
     filename: String
   },
   document: {
-    data: Buffer,
-    contentType: String,
+    url: String,
+    publicId: String,
     filename: String
   },
   isActive: {
@@ -155,10 +154,8 @@ const announcementSchema = new mongoose.Schema({
   }
 });
 
-
 announcementSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
-  
   
   if (this.isModified('captionImages')) {
     this.captionImages.forEach(image => {
@@ -168,7 +165,6 @@ announcementSchema.pre('save', function(next) {
     });
   }
   
-  
   if (this.isModified('captionVideos')) {
     this.captionVideos.forEach(video => {
       if (!video.embedId) {
@@ -177,7 +173,6 @@ announcementSchema.pre('save', function(next) {
     });
   }
   
-  
   if (this.expiresAt && this.expiresAt < new Date()) {
     this.isExpired = true;
     this.isActive = false;
@@ -185,7 +180,6 @@ announcementSchema.pre('save', function(next) {
   
   next();
 });
-
 
 announcementSchema.methods.getRenderedCaption = function() {
   if (this.captionFormat === 'markdown' && this.caption) {
@@ -223,7 +217,6 @@ announcementSchema.methods.getRenderedCaption = function() {
   return this.caption;
 };
 
-
 announcementSchema.methods.checkExpiry = function() {
   if (this.expiresAt && this.expiresAt < new Date() && !this.isExpired) {
     this.isExpired = true;
@@ -232,7 +225,6 @@ announcementSchema.methods.checkExpiry = function() {
   }
   return false;
 };
-
 
 announcementSchema.statics.expireOldAnnouncements = async function() {
   const now = new Date();
