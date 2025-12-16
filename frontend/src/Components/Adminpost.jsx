@@ -86,55 +86,56 @@ const [thumbnailPreview, setThumbnailPreview] = useState(null);
     }
   };
 
-  // Fetch a single post with comments
-  const fetchPost = async (id) => {
-    try {
-      setIsLoadingComments(true);
-      
-      const response = await fetch(`${API_BASE_URL}/api/admin/image-posts/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch post');
+ const fetchPost = async (id) => {
+  try {
+    setIsLoadingComments(true);
+    
+    const response = await fetch(`${API_BASE_URL}/api/admin/image-posts/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
+    });
 
-      const data = await response.json();
-      setSelectedPost(data.post);
-      
-      // Fetch comments with replies
-      await fetchCommentsWithReplies(id);
-      
-      // Fetch comment stats
-      await fetchCommentStats(id);
-    // Set form data for editing
-setFormData({
-  caption: data.post.caption,
-  hideReactionCount: data.post.hideReactionCount,
-  mediaType: data.post.mediaType,
-  image: null,
-  video: null,
-  thumbnail: null,
-  videoDuration: data.post.videoDuration
-});
-
-if (data.post.mediaType === 'image') {
-  setImagePreview(data.post.media);
-} else if (data.post.mediaType === 'video') {
-  setVideoPreview(data.post.media);
-  setThumbnailPreview(data.post.thumbnail);
-}
-   
-      setFormMode('edit');
-    } catch (error) {
-      showAlert(error.message, 'error');
-    } finally {
-      setIsLoadingComments(false);
+    if (!response.ok) {
+      throw new Error('Failed to fetch post');
     }
-  };
 
+    const data = await response.json();
+    setSelectedPost(data.post);
+    
+    await fetchCommentsWithReplies(id);
+    await fetchCommentStats(id);
+
+    // Set form data for editing
+    setFormData({
+      caption: data.post.caption,
+      hideReactionCount: data.post.hideReactionCount,
+      mediaType: data.post.mediaType,
+      image: null,
+      video: null,
+      thumbnail: null,
+      videoDuration: data.post.video?.duration || data.post.videoDuration
+    });
+
+    // ✅ UPDATED: Handle Cloudinary URLs for previews
+    if (data.post.mediaType === 'image' && data.post.image?.url) {
+      setImagePreview(data.post.image.url);
+    } else if (data.post.mediaType === 'video') {
+      if (data.post.video?.url) {
+        setVideoPreview(data.post.video.url);
+      }
+      if (data.post.video?.thumbnail?.url) {
+        setThumbnailPreview(data.post.video.thumbnail.url);
+      }
+    }
+   
+    setFormMode('edit');
+  } catch (error) {
+    showAlert(error.message, 'error');
+  } finally {
+    setIsLoadingComments(false);
+  }
+};
   // Fetch comments with their replies
   const fetchCommentsWithReplies = async (postId) => {
     try {
@@ -225,56 +226,59 @@ if (data.post.mediaType === 'image') {
     }
   };
 
-  // Create a new post
-  const createPost = async (e) => {
-    e.preventDefault();
-    
-    try {
+const createPost = async (e) => {
+  e.preventDefault();
+  
+  try {
     const formPayload = new FormData();
-formPayload.append('caption', formData.caption);
-formPayload.append('hideReactionCount', formData.hideReactionCount);
-formPayload.append('mediaType', formData.mediaType);
+    formPayload.append('caption', formData.caption);
+    formPayload.append('hideReactionCount', formData.hideReactionCount);
+    formPayload.append('mediaType', formData.mediaType);
 
-if (formData.mediaType === 'image') {
-  if (formData.image) {
-    formPayload.append('image', formData.image);
-  } else {
-    showAlert('Please select an image', 'error');
-    return;
-  }
-} else if (formData.mediaType === 'video') {
-  if (formData.video) {
-    formPayload.append('video', formData.video);
-    if (formData.videoDuration) {
-      formPayload.append('videoDuration', formData.videoDuration);
-    }
-    if (formData.thumbnail) {
-      formPayload.append('thumbnail', formData.thumbnail);
-    }
-  } else {
-    showAlert('Please select a video', 'error');
-    return;
-  }
-}
-      const response = await fetch(`${API_BASE_URL}/api/admin/image-posts`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formPayload
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create post');
+    if (formData.mediaType === 'image') {
+      if (formData.image) {
+        formPayload.append('image', formData.image);
+      } else {
+        showAlert('Please select an image', 'error');
+        return;
       }
-
-      resetForm();
-      fetchPosts();
-      showAlert('Post created successfully', 'success');
-    } catch (error) {
-      showAlert(error.message, 'error');
+    } else if (formData.mediaType === 'video') {
+      if (formData.video) {
+        formPayload.append('video', formData.video);
+        if (formData.videoDuration) {
+          formPayload.append('videoDuration', formData.videoDuration);
+        }
+        if (formData.thumbnail) {
+          formPayload.append('thumbnail', formData.thumbnail);
+        }
+      } else {
+        showAlert('Please select a video', 'error');
+        return;
+      }
     }
-  };
+    
+    const response = await fetch(`${API_BASE_URL}/api/admin/image-posts`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formPayload
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create post');
+    }
+
+    const data = await response.json();
+    console.log('Post created:', data.post); // ✅ NEW: Log the response
+    
+    resetForm();
+    fetchPosts();
+    showAlert('Post created successfully', 'success');
+  } catch (error) {
+    showAlert(error.message, 'error');
+  }
+};
 
   // Update a post
   const updatePost = async (e) => {
@@ -1056,24 +1060,28 @@ setThumbnailPreview(null);
               <p>{selectedPost.caption}</p>
             </div>
             
-          <div className="detail-group">
+    <div className="detail-group">
   <h3 className="text-small bold">Media:</h3>
   <p className="media-type-badge">{selectedPost.mediaType.toUpperCase()}</p>
-  {selectedPost.mediaType === 'image' && selectedPost.image && (
-    <img src={selectedPost.image} alt="Post" className="image" />
+  
+  {/* ✅ UPDATED: Display image from Cloudinary */}
+  {selectedPost.mediaType === 'image' && selectedPost.image?.url && (
+    <img src={selectedPost.image.url} alt="Post" className="image" />
   )}
+  
+  {/* ✅ UPDATED: Display video from Cloudinary */}
   {selectedPost.mediaType === 'video' && (
     <>
-      {selectedPost.thumbnail && (
+      {selectedPost.video?.thumbnail?.url && (
         <div className="video-thumbnail-container">
-          <img src={selectedPost.thumbnail} alt="Thumbnail" className="video-thumbnail" />
+          <img src={selectedPost.video.thumbnail.url} alt="Thumbnail" className="video-thumbnail" />
         </div>
       )}
-      {videoPreview && (
-        <video src={videoPreview} controls className="video" />
+      {selectedPost.video?.url && (
+        <video src={selectedPost.video.url} controls className="video" />
       )}
-      {selectedPost.videoDuration && (
-        <p className="video-info">Duration: {Math.round(selectedPost.videoDuration)}s</p>
+      {selectedPost.video?.duration && (
+        <p className="video-info">Duration: {Math.round(selectedPost.video.duration)}s</p>
       )}
     </>
   )}

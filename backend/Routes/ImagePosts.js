@@ -6,12 +6,22 @@ const ImageReaction = require('../models/imageReactionSchema');
 const authenticateToken = require("../middlewares/authMiddleware");
 const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const upload = require("../middlewares/upload");
+const cloudinaryUpload = require("../middlewares/cloudinaryUpload");
 const extractDeviceId = require("../middlewares/extractDeviceId");
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const apicache = require("apicache");
 const User = require("../models/userSchema");
-
+const cloudinary = require("../Config/cloudinarystorage");
+const deleteCloudinaryAsset = async (publicId, resourceType = 'image') => {
+  try {
+    if (publicId) {
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    }
+  } catch (error) {
+    console.error('Error deleting from Cloudinary:', error);
+  }
+};
 const clearPostCaches = (postId = null) => {
   
   apicache.clear();
@@ -40,51 +50,9 @@ const cacheMiddleware = (req, res, next) => {
 };
 
 
-router.get('/api/image-posts/:id/media', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const post = await ImagePost.findById(id).select('image video mediaType');
-    
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-    
-    if (post.mediaType === 'image' && post.image?.data) {
-      res.set('Content-Type', post.image.contentType);
-      res.set('Cache-Control', 'public, max-age=31536000'); 
-      return res.send(post.image.data);
-    } else if (post.mediaType === 'video' && post.video?.data) {
-      res.set('Content-Type', post.video.contentType);
-      res.set('Cache-Control', 'public, max-age=31536000');
-      return res.send(post.video.data);
-    }
-    
-    res.status(404).json({ message: 'Media not found' });
-  } catch (error) {
-    console.error('Error serving media:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-router.get('/api/image-posts/:id/thumbnail', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const post = await ImagePost.findById(id).select('video.thumbnail');
-    
-    if (!post || !post.video?.thumbnail?.data) {
-      return res.status(404).json({ message: 'Thumbnail not found' });
-    }
-    
-    res.set('Content-Type', post.video.thumbnail.contentType);
-    res.set('Cache-Control', 'public, max-age=31536000');
-    res.send(post.video.thumbnail.data);
-  } catch (error) {
-    console.error('Error serving thumbnail:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-router.post('/api/admin/image-posts', authenticateToken, upload.fields([
+
+
+router.post('/api/admin/image-posts', authenticateToken, cloudinaryUpload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 }
@@ -113,21 +81,24 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
     
     if (mediaType === 'image' && req.files.image) {
       postData.image = {
-        data: req.files.image[0].buffer,
+        url: req.files.image[0].path,
+        publicId: req.files.image[0].filename,
         contentType: req.files.image[0].mimetype
       };
     }
     
     if (mediaType === 'video' && req.files.video) {
       postData.video = {
-        data: req.files.video[0].buffer,
+        url: req.files.video[0].path,
+        publicId: req.files.video[0].filename,
         contentType: req.files.video[0].mimetype,
         duration: videoDuration ? parseFloat(videoDuration) : null
       };
       
       if (req.files.thumbnail) {
         postData.video.thumbnail = {
-          data: req.files.thumbnail[0].buffer,
+          url: req.files.thumbnail[0].path,
+          publicId: req.files.thumbnail[0].filename,
           contentType: req.files.thumbnail[0].mimetype
         };
       }
@@ -144,18 +115,24 @@ router.post('/api/admin/image-posts', authenticateToken, upload.fields([
         id: newImagePost._id,
         caption: newImagePost.caption,
         mediaType: newImagePost.mediaType,
+        mediaUrl: mediaType === 'image' ? newImagePost.image?.url : newImagePost.video?.url,
+        thumbnailUrl: newImagePost.video?.thumbnail?.url,
         hideReactionCount: newImagePost.hideReactionCount,
         createdAt: newImagePost.createdAt
       }
     });
   } catch (error) {
     console.error('Error creating post:', error);
+    
+    if (req.files?.image?.[0]) await deleteCloudinaryAsset(req.files.image[0].filename);
+    if (req.files?.video?.[0]) await deleteCloudinaryAsset(req.files.video[0].filename, 'video');
+    if (req.files?.thumbnail?.[0]) await deleteCloudinaryAsset(req.files.thumbnail[0].filename);
+    
     res.status(500).json({ message: error.message });
   }
 });
 
-
-router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
+router.put('/api/admin/image-posts/:id', authenticateToken, cloudinaryUpload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 }
@@ -183,23 +160,46 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     }
     
     if (req.files?.image && post.mediaType === 'image') {
+      if (post.image?.publicId) {
+        await deleteCloudinaryAsset(post.image.publicId);
+      }
+      if (post.video?.publicId) {
+        await deleteCloudinaryAsset(post.video.publicId, 'video');
+      }
+      if (post.video?.thumbnail?.publicId) {
+        await deleteCloudinaryAsset(post.video.thumbnail.publicId);
+      }
+      
       post.image = {
-        data: req.files.image[0].buffer,
+        url: req.files.image[0].path,
+        publicId: req.files.image[0].filename,
         contentType: req.files.image[0].mimetype
       };
       post.video = undefined;
     }
     
     if (req.files?.video && post.mediaType === 'video') {
+      if (post.video?.publicId) {
+        await deleteCloudinaryAsset(post.video.publicId, 'video');
+      }
+      if (post.video?.thumbnail?.publicId) {
+        await deleteCloudinaryAsset(post.video.thumbnail.publicId);
+      }
+      if (post.image?.publicId) {
+        await deleteCloudinaryAsset(post.image.publicId);
+      }
+      
       post.video = {
-        data: req.files.video[0].buffer,
+        url: req.files.video[0].path,
+        publicId: req.files.video[0].filename,
         contentType: req.files.video[0].mimetype,
         duration: videoDuration ? parseFloat(videoDuration) : post.video?.duration
       };
       
       if (req.files.thumbnail) {
         post.video.thumbnail = {
-          data: req.files.thumbnail[0].buffer,
+          url: req.files.thumbnail[0].path,
+          publicId: req.files.thumbnail[0].filename,
           contentType: req.files.thumbnail[0].mimetype
         };
       }
@@ -208,9 +208,14 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     }
     
     if (req.files?.thumbnail && post.mediaType === 'video' && !req.files.video) {
+      if (post.video?.thumbnail?.publicId) {
+        await deleteCloudinaryAsset(post.video.thumbnail.publicId);
+      }
+      
       if (!post.video) post.video = {};
       post.video.thumbnail = {
-        data: req.files.thumbnail[0].buffer,
+        url: req.files.thumbnail[0].path,
+        publicId: req.files.thumbnail[0].filename,
         contentType: req.files.thumbnail[0].mimetype
       };
     }
@@ -226,6 +231,8 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
         id: post._id,
         caption: post.caption,
         mediaType: post.mediaType,
+        mediaUrl: post.mediaType === 'image' ? post.image?.url : post.video?.url,
+        thumbnailUrl: post.video?.thumbnail?.url,
         hideReactionCount: post.hideReactionCount,
         updatedAt: post.updatedAt
       }
@@ -235,8 +242,6 @@ router.put('/api/admin/image-posts/:id', authenticateToken, upload.fields([
     res.status(500).json({ message: error.message });
   }
 });
-
-
 router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -248,6 +253,16 @@ router.delete('/api/admin/image-posts/:id', authenticateToken, async (req, res) 
     
     if (post.author.toString() !== req.user.admin_id) {
       return res.status(403).json({ message: 'Not authorized to delete this post' });
+    }
+    
+    if (post.image?.publicId) {
+      await deleteCloudinaryAsset(post.image.publicId);
+    }
+    if (post.video?.publicId) {
+      await deleteCloudinaryAsset(post.video.publicId, 'video');
+    }
+    if (post.video?.thumbnail?.publicId) {
+      await deleteCloudinaryAsset(post.video.thumbnail.publicId);
     }
     
     await ImageReaction.deleteMany({ post: id });
@@ -279,7 +294,6 @@ router.get('/api/admin/image-posts', authenticateToken, async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('-image.data -video.data -video.thumbnail.data')
       .populate('author', 'name email');
     
     const total = await ImagePost.countDocuments(filter);
@@ -310,23 +324,15 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    
-    const mediaUrl = `/api/image-posts/${id}/media`;
-    const thumbnailUrl = post.mediaType === 'video' && post.video?.thumbnail?.data 
-      ? `/api/image-posts/${id}/thumbnail` 
-      : null;
-    
     const reactions = await ImageReaction.find({ post: id }).countDocuments();
     const comments = await ImageComment.find({ post: id }).sort({ createdAt: -1 });
     
     res.json({
       post: {
         ...post._doc,
-        media: mediaUrl,  
-        thumbnail: thumbnailUrl,  
-        videoDuration: post.video?.duration,
-        image: undefined,
-        video: undefined
+        mediaUrl: post.mediaType === 'image' ? post.image?.url : post.video?.url,
+        thumbnailUrl: post.video?.thumbnail?.url,
+        videoDuration: post.video?.duration
       },
       reactions,
       comments
@@ -336,8 +342,6 @@ router.get('/api/admin/image-posts/:id', authenticateToken, async (req, res) => 
     res.status(500).json({ message: error.message });
   }
 });
-
-
 
 
 router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
@@ -354,14 +358,11 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
     
     const total = await ImagePost.countDocuments(filter);
     
-    
     if (limitNum > 3 && req.headers['accept'] !== 'application/json-stream') {
-      
       const posts = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('-image.data -video.data -video.thumbnail.data')
         .lean();
       
       return res.json({
@@ -378,18 +379,14 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
       });
     }
     
-    
     if (limitNum > 3) {
       res.setHeader('Content-Type', 'application/json');
-      
       
       const firstBatch = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(3)
-        .select('-image.data -video.data -video.thumbnail.data')
         .lean();
-      
       
       res.write(JSON.stringify({
         streaming: true,
@@ -406,14 +403,12 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
         }
       }));
       
-      
       setTimeout(async () => {
         try {
           const remainingPosts = await ImagePost.find(filter)
             .sort({ createdAt: -1 })
             .skip(skip + 3)
             .limit(limitNum - 3)
-            .select('-image.data -video.data -video.thumbnail.data')
             .lean();
           
           res.write('\n' + JSON.stringify({
@@ -432,12 +427,10 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
         }
       }, 150);
     } else {
-      
       const posts = await ImagePost.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('-image.data -video.data -video.thumbnail.data')
         .lean();
       
       res.json({
@@ -462,7 +455,6 @@ router.get('/api/image-posts', cacheMiddleware, async (req, res) => {
   }
 });
 
-
 router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -478,12 +470,6 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
     
-    
-    const mediaUrl = `/api/image-posts/${id}/media`;
-    const thumbnailUrl = post.mediaType === 'video' && post.video?.thumbnail?.data 
-      ? `/api/image-posts/${id}/thumbnail` 
-      : null;
-    
     const comments = await ImageComment.find({ 
       post: id,
       status: 'active',
@@ -493,36 +479,38 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
     .sort({ isAuthorComment: -1, createdAt: -1 })
     .select('-user.deviceId')
     .lean();
+    
     for (let comment of comments) {
-  if (comment.user?.userId) {
-    try {
-      const userData = await User.findById(comment.user.userId)
-        .select('name email profilePicture googleId')
-        .lean();
-      
-      if (userData) {
-        comment.user.profilePicture = userData.profilePicture;
-        comment.user.googleId = userData.googleId;
+      if (comment.user?.userId) {
+        try {
+          const userData = await User.findById(comment.user.userId)
+            .select('name email profilePicture googleId')
+            .lean();
+          
+          if (userData) {
+            comment.user.profilePicture = userData.profilePicture;
+            comment.user.googleId = userData.googleId;
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err);
+        }
       }
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
+      
+      if (comment.isAuthorComment && comment.authorAdminId) {
+        comment.authorHasProfileImage = !!(
+          comment.authorAdminId.profileImage && 
+          comment.authorAdminId.profileImage.data
+        );
+      }
     }
-  }
-  
-  if (comment.isAuthorComment && comment.authorAdminId) {
-    comment.authorHasProfileImage = !!(
-      comment.authorAdminId.profileImage && 
-      comment.authorAdminId.profileImage.data
-    );
-  }
-}
+    
     res.json({
       post: {
         id: post._id,
         caption: post.caption,
         mediaType: post.mediaType,
-        media: mediaUrl,  
-        thumbnail: thumbnailUrl,  
+        mediaUrl: post.mediaType === 'image' ? post.image?.url : post.video?.url,
+        thumbnailUrl: post.video?.thumbnail?.url,
         videoDuration: post.video?.duration,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -537,7 +525,6 @@ router.get('/api/image-posts/:id', cacheMiddleware, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 
 
 router.get('/api/image-posts/:id/comments', async (req, res) => {
@@ -1339,7 +1326,7 @@ router.get('/api/admin/image-posts/:id/comments/stats',
       const { id } = req.params;
       
       const stats = await ImageComment.aggregate([
-        { $match: { post: mongoose.Types.ObjectId(id) } },
+        { $match: { post: new mongoose.Types.ObjectId(id) } }, // ✅ FIXED: Added 'new'
         {
           $group: {
             _id: null,

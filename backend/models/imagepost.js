@@ -13,15 +13,18 @@ const imagePostSchema = new mongoose.Schema({
     default: 'image'
   },
   image: {
-    data: Buffer,
+    url: String,
+    publicId: String,
     contentType: String
   },
   video: {
-    data: Buffer,
+    url: String,
+    publicId: String,
     contentType: String,
-    duration: Number, 
+    duration: Number,
     thumbnail: {
-      data: Buffer,
+      url: String,
+      publicId: String,
       contentType: String
     }
   },
