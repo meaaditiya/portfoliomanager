@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import Header from './Components/Header'; // Keep the original import name
+import Header from './Components/Header'; 
 import Home from './Components/Home';
 import Login from './Components/Login';
 import BlogEditor from './Components/BlogEditor';
@@ -23,41 +23,42 @@ import BlogSubmissions from './Components/BlogSubmissions';
 import Document from './Components/Document';
 import FeaturedProjects from './Components/FeaturedProjects';
 import ManageUsers from './Components/manageUsers';
+import PrivacyPolicy from './Components/PolicyAdmin';
 function AppContent() {
-  const [activeSection, setActiveSection] = useState('/adminpost'); // Initialize with default path
+  const [activeSection, setActiveSection] = useState('/adminpost'); 
   const [redirectMessage, setRedirectMessage] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Update activeSection when location changes
+  
   useEffect(() => {
     setActiveSection(location.pathname);
   }, [location.pathname]);
 
-  // Check token and redirect if necessary
+  
   useEffect(() => {
     const publicRoutes = ['/', '/login'];
     const token = localStorage.getItem('token');
     if (!token && !publicRoutes.includes(location.pathname)) {
-      // Show redirect message briefly
+      
       setRedirectMessage('Please log in to access this page.');
       setTimeout(() => {
-        navigate('/'); // Redirect to home
+        navigate('/'); 
         setTimeout(() => {
-          navigate('/login'); // Then to login
+          navigate('/login'); 
           setRedirectMessage(null);
-        }, 500); // Brief pause on home for smooth UX
-      }, 1000); // Show message for 1 second
+        }, 500); 
+      }, 1000); 
     }
   }, [location.pathname, navigate]);
 
   const handleLogout = () => {
-    // Implement logout logic here, e.g., clear auth tokens and redirect to login
+    
     console.log('Logout triggered');
-    window.location.href = '/login'; // Simple redirect for now
+    window.location.href = '/login'; 
   };
 
-  // Define routes where header should be hidden
+  
   const hideHeaderRoutes = ['/', '/login'];
   const shouldShowHeader = !hideHeaderRoutes.includes(location.pathname);
 
@@ -95,6 +96,7 @@ function AppContent() {
           <Route path="/document" element={<Document/>}/>
           <Route path="/featured-projects" element={<FeaturedProjects/>}/>
           <Route path="/manage-users" element={<ManageUsers/>}/>
+          <Route path="/policy" element={<PrivacyPolicy/>}/>
         </Routes>
       </main>
     </div>
