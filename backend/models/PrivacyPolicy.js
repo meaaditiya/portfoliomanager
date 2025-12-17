@@ -12,7 +12,6 @@ const policyTabSchema = new mongoose.Schema({
   tabId: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   tabName: {
