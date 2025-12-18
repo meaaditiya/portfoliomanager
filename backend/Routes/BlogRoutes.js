@@ -347,7 +347,6 @@ router.get(
         ? { _id: identifier }
         : { slug: identifier };
       
-      
       const isAuthenticated = req.user?.isAuthenticated;
       
       console.log('Auth check:', {
@@ -371,10 +370,11 @@ router.get(
       console.log('Blog found:', {
         id: blog._id,
         isSubscriberOnly: blog.isSubscriberOnly,
+        audioIsSubscriberOnly: blog.audioBlog?.audioAccess?.isSubscriberOnly,
         isAuthenticated
       });
       
-      
+      // Handle blog content subscriber-only check
       if (blog.isSubscriberOnly && !isAuthenticated) {
         console.log('✅ Returning subscriber-only preview (not authenticated)');
         return res.json({
@@ -388,15 +388,26 @@ router.get(
           readTime: blog.readTime,  
           isSubscriberOnly: true,
           preview: true,
-          message: 'This is subscriber-only content. Please login to access full article.'
+          message: 'This is subscriber-only content. Please login to access full article.',
+          // Audio preview if exists
+          audioBlog: blog.audioBlog?.isAudioAvailable ? {
+            isAudioAvailable: true,
+            audioAccess: {
+              isSubscriberOnly: blog.audioBlog.audioAccess.isSubscriberOnly
+            },
+            audioMetadata: {
+              duration: blog.audioBlog.audioMetadata.duration,
+              language: blog.audioBlog.audioMetadata.language,
+              narrator: blog.audioBlog.audioMetadata.narrator
+            }
+          } : undefined
         });
       }
       
-      
-      
-      
+      // Blog is accessible (either public or user is authenticated)
       console.log('✅ Returning full blog content (public or authenticated)');
       
+      // Track reads
       const fingerprint = getFingerprintFromRequest(req);
       
       if (!blog.readFingerprints) {
@@ -432,6 +443,36 @@ router.get(
         blogObj.contentVideos
       );
       
+      // ⚠️ CRITICAL FIX: Filter audio data based on audio subscriber-only setting
+      if (blogObj.audioBlog?.isAudioAvailable) {
+        const audioIsSubscriberOnly = blogObj.audioBlog.audioAccess.isSubscriberOnly;
+        
+        if (audioIsSubscriberOnly && !isAuthenticated) {
+          // User not authenticated - send preview only
+          console.log('🔒 Audio is subscriber-only, returning preview');
+          blogObj.audioBlog = {
+            isAudioAvailable: true,
+            audioAccess: {
+              isSubscriberOnly: true
+            },
+            audioMetadata: {
+              duration: blogObj.audioBlog.audioMetadata.duration,
+              language: blogObj.audioBlog.audioMetadata.language,
+              narrator: blogObj.audioBlog.audioMetadata.narrator
+            },
+            audioStats: {
+              plays: blogObj.audioBlog.audioStats.plays
+            },
+            preview: true,
+            message: 'This audio is subscriber-only. Please login to access.'
+          };
+        } else {
+          // User authenticated or audio is public - send full data
+          console.log('🔓 Returning full audio data');
+          blogObj.audioBlog.preview = false;
+        }
+      }
+      
       delete blogObj.reports;
       delete blogObj.readFingerprints;
       
@@ -442,7 +483,6 @@ router.get(
     }
   }
 );
-
 
 
 
