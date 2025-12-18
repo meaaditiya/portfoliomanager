@@ -96,8 +96,21 @@ const [editImageModal, setEditImageModal] = useState({
   caption: '',
   position: 'center'
 });
+
 const [updatingImage, setUpdatingImage] = useState(false);
   // Fetch blogs from API
+ const [editAudioModal, setEditAudioModal] = useState({
+  isOpen: false,
+  file: null,
+  duration: '',
+  bitrate: '',
+  sampleRate: '',
+  channels: 2,
+  language: 'en',
+  narrator: '',
+  isSubscriberOnly: false,
+  replaceFile: false
+});
   const fetchBlogs = async () => {
     try {
       setLoading(true);
@@ -321,20 +334,154 @@ const handleAddAudio = async () => {
 };
 // 10. ADD REMOVE AUDIO HANDLER (after handleAddAudio)
 
-const handleRemoveAudio = () => {
-  setFormData(prev => ({
-    ...prev,
-    audioBlog: {
-      audioFile: null,
+const handleRemoveAudio = async () => {
+  if (!window.confirm('Are you sure you want to remove this audio? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    // If editing existing blog with audio, call DELETE API
+    if (selectedBlog && formData.audioBlog.audioFile) {
+      setLoading(true);
+      await axios.delete(
+        `https://aadibgmg.onrender.com/api/blogs/${selectedBlog._id}/audio`,
+        { withCredentials: true }
+      );
+      
+      setSuccessMessage('Audio removed successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
+    
+    // Clear audio from form state
+    setFormData(prev => ({
+      ...prev,
+      audioBlog: {
+        audioFile: null,
+        duration: '',
+        bitrate: '',
+        sampleRate: '',
+        channels: 2,
+        language: 'en',
+        narrator: '',
+        isSubscriberOnly: false
+      }
+    }));
+    
+  } catch (err) {
+    console.error('Error removing audio:', err);
+    setError(err.response?.data?.message || 'Failed to remove audio. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+const handleEditAudio = () => {
+  setEditAudioModal({
+    isOpen: true,
+    file: null,
+    duration: formData.audioBlog.duration || '',
+    bitrate: formData.audioBlog.bitrate || '',
+    sampleRate: formData.audioBlog.sampleRate || '',
+    channels: formData.audioBlog.channels || 2,
+    language: formData.audioBlog.language || 'en',
+    narrator: formData.audioBlog.narrator || '',
+    isSubscriberOnly: formData.audioBlog.isSubscriberOnly || false,
+    replaceFile: false
+  });
+};
+
+const handleEditAudioModalChange = (e) => {
+  const { name, value, type, checked, files } = e.target;
+  
+  if (name === 'audioFile') {
+    setEditAudioModal(prev => ({
+      ...prev,
+      file: files[0] || null,
+      replaceFile: true
+    }));
+  } else {
+    setEditAudioModal(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }
+};
+
+const handleUpdateAudio = async () => {
+  try {
+    setUploadingAudio(true);
+    setError(null);
+
+    const formDataAudio = new FormData();
+    
+    // Add file only if user wants to replace it
+    if (editAudioModal.replaceFile && editAudioModal.file) {
+      const allowedFormats = ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/flac'];
+      if (!allowedFormats.includes(editAudioModal.file.type)) {
+        setError('Invalid audio format. Supported: MP3, WAV, WebM, OGG, AAC, FLAC');
+        return;
+      }
+
+      if (editAudioModal.file.size > 100 * 1024 * 1024) {
+        setError('Audio file size cannot exceed 100MB');
+        return;
+      }
+      
+      formDataAudio.append('audio', editAudioModal.file);
+    }
+    
+    formDataAudio.append('duration', editAudioModal.duration);
+    formDataAudio.append('bitrate', editAudioModal.bitrate);
+    formDataAudio.append('sampleRate', editAudioModal.sampleRate);
+    formDataAudio.append('channels', editAudioModal.channels);
+    formDataAudio.append('language', editAudioModal.language);
+    formDataAudio.append('narrator', editAudioModal.narrator);
+    formDataAudio.append('isSubscriberOnly', editAudioModal.isSubscriberOnly);
+
+    const response = await axios.put(
+      `https://aadibgmg.onrender.com/api/blogs/${selectedBlog._id}/audio`,
+      formDataAudio,
+      {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    );
+
+    setFormData(prev => ({
+      ...prev,
+      audioBlog: {
+        audioFile: response.data.audio,
+        duration: response.data.audio.duration,
+        bitrate: response.data.audio.bitrate,
+        sampleRate: response.data.audio.sampleRate,
+        channels: response.data.audio.channels,
+        language: response.data.audio.language,
+        narrator: response.data.audio.narrator,
+        isSubscriberOnly: response.data.audio.isSubscriberOnly
+      }
+    }));
+
+    setSuccessMessage('Audio updated successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+
+    setEditAudioModal({
+      isOpen: false,
+      file: null,
       duration: '',
       bitrate: '',
       sampleRate: '',
       channels: 2,
       language: 'en',
       narrator: '',
-      isSubscriberOnly: false
-    }
-  }));
+      isSubscriberOnly: false,
+      replaceFile: false
+    });
+
+  } catch (err) {
+    console.error('Error updating audio:', err);
+    setError(err.response?.data?.message || 'Failed to update audio. Please try again.');
+  } finally {
+    setUploadingAudio(false);
+  }
 };
   const cleanupContentImages = (content, contentImages) => {
     if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
@@ -595,6 +742,8 @@ const handleRemoveAudio = () => {
   // Modify cancel function
 // 6. UPDATE handleCancel FUNCTION (around line 330)
 
+
+// 7. UPDATE handleEdit FUNCTION (around line 350)
 const handleCancel = () => {
   setViewMode('list');
   setEditMode(false);
@@ -633,11 +782,22 @@ const handleCancel = () => {
     sampleRate: '',
     channels: 2,
     language: 'en',
-    narrator: ''
+    narrator: '',
+    isSubscriberOnly: false
+  });
+  setEditAudioModal({
+    isOpen: false,
+    file: null,
+    duration: '',
+    bitrate: '',
+    sampleRate: '',
+    channels: 2,
+    language: 'en',
+    narrator: '',
+    isSubscriberOnly: false,
+    replaceFile: false
   });
 };
-// 7. UPDATE handleEdit FUNCTION (around line 350)
-
 const handleEdit = async (blog) => {
   setViewMode('edit');
   setEditMode(true);
@@ -709,7 +869,7 @@ const AudioBlogSection = ({ audioBlog }) => {
       <div className="audio-info">
         <div className="audio-details">
           <span className="audio-filename">
-            📻 {audioBlog.audioFile.originalFileName || 'Audio file'}
+            📻 {audioBlog.audioFile.originalFileName || audioBlog.audioFile.name || 'Audio file'}
           </span>
           <div className="audio-metadata">
             {audioBlog.duration && (
@@ -724,16 +884,29 @@ const AudioBlogSection = ({ audioBlog }) => {
             {audioBlog.narrator && (
               <span>Narrator: {audioBlog.narrator}</span>
             )}
+            {audioBlog.isSubscriberOnly && (
+              <span className="subscriber-badge">🔒 Subscriber Only</span>
+            )}
           </div>
         </div>
-        <button
-          type="button"
-          className="img-remv-btn"
-          onClick={() => handleRemoveAudio()}
-          title="Remove audio blog"
-        >
-          Remove
-        </button>
+        <div className="audio-actions">
+          <button
+            type="button"
+            className="btn3 btn-edit1"
+            onClick={() => handleEditAudio()}
+            title="Edit audio metadata"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="btn3 btn-delete1"
+            onClick={() => handleRemoveAudio()}
+            title="Remove audio blog"
+          >
+            Remove
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1754,6 +1927,148 @@ const ContentImagesSection = ({ contentImages, content }) => {
     </div>
   </div>
 )}
+{/* Edit Audio Modal */}
+{editAudioModal.isOpen && (
+  <div className="modal-overlay">
+    <div className="modal-content">
+      <div className="modal-header">
+        <h3>Edit Audio Blog</h3>
+        <button 
+          className="modal-close"
+          onClick={() => setEditAudioModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          ×
+        </button>
+      </div>
+      <div className="modal-body">
+        <div className="form-group">
+          <label>Replace Audio File (Optional)</label>
+          <input
+            type="file"
+            id="editAudioFile"
+            name="audioFile"
+            accept="audio/*"
+            onChange={handleEditAudioModalChange}
+          />
+          {editAudioModal.file && (
+            <div className="file-info">
+              <p>New file: {editAudioModal.file.name}</p>
+              <p>Size: {(editAudioModal.file.size / 1024 / 1024).toFixed(2)} MB</p>
+            </div>
+          )}
+          {!editAudioModal.file && (
+            <p className="helper-text">Leave empty to keep existing audio file</p>
+          )}
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioDuration">Duration (seconds)</label>
+          <input
+            type="number"
+            id="editAudioDuration"
+            name="duration"
+            value={editAudioModal.duration}
+            onChange={handleEditAudioModalChange}
+            placeholder="e.g., 600"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioBitrate">Bitrate</label>
+          <input
+            type="text"
+            id="editAudioBitrate"
+            name="bitrate"
+            value={editAudioModal.bitrate}
+            onChange={handleEditAudioModalChange}
+            placeholder="e.g., 128 kbps"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioSampleRate">Sample Rate (Hz)</label>
+          <input
+            type="number"
+            id="editAudioSampleRate"
+            name="sampleRate"
+            value={editAudioModal.sampleRate}
+            onChange={handleEditAudioModalChange}
+            placeholder="e.g., 44100"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioChannels">Channels</label>
+          <select
+            id="editAudioChannels"
+            name="channels"
+            value={editAudioModal.channels}
+            onChange={handleEditAudioModalChange}
+          >
+            <option value="1">Mono</option>
+            <option value="2">Stereo</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioLanguage">Language</label>
+          <select
+            id="editAudioLanguage"
+            name="language"
+            value={editAudioModal.language}
+            onChange={handleEditAudioModalChange}
+          >
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="hi">Hindi</option>
+            <option value="ja">Japanese</option>
+            <option value="zh">Chinese</option>
+            <option value="ar">Arabic</option>
+            <option value="pt">Portuguese</option>
+            <option value="ru">Russian</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="editAudioNarrator">Narrator</label>
+          <input
+            type="text"
+            id="editAudioNarrator"
+            name="narrator"
+            value={editAudioModal.narrator}
+            onChange={handleEditAudioModalChange}
+            placeholder="e.g., John Doe"
+          />
+        </div>
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              name="isSubscriberOnly"
+              checked={editAudioModal.isSubscriberOnly}
+              onChange={handleEditAudioModalChange}
+            />
+            Audio is Subscriber Only
+          </label>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setEditAudioModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleUpdateAudio}
+          disabled={uploadingAudio}
+        >
+          {uploadingAudio && <span className="spinner"></span>}
+          Update Audio
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {/* Blog editor */}
         {viewMode === 'edit' && (
           <div className="blog-editor-section">
@@ -2151,6 +2466,14 @@ const ContentImagesSection = ({ contentImages, content }) => {
                                 🎥 {blog.contentVideos.length} embedded video{blog.contentVideos.length !== 1 ? 's' : ''}
                               </span>
                             )}
+                            {blog.audioBlog?.isAudioAvailable && (
+  <div className="card-audio-badge">
+    <span>🎙️ Audio Available</span>
+    {blog.audioBlog.audioAccess?.isSubscriberOnly && (
+      <span className="audio-subscriber-badge">🔒</span>
+    )}
+  </div>
+)}
                           </div>
                         )}
                         
