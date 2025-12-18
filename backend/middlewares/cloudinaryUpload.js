@@ -9,7 +9,7 @@ const storage = new CloudinaryStorage({
     const isVideo = file.mimetype.startsWith('video/');
     const isThumbnail = file.fieldname === 'thumbnail';
     const isDocument = file.fieldname === 'document';
-    
+    const isAudio = file.mimetype.startsWith('audio/');
     let folder = 'uploads';
     let resourceType = 'auto';
     let allowedFormats = [];
@@ -28,7 +28,12 @@ const storage = new CloudinaryStorage({
       resourceType = 'raw';
       const ext = path.extname(file.originalname).substring(1).toLowerCase();
       format = ext;
-    } else {
+    } else if(isAudio){
+       folder = 'uploads/audio';
+  resourceType = 'video'; 
+  allowedFormats = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'webm', 'm4a', 'wma', 'aiff'];
+    }
+    else {
       folder = 'uploads/images';
       resourceType = 'image';
       allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'tiff', 'ico', 'heic', 'heif'];
