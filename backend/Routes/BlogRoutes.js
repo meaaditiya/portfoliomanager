@@ -3290,7 +3290,6 @@ router.put('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, as
   }
 });
 
-
 router.get('/api/blogs/:identifier/audio', extractAuthFromToken, async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -3317,10 +3316,29 @@ router.get('/api/blogs/:identifier/audio', extractAuthFromToken, async (req, res
       return res.status(404).json({ message: 'Audio not available for this blog' });
     }
 
+    // Check if audio is subscriber-only and user is not authenticated
     if (blog.audioBlog.audioAccess.isSubscriberOnly && !isAuthenticated) {
-      return res.status(403).json({ message: 'This audio is subscriber-only. Please login to access.' });
+      console.log('✅ Returning audio preview (not authenticated, subscriber-only)');
+      return res.json({
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug,
+        audio: {
+          duration: blog.audioBlog.audioMetadata.duration,
+          language: blog.audioBlog.audioMetadata.language,
+          narrator: blog.audioBlog.audioMetadata.narrator,
+          uploadedAt: blog.audioBlog.audioFile.uploadedAt
+        },
+        isSubscriberOnly: true,
+        preview: true,
+        message: 'This audio is subscriber-only. Please login to access full audio.'
+      });
     }
 
+    // User is authenticated or audio is public - return full audio
+    console.log('✅ Returning full audio content (public or authenticated)');
+    
+    // Track plays only for full audio access
     blog.audioBlog.audioStats.plays += 1;
     
     if (isAuthenticated && req.user.user_id) {
@@ -3360,7 +3378,8 @@ router.get('/api/blogs/:identifier/audio', extractAuthFromToken, async (req, res
         plays: blog.audioBlog.audioStats.plays,
         completionRate: blog.audioBlog.audioStats.completionRate,
         averageListenTime: blog.audioBlog.audioStats.averageListenTime
-      }
+      },
+      preview: false
     });
   } catch (error) {
     console.error('Error fetching audio:', error);
