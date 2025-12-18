@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require('mongoose');
+const crypto = require('crypto');
+const fs = require('fs');
 const authenticateToken = require("../middlewares/authMiddleware");
 const cleanupUnusedImages = require("../utils/cleanupUnusedImages");
 const cleanupUnusedVideos = require("../utils/cleanupUnusedVideos");
@@ -22,12 +24,18 @@ const jwt = require('jsonwebtoken');
 const User = require("../models/userSchema");
 const calculateReadTime = require('../utils/calculateReadTime');
 const BlacklistedToken = require('../models/blacklistedtoken.js');
+const upload = require('../middlewares/cloudinaryUpload');
+
 const { 
   generateQueryEmbedding, 
   cosineSimilarity,
   doextractPlainText,
   generateBlogEmbedding 
 } = require('../services/embeddingService');
+const generateAudioHash = (buffer) => {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+};
+
 router.post('/api/blogs', authenticateToken, async (req, res) => {
   try {
     const { title, content, summary, status, tags, featuredImage, contentImages, contentVideos, isSubscriberOnly } = req.body;
@@ -3152,6 +3160,478 @@ router.post(
   }
 );
 
+router.post('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { duration, bitrate, sampleRate, channels, language, narrator, isSubscriberOnly } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Audio file is required' });
+    }
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+
+    const audioBuffer = req.file.buffer;
+    const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
+
+    const existingAudio = await Blog.findOne({ 'audioBlog.audioHash': audioHash });
+    if (existingAudio && existingAudio._id.toString() !== id) {
+      return res.status(409).json({ message: 'Audio file already exists in another blog' });
+    }
+
+    blog.audioBlog.audioFile.url = req.file.path;
+    blog.audioBlog.audioFile.cloudinaryId = req.file.filename;
+    blog.audioBlog.audioFile.originalFileName = req.file.originalname;
+    blog.audioBlog.audioFile.fileSize = req.file.size;
+    blog.audioBlog.audioFile.mimeType = req.file.mimetype;
+    blog.audioBlog.audioFile.uploadedAt = new Date();
+    blog.audioBlog.audioFile.uploadedBy = req.user.admin_id;
+    blog.audioBlog.audioHash = audioHash;
+    blog.audioBlog.isAudioAvailable = true;
+    blog.audioBlog.audioAccess.isSubscriberOnly = isSubscriberOnly || false;
+
+    if (duration) blog.audioBlog.audioMetadata.duration = parseInt(duration);
+    if (bitrate) blog.audioBlog.audioMetadata.bitrate = bitrate;
+    if (sampleRate) blog.audioBlog.audioMetadata.sampleRate = parseInt(sampleRate);
+    if (channels) blog.audioBlog.audioMetadata.channels = parseInt(channels);
+    if (language) blog.audioBlog.audioMetadata.language = language;
+    if (narrator) blog.audioBlog.audioMetadata.narrator = narrator;
+
+    await blog.save();
+
+    res.status(201).json({
+      message: 'Audio blog uploaded successfully',
+      audio: {
+        url: blog.audioBlog.audioFile.url,
+        duration: blog.audioBlog.audioMetadata.duration,
+        language: blog.audioBlog.audioMetadata.language,
+        uploadedAt: blog.audioBlog.audioFile.uploadedAt
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading audio:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/api/blogs/:id/audio',upload.single('audio'), authenticateToken,  async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { duration, bitrate, sampleRate, channels, language, narrator, isSubscriberOnly } = req.body;
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+
+    if (req.file) {
+      const audioBuffer = req.file.buffer;
+      const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
+
+      const existingAudio = await Blog.findOne({ 
+        'audioBlog.audioHash': audioHash,
+        _id: { $ne: id }
+      });
+
+      if (existingAudio) {
+        return res.status(409).json({ message: 'Audio file already exists in another blog' });
+      }
+
+      blog.audioBlog.audioFile.url = req.file.path;
+      blog.audioBlog.audioFile.cloudinaryId = req.file.filename;
+      blog.audioBlog.audioFile.originalFileName = req.file.originalname;
+      blog.audioBlog.audioFile.fileSize = req.file.size;
+      blog.audioBlog.audioFile.mimeType = req.file.mimetype;
+      blog.audioBlog.audioFile.uploadedAt = new Date();
+      blog.audioBlog.audioHash = audioHash;
+      blog.audioBlog.isAudioAvailable = true;
+    }
+
+    if (duration !== undefined) blog.audioBlog.audioMetadata.duration = parseInt(duration);
+    if (bitrate !== undefined) blog.audioBlog.audioMetadata.bitrate = bitrate;
+    if (sampleRate !== undefined) blog.audioBlog.audioMetadata.sampleRate = parseInt(sampleRate);
+    if (channels !== undefined) blog.audioBlog.audioMetadata.channels = parseInt(channels);
+    if (language !== undefined) blog.audioBlog.audioMetadata.language = language;
+    if (narrator !== undefined) blog.audioBlog.audioMetadata.narrator = narrator;
+    if (isSubscriberOnly !== undefined) blog.audioBlog.audioAccess.isSubscriberOnly = isSubscriberOnly;
+
+    await blog.save();
+
+    res.json({
+      message: 'Audio blog updated successfully',
+      audio: {
+        url: blog.audioBlog.audioFile.url,
+        duration: blog.audioBlog.audioMetadata.duration,
+        language: blog.audioBlog.audioMetadata.language
+      }
+    });
+  } catch (error) {
+    console.error('Error updating audio:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET - Fetch Audio Blog
+router.get('/api/blogs/:identifier/audio', extractAuthFromToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+
+    const isAuthenticated = req.user?.isAuthenticated;
+
+    if (!isAuthenticated) {
+      query.status = 'published';
+    }
+
+    const blog = await Blog.findOne(query)
+      .select('audioBlog title slug isSubscriberOnly');
+
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (!blog.audioBlog.isAudioAvailable) {
+      return res.status(404).json({ message: 'Audio not available for this blog' });
+    }
+
+    if (blog.audioBlog.audioAccess.isSubscriberOnly && !isAuthenticated) {
+      return res.status(403).json({ message: 'This audio is subscriber-only. Please login to access.' });
+    }
+
+    blog.audioBlog.audioStats.plays += 1;
+    
+    if (isAuthenticated && req.user.user_id) {
+      const alreadyAccessed = blog.audioBlog.audioAccess.accessedBy.some(
+        access => access.userId.toString() === req.user.user_id.toString()
+      );
+      
+      if (!alreadyAccessed) {
+        blog.audioBlog.audioAccess.accessedBy.push({
+          userId: req.user.user_id,
+          accessedAt: new Date()
+        });
+      }
+    }
+
+    await blog.save();
+
+    res.json({
+      _id: blog._id,
+      title: blog.title,
+      slug: blog.slug,
+      audio: {
+        url: blog.audioBlog.audioFile.url,
+        duration: blog.audioBlog.audioMetadata.duration,
+        bitrate: blog.audioBlog.audioMetadata.bitrate,
+        sampleRate: blog.audioBlog.audioMetadata.sampleRate,
+        channels: blog.audioBlog.audioMetadata.channels,
+        language: blog.audioBlog.audioMetadata.language,
+        narrator: blog.audioBlog.audioMetadata.narrator,
+        uploadedAt: blog.audioBlog.audioFile.uploadedAt
+      },
+      transcript: blog.audioBlog.audioTranscript.hasTranscript ? {
+        exists: true,
+        generatedBy: blog.audioBlog.audioTranscript.generatedBy
+      } : { exists: false },
+      stats: {
+        plays: blog.audioBlog.audioStats.plays,
+        completionRate: blog.audioBlog.audioStats.completionRate,
+        averageListenTime: blog.audioBlog.audioStats.averageListenTime
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching audio:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put('/api/blogs/:id/audio', authenticateToken, upload.single('audio'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { duration, bitrate, sampleRate, channels, language, narrator, isSubscriberOnly } = req.body;
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+
+    if (req.file) {
+      const audioBuffer = req.file.buffer;
+      const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
+
+      const existingAudio = await Blog.findOne({ 
+        'audioBlog.audioHash': audioHash,
+        _id: { $ne: id }
+      });
+
+      if (existingAudio) {
+        return res.status(409).json({ message: 'Audio file already exists in another blog' });
+      }
+
+      blog.audioBlog.audioFile.url = req.file.path;
+      blog.audioBlog.audioFile.cloudinaryId = req.file.filename;
+      blog.audioBlog.audioFile.originalFileName = req.file.originalname;
+      blog.audioBlog.audioFile.fileSize = req.file.size;
+      blog.audioBlog.audioFile.mimeType = req.file.mimetype;
+      blog.audioBlog.audioFile.uploadedAt = new Date();
+      blog.audioBlog.audioFile.uploadedBy = req.user.admin_id;
+      blog.audioBlog.audioHash = audioHash;
+      blog.audioBlog.isAudioAvailable = true;
+    }
+
+    if (duration !== undefined) blog.audioBlog.audioMetadata.duration = parseInt(duration);
+    if (bitrate !== undefined) blog.audioBlog.audioMetadata.bitrate = bitrate;
+    if (sampleRate !== undefined) blog.audioBlog.audioMetadata.sampleRate = parseInt(sampleRate);
+    if (channels !== undefined) blog.audioBlog.audioMetadata.channels = parseInt(channels);
+    if (language !== undefined) blog.audioBlog.audioMetadata.language = language;
+    if (narrator !== undefined) blog.audioBlog.audioMetadata.narrator = narrator;
+    if (isSubscriberOnly !== undefined) blog.audioBlog.audioAccess.isSubscriberOnly = isSubscriberOnly;
+
+    await blog.save();
+
+    res.json({
+      message: 'Audio blog updated successfully',
+      audio: {
+        url: blog.audioBlog.audioFile.url,
+        cloudinaryId: blog.audioBlog.audioFile.cloudinaryId,
+        duration: blog.audioBlog.audioMetadata.duration,
+        bitrate: blog.audioBlog.audioMetadata.bitrate,
+        sampleRate: blog.audioBlog.audioMetadata.sampleRate,
+        channels: blog.audioBlog.audioMetadata.channels,
+        language: blog.audioBlog.audioMetadata.language,
+        narrator: blog.audioBlog.audioMetadata.narrator,
+        uploadedAt: blog.audioBlog.audioFile.uploadedAt,
+        isSubscriberOnly: blog.audioBlog.audioAccess.isSubscriberOnly
+      }
+    });
+  } catch (error) {
+    console.error('Error updating audio:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// DELETE - Delete Audio Blog
+router.delete('/api/blogs/:id/audio', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+
+    blog.audioBlog.isAudioAvailable = false;
+    blog.audioBlog.audioFile = {
+      url: null,
+      cloudinaryId: null,
+      originalFileName: null,
+      fileSize: null,
+      mimeType: 'audio/mpeg',
+      uploadedAt: null,
+      uploadedBy: null
+    };
+    blog.audioBlog.audioHash = null;
+    blog.audioBlog.audioStats = {
+      plays: 0,
+      completionRate: 0,
+      averageListenTime: 0
+    };
+
+    await blog.save();
+
+    res.json({ message: 'Audio blog deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting audio:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST - Add Audio Transcript
+router.post('/api/blogs/:id/audio/transcript', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { transcriptText, generatedBy } = req.body;
+
+    if (!transcriptText) {
+      return res.status(400).json({ message: 'Transcript text is required' });
+    }
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to modify this blog post' });
+    }
+
+    if (!blog.audioBlog.isAudioAvailable) {
+      return res.status(400).json({ message: 'No audio available for this blog' });
+    }
+
+    const transcriptHash = crypto.createHash('sha256').update(transcriptText).digest('hex');
+
+    blog.audioBlog.audioTranscript.hasTranscript = true;
+    blog.audioBlog.audioTranscript.transcriptText = transcriptText;
+    blog.audioBlog.audioTranscript.transcriptHash = transcriptHash;
+    blog.audioBlog.audioTranscript.generatedAt = new Date();
+    blog.audioBlog.audioTranscript.generatedBy = generatedBy || 'manual';
+
+    await blog.save();
+
+    res.json({
+      message: 'Transcript added successfully',
+      transcript: {
+        length: transcriptText.length,
+        generatedAt: blog.audioBlog.audioTranscript.generatedAt,
+        generatedBy: blog.audioBlog.audioTranscript.generatedBy
+      }
+    });
+  } catch (error) {
+    console.error('Error adding transcript:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET - Fetch Audio Transcript
+router.get('/api/blogs/:identifier/audio/transcript', extractAuthFromToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+
+    const isAuthenticated = req.user?.isAuthenticated;
+
+    if (!isAuthenticated) {
+      query.status = 'published';
+    }
+
+    const blog = await Blog.findOne(query)
+      .select('audioBlog title slug')
+      .select('+audioBlog.audioTranscript.transcriptText');
+
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (!blog.audioBlog.audioTranscript.hasTranscript) {
+      return res.status(404).json({ message: 'No transcript available for this audio' });
+    }
+
+    if (blog.audioBlog.audioAccess.isSubscriberOnly && !isAuthenticated) {
+      return res.status(403).json({ message: 'This transcript is subscriber-only. Please login to access.' });
+    }
+
+    res.json({
+      _id: blog._id,
+      title: blog.title,
+      transcript: {
+        text: blog.audioBlog.audioTranscript.transcriptText,
+        generatedAt: blog.audioBlog.audioTranscript.generatedAt,
+        generatedBy: blog.audioBlog.audioTranscript.generatedBy
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching transcript:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// POST - Update Audio Stats (Listen Time)
+router.post('/api/blogs/:id/audio/stats', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { completionRate, listenTime } = req.body;
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (completionRate !== undefined) {
+      blog.audioBlog.audioStats.completionRate = Math.min(100, Math.max(0, completionRate));
+    }
+
+    if (listenTime !== undefined) {
+      const currentAvg = blog.audioBlog.audioStats.averageListenTime;
+      const plays = blog.audioBlog.audioStats.plays;
+      blog.audioBlog.audioStats.averageListenTime = 
+        (currentAvg * plays + listenTime) / (plays + 1);
+    }
+
+    await blog.save();
+
+    res.json({
+      message: 'Audio stats updated successfully',
+      stats: {
+        plays: blog.audioBlog.audioStats.plays,
+        completionRate: blog.audioBlog.audioStats.completionRate,
+        averageListenTime: blog.audioBlog.audioStats.averageListenTime
+      }
+    });
+  } catch (error) {
+    console.error('Error updating audio stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET - Audio Blog Stats
+router.get('/api/blogs/:identifier/audio/stats', authenticateToken, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+
+    const query = isObjectId 
+      ? { _id: identifier }
+      : { slug: identifier };
+
+    const blog = await Blog.findOne(query)
+      .select('audioBlog title');
+
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+
+    if (blog.author.toString() !== req.user.admin_id) {
+      return res.status(403).json({ message: 'Not authorized to view this audio stats' });
+    }
+
+    res.json({
+      title: blog.title,
+      audioStats: blog.audioBlog.audioStats,
+      totalAccessedBy: blog.audioBlog.audioAccess.accessedBy.length
+    });
+  } catch (error) {
+    console.error('Error fetching audio stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 
 module.exports = router;

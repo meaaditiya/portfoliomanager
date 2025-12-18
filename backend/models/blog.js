@@ -203,6 +203,132 @@ const blogSchema = new mongoose.Schema({
   readTime: {
   type: Number,
   default: 0
+},
+audioBlog: {
+  isAudioAvailable: {
+    type: Boolean,
+    default: false
+  },
+  audioFile: {
+    url: {
+      type: String,
+      default: null
+    },
+    cloudinaryId: {
+      type: String,
+      default: null
+    },
+    originalFileName: {
+      type: String,
+      default: null
+    },
+    fileSize: {
+      type: Number,
+      default: null
+    },
+    mimeType: {
+      type: String,
+      default: 'audio/mpeg',
+      enum: ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/flac']
+    },
+    uploadedAt: {
+      type: Date,
+      default: null
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null
+    }
+  },
+  audioHash: {
+    type: String,
+    default: null,
+    select: false,
+    unique: true,
+    sparse: true
+  },
+  audioMetadata: {
+    duration: {
+      type: Number,
+      default: null
+    },
+    bitrate: {
+      type: String,
+      default: null
+    },
+    sampleRate: {
+      type: Number,
+      default: null
+    },
+    channels: {
+      type: Number,
+      default: 2
+    },
+    language: {
+      type: String,
+      default: 'en',
+      enum: ['en', 'es', 'fr', 'de', 'hi', 'ja', 'zh', 'ar', 'pt', 'ru']
+    },
+    narrator: {
+      type: String,
+      default: null
+    }
+  },
+  audioTranscript: {
+    hasTranscript: {
+      type: Boolean,
+      default: false
+    },
+    transcriptText: {
+      type: String,
+      default: null,
+      select: false
+    },
+    transcriptHash: {
+      type: String,
+      default: null,
+      select: false
+    },
+    generatedAt: {
+      type: Date,
+      default: null
+    },
+    generatedBy: {
+      type: String,
+      default: null
+    }
+  },
+  audioAccess: {
+    isSubscriberOnly: {
+      type: Boolean,
+      default: false
+    },
+    accessedBy: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      accessedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
+  },
+  audioStats: {
+    plays: {
+      type: Number,
+      default: 0
+    },
+    completionRate: {
+      type: Number,
+      default: 0
+    },
+    averageListenTime: {
+      type: Number,
+      default: 0
+    }
+  }
 }
 });
 blogSchema.index({ 'readFingerprints.fingerprint': 1 });
