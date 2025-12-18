@@ -3160,6 +3160,8 @@ router.post(
   }
 );
 
+
+
 router.post('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -3178,8 +3180,10 @@ router.post('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, a
       return res.status(403).json({ message: 'Not authorized to modify this blog post' });
     }
 
-    const audioBuffer = req.file.buffer;
-    const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
+    
+    const audioHash = crypto.createHash('sha256')
+      .update(req.file.filename + req.file.originalname + req.file.size.toString())
+      .digest('hex');
 
     const existingAudio = await Blog.findOne({ 'audioBlog.audioHash': audioHash });
     if (existingAudio && existingAudio._id.toString() !== id) {
@@ -3210,6 +3214,7 @@ router.post('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, a
       message: 'Audio blog uploaded successfully',
       audio: {
         url: blog.audioBlog.audioFile.url,
+        cloudinaryId: blog.audioBlog.audioFile.cloudinaryId,
         duration: blog.audioBlog.audioMetadata.duration,
         language: blog.audioBlog.audioMetadata.language,
         uploadedAt: blog.audioBlog.audioFile.uploadedAt
@@ -3221,7 +3226,7 @@ router.post('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, a
   }
 });
 
-router.put('/api/blogs/:id/audio',upload.single('audio'), authenticateToken,  async (req, res) => {
+router.put('/api/blogs/:id/audio', upload.single('audio'), authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { duration, bitrate, sampleRate, channels, language, narrator, isSubscriberOnly } = req.body;
@@ -3236,8 +3241,10 @@ router.put('/api/blogs/:id/audio',upload.single('audio'), authenticateToken,  as
     }
 
     if (req.file) {
-      const audioBuffer = req.file.buffer;
-      const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
+   
+      const audioHash = crypto.createHash('sha256')
+        .update(req.file.filename + req.file.originalname + req.file.size.toString())
+        .digest('hex');
 
       const existingAudio = await Blog.findOne({ 
         'audioBlog.audioHash': audioHash,
@@ -3272,6 +3279,7 @@ router.put('/api/blogs/:id/audio',upload.single('audio'), authenticateToken,  as
       message: 'Audio blog updated successfully',
       audio: {
         url: blog.audioBlog.audioFile.url,
+        cloudinaryId: blog.audioBlog.audioFile.cloudinaryId,
         duration: blog.audioBlog.audioMetadata.duration,
         language: blog.audioBlog.audioMetadata.language
       }
@@ -3282,7 +3290,7 @@ router.put('/api/blogs/:id/audio',upload.single('audio'), authenticateToken,  as
   }
 });
 
-// GET - Fetch Audio Blog
+
 router.get('/api/blogs/:identifier/audio', extractAuthFromToken, async (req, res) => {
   try {
     const { identifier } = req.params;
