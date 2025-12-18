@@ -25,7 +25,10 @@ const BlogManagementPanel = () => {
   // Editor state
   const [editMode, setEditMode] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState(null);
- const [formData, setFormData] = useState({
+
+// 1. ADD TO formData STATE (around line 25)
+
+const [formData, setFormData] = useState({
   title: '',
   content: '',
   summary: '',
@@ -34,8 +37,31 @@ const BlogManagementPanel = () => {
   featuredImage: '',
   contentImages: [],
   contentVideos: [],
-  isSubscriberOnly: false  // ADD THIS LINE
+  isSubscriberOnly: false,
+  audioBlog: {
+    audioFile: null,
+    duration: '',
+    bitrate: '',
+    sampleRate: '',
+    channels: 2,
+    language: 'en',
+    narrator: '',
+    isSubscriberOnly: false
+  }
 });
+// 2. ADD AUDIO MODAL STATE (after videoModal state, around line 95)
+
+const [audioModal, setAudioModal] = useState({
+  isOpen: false,
+  file: null,
+  duration: '',
+  bitrate: '',
+  sampleRate: '',
+  channels: 2,
+  language: 'en',
+  narrator: ''
+});
+const [uploadingAudio, setUploadingAudio] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list', 'edit', 'analytics'
   const [analyticsId, setAnalyticsId] = useState(null);
@@ -149,8 +175,10 @@ const [updatingImage, setUpdatingImage] = useState(false);
     return new Date(dateString).toLocaleDateString('en-US', options);
   };
   
-  // Handle form input changes
-  const handleInputChange = (e) => {
+
+// 3. UPDATE handleInputChange FUNCTION (around line 155)
+
+const handleInputChange = (e) => {
   const { name, value, type, checked } = e.target;
   
   if (name === 'content') {
@@ -162,6 +190,15 @@ const [updatingImage, setUpdatingImage] = useState(false);
       contentImages: updatedImages,
       contentVideos: updatedVideos
     }));
+  } else if (name.startsWith('audio_')) {
+    const audioFieldName = name.replace('audio_', '');
+    setFormData(prev => ({
+      ...prev,
+      audioBlog: {
+        ...prev.audioBlog,
+        [audioFieldName]: type === 'checkbox' ? checked : value
+      }
+    }));
   } else {
     setFormData(prev => ({
       ...prev,
@@ -169,7 +206,136 @@ const [updatingImage, setUpdatingImage] = useState(false);
     }));
   }
 };
+// 4. ADD AUDIO MODAL CHANGE HANDLER (after handleVideoModalChange)
 
+const handleAudioModalChange = (e) => {
+  const { name, value, type, checked, files } = e.target;
+  
+  if (name === 'audioFile') {
+    setAudioModal(prev => ({
+      ...prev,
+      file: files[0] || null
+    }));
+  } else {
+    setAudioModal(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }
+};
+// 5. ADD AUDIO UPLOAD HANDLER (after handleAddImage function)
+
+const handleAddAudio = async () => {
+  if (!audioModal.file) {
+    setError('Please select an audio file');
+    return;
+  }
+
+  const allowedFormats = ['audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/flac'];
+  if (!allowedFormats.includes(audioModal.file.type)) {
+    setError('Invalid audio format. Supported: MP3, WAV, WebM, OGG, AAC, FLAC');
+    return;
+  }
+
+  if (audioModal.file.size > 100 * 1024 * 1024) {
+    setError('Audio file size cannot exceed 100MB');
+    return;
+  }
+
+  try {
+    setUploadingAudio(true);
+    setError(null);
+
+    const formDataAudio = new FormData();
+    formDataAudio.append('audio', audioModal.file);
+    formDataAudio.append('duration', audioModal.duration);
+    formDataAudio.append('bitrate', audioModal.bitrate);
+    formDataAudio.append('sampleRate', audioModal.sampleRate);
+    formDataAudio.append('channels', audioModal.channels);
+    formDataAudio.append('language', audioModal.language);
+    formDataAudio.append('narrator', audioModal.narrator);
+    formDataAudio.append('isSubscriberOnly', audioModal.isSubscriberOnly || false);
+
+    if (selectedBlog) {
+      const response = await axios.post(
+        `https://aadibgmg.onrender.com/api/blogs/${selectedBlog._id}/audio`,
+        formDataAudio,
+        {
+          withCredentials: true,
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      setFormData(prev => ({
+        ...prev,
+        audioBlog: {
+          audioFile: response.data.audio,
+          duration: response.data.audio.duration,
+          bitrate: response.data.audio.bitrate,
+          sampleRate: response.data.audio.sampleRate,
+          channels: response.data.audio.channels,
+          language: response.data.audio.language,
+          narrator: response.data.audio.narrator,
+          isSubscriberOnly: audioModal.isSubscriberOnly
+        }
+      }));
+
+      setSuccessMessage('Audio uploaded successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        audioBlog: {
+          audioFile: audioModal.file,
+          duration: audioModal.duration,
+          bitrate: audioModal.bitrate,
+          sampleRate: audioModal.sampleRate,
+          channels: audioModal.channels,
+          language: audioModal.language,
+          narrator: audioModal.narrator,
+          isSubscriberOnly: audioModal.isSubscriberOnly
+        }
+      }));
+
+      setSuccessMessage('Audio file selected successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
+
+    setAudioModal({
+      isOpen: false,
+      file: null,
+      duration: '',
+      bitrate: '',
+      sampleRate: '',
+      channels: 2,
+      language: 'en',
+      narrator: ''
+    });
+
+  } catch (err) {
+    console.error('Error uploading audio:', err);
+    setError(err.response?.data?.message || 'Failed to upload audio. Please try again.');
+  } finally {
+    setUploadingAudio(false);
+  }
+};
+// 10. ADD REMOVE AUDIO HANDLER (after handleAddAudio)
+
+const handleRemoveAudio = () => {
+  setFormData(prev => ({
+    ...prev,
+    audioBlog: {
+      audioFile: null,
+      duration: '',
+      bitrate: '',
+      sampleRate: '',
+      channels: 2,
+      language: 'en',
+      narrator: '',
+      isSubscriberOnly: false
+    }
+  }));
+};
   const cleanupContentImages = (content, contentImages) => {
     if (!content || !Array.isArray(contentImages) || contentImages.length === 0) {
       return contentImages;
@@ -397,6 +563,9 @@ const [updatingImage, setUpdatingImage] = useState(false);
       case 'video':
         setVideoModal(prev => ({ ...prev, isOpen: true }));
         return;
+      case 'audio':
+        setAudioModal(prev => ({ ...prev, isOpen: true }));
+        return;
       default:
         return;
     }
@@ -424,7 +593,9 @@ const [updatingImage, setUpdatingImage] = useState(false);
   };
   
   // Modify cancel function
- const handleCancel = () => {
+// 6. UPDATE handleCancel FUNCTION (around line 330)
+
+const handleCancel = () => {
   setViewMode('list');
   setEditMode(false);
   setSelectedBlog(null);
@@ -437,7 +608,7 @@ const [updatingImage, setUpdatingImage] = useState(false);
     caption: '',
     position: 'center'
   });
-  setEditImageModal({  // Add this
+  setEditImageModal({
     isOpen: false,
     imageId: null,
     url: '',
@@ -454,8 +625,20 @@ const [updatingImage, setUpdatingImage] = useState(false);
     autoplay: false,
     muted: false
   });
+  setAudioModal({
+    isOpen: false,
+    file: null,
+    duration: '',
+    bitrate: '',
+    sampleRate: '',
+    channels: 2,
+    language: 'en',
+    narrator: ''
+  });
 };
- const handleEdit = async (blog) => {
+// 7. UPDATE handleEdit FUNCTION (around line 350)
+
+const handleEdit = async (blog) => {
   setViewMode('edit');
   setEditMode(true);
   setSelectedBlog(blog);
@@ -468,13 +651,24 @@ const [updatingImage, setUpdatingImage] = useState(false);
     featuredImage: blog.featuredImage || '',
     contentImages: blog.contentImages || [],
     contentVideos: blog.contentVideos || [],
-    isSubscriberOnly: blog.isSubscriberOnly || false  // ADD THIS LINE
+    isSubscriberOnly: blog.isSubscriberOnly || false,
+    audioBlog: blog.audioBlog || {
+      audioFile: null,
+      duration: '',
+      bitrate: '',
+      sampleRate: '',
+      channels: 2,
+      language: 'en',
+      narrator: '',
+      isSubscriberOnly: false
+    }
   });
   
   window.scrollTo(0, 0);
 };
-  
- const handleNew = () => {
+// 8. UPDATE handleNew FUNCTION (around line 365)
+
+const handleNew = () => {
   setViewMode('edit');
   setEditMode(true);
   setSelectedBlog(null);
@@ -487,11 +681,64 @@ const [updatingImage, setUpdatingImage] = useState(false);
     featuredImage: '',
     contentImages: [],
     contentVideos: [],
-    isSubscriberOnly: false  // ADD THIS LINE
+    isSubscriberOnly: false,
+    audioBlog: {
+      audioFile: null,
+      duration: '',
+      bitrate: '',
+      sampleRate: '',
+      channels: 2,
+      language: 'en',
+      narrator: '',
+      isSubscriberOnly: false
+    }
   });
   
   window.scrollTo(0, 0);
 };
+// 9. ADD AUDIO SECTION COMPONENT (after ContentVideosSection)
+
+const AudioBlogSection = ({ audioBlog }) => {
+  if (!audioBlog.audioFile) {
+    return null;
+  }
+
+  return (
+    <div className="form-group audio-section">
+      <label>Audio Blog</label>
+      <div className="audio-info">
+        <div className="audio-details">
+          <span className="audio-filename">
+            📻 {audioBlog.audioFile.originalFileName || 'Audio file'}
+          </span>
+          <div className="audio-metadata">
+            {audioBlog.duration && (
+              <span>Duration: {audioBlog.duration}s</span>
+            )}
+            {audioBlog.bitrate && (
+              <span>Bitrate: {audioBlog.bitrate}</span>
+            )}
+            {audioBlog.language && (
+              <span>Language: {audioBlog.language}</span>
+            )}
+            {audioBlog.narrator && (
+              <span>Narrator: {audioBlog.narrator}</span>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="img-remv-btn"
+          onClick={() => handleRemoveAudio()}
+          title="Remove audio blog"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+};
+
   // Extract video information from URL
   const extractVideoInfo = (url) => {
     // YouTube URL patterns
@@ -1366,7 +1613,147 @@ const ContentImagesSection = ({ contentImages, content }) => {
             </div>
           </div>
         )}
-        
+      
+
+{audioModal.isOpen && (
+  <div className="modal-overlay">
+    <div className="modal-content">
+      <div className="modal-header">
+        <h3>Add Audio Blog</h3>
+        <button 
+          className="modal-close"
+          onClick={() => setAudioModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          ×
+        </button>
+      </div>
+      <div className="modal-body">
+        <div className="form-group">
+          <label htmlFor="audioFile">Audio File * (MP3, WAV, WebM, OGG, AAC, FLAC)</label>
+          <input
+            type="file"
+            id="audioFile"
+            name="audioFile"
+            accept="audio/*"
+            onChange={handleAudioModalChange}
+            required
+          />
+          {audioModal.file && (
+            <div className="file-info">
+              <p>Selected: {audioModal.file.name}</p>
+              <p>Size: {(audioModal.file.size / 1024 / 1024).toFixed(2)} MB</p>
+            </div>
+          )}
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioDuration">Duration (seconds)</label>
+          <input
+            type="number"
+            id="audioDuration"
+            name="duration"
+            value={audioModal.duration}
+            onChange={handleAudioModalChange}
+            placeholder="e.g., 600"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioBitrate">Bitrate</label>
+          <input
+            type="text"
+            id="audioBitrate"
+            name="bitrate"
+            value={audioModal.bitrate}
+            onChange={handleAudioModalChange}
+            placeholder="e.g., 128 kbps"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioSampleRate">Sample Rate (Hz)</label>
+          <input
+            type="number"
+            id="audioSampleRate"
+            name="sampleRate"
+            value={audioModal.sampleRate}
+            onChange={handleAudioModalChange}
+            placeholder="e.g., 44100"
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioChannels">Channels</label>
+          <select
+            id="audioChannels"
+            name="channels"
+            value={audioModal.channels}
+            onChange={handleAudioModalChange}
+          >
+            <option value="1">Mono</option>
+            <option value="2">Stereo</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioLanguage">Language</label>
+          <select
+            id="audioLanguage"
+            name="language"
+            value={audioModal.language}
+            onChange={handleAudioModalChange}
+          >
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="hi">Hindi</option>
+            <option value="ja">Japanese</option>
+            <option value="zh">Chinese</option>
+            <option value="ar">Arabic</option>
+            <option value="pt">Portuguese</option>
+            <option value="ru">Russian</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="audioNarrator">Narrator</label>
+          <input
+            type="text"
+            id="audioNarrator"
+            name="narrator"
+            value={audioModal.narrator}
+            onChange={handleAudioModalChange}
+            placeholder="e.g., John Doe"
+          />
+        </div>
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              name="isSubscriberOnly"
+              checked={audioModal.isSubscriberOnly}
+              onChange={handleAudioModalChange}
+            />
+            Audio is Subscriber Only
+          </label>
+        </div>
+      </div>
+      <div className="modal-footer">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setAudioModal(prev => ({ ...prev, isOpen: false }))}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleAddAudio}
+          disabled={uploadingAudio || !audioModal.file}
+        >
+          {uploadingAudio && <span className="spinner"></span>}
+          Upload Audio
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {/* Blog editor */}
         {viewMode === 'edit' && (
           <div className="blog-editor-section">
@@ -1466,6 +1853,15 @@ const ContentImagesSection = ({ contentImages, content }) => {
                   >
                     <span>🎥 Video</span>
                   </button>
+                  <button 
+  type="button" 
+  onClick={(e) => formatText(e, 'audio')}
+  className="toolbar-btn"
+  title="Add Audio Blog"
+>
+  <span>🎙️ Audio</span>
+</button>
+
                 </div>
                 <textarea
                   id="content"
@@ -1581,6 +1977,9 @@ const ContentImagesSection = ({ contentImages, content }) => {
                   content={formData.content} 
                 />
               )}
+              {formData.audioBlog && formData.audioBlog.audioFile && (
+  <AudioBlogSection audioBlog={formData.audioBlog} />
+)}
               
               <div className="form-actions">
                 <button

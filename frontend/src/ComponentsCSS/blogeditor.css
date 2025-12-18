@@ -1146,3 +1146,322 @@
     min-height: 34px;
   }
 }
+/* AUDIO BLOG SECTION STYLES */
+
+.audio-section {
+  border: 2px solid var(--color-gray-400);
+  padding: 16px;
+  border-radius: 8px;
+  background-color: var(--color-gray-100);
+  margin-top: 20px;
+}
+
+.audio-section label {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-black);
+  margin-bottom: 12px;
+}
+
+.audio-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+
+.audio-details {
+  flex: 1;
+}
+
+.audio-filename {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--color-black);
+  font-size: 14px;
+}
+
+.audio-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  font-size: 12px;
+  color: var(--color-gray-600);
+}
+
+.audio-metadata span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* AUDIO MODAL STYLES */
+
+.modal-body .form-group input[type="file"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px dashed var(--color-gray-500);
+  background-color: var(--color-white);
+  color: var(--color-black);
+  font-size: 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-body .form-group input[type="file"]:hover {
+  border-color: var(--color-gold);
+  background-color: var(--color-gray-50);
+}
+
+.modal-body .form-group input[type="file"]:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  background-color: var(--color-white);
+}
+
+.file-info {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--color-gray-100);
+  border: 1px solid var(--color-gray-400);
+  border-radius: 2px;
+  font-size: 13px;
+  color: var(--color-black);
+}
+
+.file-info p {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-info p:first-child::before {
+  content: "📁";
+  font-size: 14px;
+}
+
+.file-info p:last-child::before {
+  content: "📊";
+  font-size: 14px;
+}
+
+/* AUDIO TOOLBAR BUTTON */
+
+.toolbar-btn span[data-icon="audio"]::before {
+  content: "🎙️";
+  margin-right: 4px;
+}
+
+/* RESPONSIVE AUDIO SECTION */
+
+@media (max-width: 768px) {
+  .audio-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .audio-metadata {
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .audio-section {
+    padding: 12px;
+  }
+
+  .audio-filename {
+    font-size: 13px;
+  }
+
+  .audio-metadata {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .audio-info {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .audio-metadata {
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .audio-section {
+    padding: 12px;
+    margin-top: 16px;
+  }
+
+  .file-info {
+    font-size: 12px;
+  }
+}
+
+/* AUDIO FORM INPUTS IN MODAL */
+
+.modal-body .form-group input[type="number"],
+.modal-body .form-group input[type="text"],
+.modal-body .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-gray-500);
+  background-color: var(--color-white);
+  color: var(--color-black);
+  font-size: 14px;
+  border-radius: 2px;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.modal-body .form-group input[type="number"]:focus,
+.modal-body .form-group input[type="text"]:focus,
+.modal-body .form-group select:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  background-color: var(--color-white);
+}
+
+.modal-body .form-group label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-black);
+  margin-bottom: 6px;
+}
+
+/* AUDIO CHECKBOX IN MODAL */
+
+.modal-body .form-group label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-gold);
+  margin-right: 8px;
+}
+
+.modal-body .form-group label {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-black);
+}
+
+/* AUDIO SECTION REMOVE BUTTON */
+
+.audio-info .img-remv-btn {
+  align-self: flex-start;
+  flex-shrink: 0;
+  min-width: 80px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+/* AUDIO UPLOAD BUTTON STATE */
+
+.btn-primary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary:not([disabled]):hover {
+  background-color: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
+}
+
+/* AUDIO LOADING STATE */
+
+.btn-primary .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-gray-300);
+  border-top: 2px solid var(--color-black);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* EXTRA STYLES FOR AUDIO METADATA DISPLAY */
+
+.audio-metadata span::before {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Duration */
+.audio-metadata span:nth-child(1)::before {
+  content: "⏱️";
+}
+
+/* Bitrate */
+.audio-metadata span:nth-child(2)::before {
+  content: "📻";
+}
+
+/* Sample Rate */
+.audio-metadata span:nth-child(3)::before {
+  content: "🔊";
+}
+
+/* Language */
+.audio-metadata span:nth-child(4)::before {
+  content: "🌐";
+}
+
+/* Narrator */
+.audio-metadata span:nth-child(5)::before {
+  content: "🎤";
+}
+
+/* RESPONSIVE MODAL FOR AUDIO */
+
+@media (max-width: 768px) {
+  .modal-body .form-group {
+    margin-bottom: 16px;
+  }
+
+  .modal-body .form-group label {
+    font-size: 12px;
+  }
+
+  .modal-body .form-group input[type="file"],
+  .modal-body .form-group input[type="number"],
+  .modal-body .form-group input[type="text"],
+  .modal-body .form-group select {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .file-info {
+    font-size: 12px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-body {
+    padding: 16px;
+  }
+
+  .file-info {
+    font-size: 11px;
+    padding: 8px;
+  }
+
+  .file-info p {
+    margin: 4px 0;
+    font-size: 11px;
+  }
+
+  .audio-metadata {
+    font-size: 11px;
+    gap: 8px;
+  }
+}
