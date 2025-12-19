@@ -11,6 +11,13 @@ const DocumentSchema = new mongoose.Schema({
   mimeType: String,
   size: Number,
   gcsPath: String,
+  driveFileId: String,
+storageProvider: {
+  type: String,
+  enum: ["gcs", "drive"],
+  default: "drive"
+},
+
   embedding: { type: [Number], default: [] },
   
   

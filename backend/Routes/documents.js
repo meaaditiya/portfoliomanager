@@ -3,7 +3,7 @@ const multer = require("multer")();
 const XLSX = require("xlsx"); 
 const jwt = require('jsonwebtoken');
 const authenticateToken = require("../middlewares/authMiddleware");
-const bucket = require("../services/gcs");
+const bucket = require("../services/driveService");
 const{Document, AccessRequest} = require("../models/Document");
 const { generateQueryEmbedding, cosineSimilarity } = require("../services/embeddingService");
 const User = require("../models/userSchema"); 
@@ -14,7 +14,7 @@ const ADMIN_EMAIL= process.env.FROM_EMAIL;
 const crypto = require('crypto');
 const https = require('https');
 const BlacklistedToken = require("../models/blacklistedtoken");
-
+const drive = require("../services/driveService");
 const verifyTurnstile = async (token) => {
   return new Promise((resolve, reject) => {
     const postData = new URLSearchParams({
@@ -429,46 +429,6 @@ router.post("/api/admin/folder/create", authenticateToken, async (req, res) => {
 
 
 
-router.post("/api/admin/document/upload", authenticateToken, multer.single("file"), async (req, res) => {
-  try {
-    const file = req.file;
-    const { parentId } = req.body;
-    
-    if (!file) return res.status(400).json({ message: "No file uploaded" });
-
-    if (parentId) {
-      const parent = await Document.findById(parentId);
-      if (!parent) return res.status(404).json({ message: "Parent folder not found" });
-      if (parent.type !== "folder") return res.status(400).json({ message: "Parent must be a folder" });
-    }
-
-    const storedName = Date.now() + "-" + file.originalname;
-    const gcsFile = bucket.file(storedName);
-
-    await gcsFile.save(file.buffer, { resumable: false });
-
-    const embedding = await generateQueryEmbedding(file.originalname);
-
-    const doc = await Document.create({
-      name: file.originalname,
-      type: "file",
-      originalName: file.originalname,
-      storedName,
-      mimeType: file.mimetype,
-      size: file.size,
-      gcsPath: storedName,
-      embedding,
-      parent: parentId || null,
-      createdBy: req.user.id
-    });
-
-    res.json({ message: "Uploaded", id: doc._id, document: doc });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 
 
 
@@ -756,66 +716,7 @@ router.get("/api/item/:id", optionalAuth, async (req, res) => {
   }
 });
 
-router.get("/api/download/:id", optionalAuth, async (req, res) => {
-  try {
-    const { key, turnstileToken } = req.query;
-    const isAdmin = req.user?.isAdmin || false;
-    const isPremium = req.user?.isPremium || false;
-    if (!isAdmin && !isPremium) {
-      if (turnstileToken) {
-        const isValid = await verifyTurnstile(turnstileToken);
-        if (!isValid) {
-          return res.status(403).json({ 
-            message: 'Verification failed',
-            requiresTurnstile: true 
-          });
-        }
-      } else {
-        return res.status(403).json({ 
-          message: 'Turnstile verification required',
-          requiresTurnstile: true 
-        });
-      }
-    }
-    
-    const doc = await Document.findById(req.params.id);
-    if (!doc) return res.status(404).json({ message: "Not found" });
-    if (doc.type !== "file") {
-      return res.status(400).json({ message: "Cannot download this item type" });
-    }
 
-    const userId = req.user ? String(req.user.id) : null;
-   const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
-
-    if (!accessCheck.hasAccess) {
-      return res.status(403).json({ 
-        message: accessCheck.reason,
-        details: accessCheck.lockedItem || accessCheck.privateItem
-      });
-    }
-
-    const file = bucket.file(doc.gcsPath);
-
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 30 * 60 * 1000
-    });
-
-    if (key) {
-      const link = doc.privateAccessLinks.find(l => l.linkId === key);
-      if (link && link.isActive) {
-        link.accessCount += 1;
-        await doc.save();
-      }
-    }
-
-    res.json({ downloadUrl: url, filename: doc.originalName });
-
-  } catch (err) {
-    console.error('Download error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 router.get("/api/search", optionalAuth, async (req, res) => {
   try {
@@ -1146,35 +1047,6 @@ router.patch("/api/admin/item/:id/rename", authenticateToken, async (req, res) =
 
 
 
-router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
-  try {
-    const item = await Document.findById(req.params.id);
-    if (!item) return res.status(404).json({ message: "Not found" });
-
-    if (item.type === "folder") {
-      const children = await Document.countDocuments({ parent: item._id });
-      if (children > 0) {
-        return res.status(400).json({ 
-          message: "Cannot delete folder with contents. Delete or move contents first." 
-        });
-      }
-    } else if (item.type === "file") {
-      try {
-        await bucket.file(item.gcsPath).delete();
-      } catch (gcsErr) {
-        console.error("GCS deletion error:", gcsErr);
-      }
-    }
-    
-
-    await Document.findByIdAndDelete(req.params.id);
-
-    res.json({ message: "Deleted successfully" });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 
@@ -1194,28 +1066,178 @@ router.delete("/api/admin/folder/:id/recursive", authenticateToken, async (req, 
   }
 });
 
+router.post("/api/admin/document/upload", authenticateToken, multer.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+    const { parentId } = req.body;
+    
+    if (!file) return res.status(400).json({ message: "No file uploaded" });
+
+    if (parentId) {
+      const parent = await Document.findById(parentId);
+      if (!parent) return res.status(404).json({ message: "Parent folder not found" });
+      if (parent.type !== "folder") return res.status(400).json({ message: "Parent must be a folder" });
+    }
+
+    const fileMetadata = {
+  name: file.originalname,
+  parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+};
+
+
+    const media = {
+      mimeType: file.mimetype,
+      body: require('stream').Readable.from(file.buffer)
+    };
+
+    const driveResponse = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+     fields: 'id, mimeType, size, webViewLink, webContentLink'
+    });
+
+    const driveFileId = driveResponse.data.id;
+
+    await drive.permissions.create({
+      fileId: driveFileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+
+  const publicUrl = driveResponse.data.webContentLink;
+
+
+    const embedding = await generateQueryEmbedding(file.originalname);
+
+    const doc = await Document.create({
+      name: file.originalname,
+      type: "file",
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: parseInt(driveResponse.data.size) || file.size,
+      url: publicUrl,
+      driveFileId: driveFileId,
+      storageProvider: "drive",
+      embedding,
+      parent: parentId || null,
+      createdBy: req.user.id
+    });
+
+    res.json({ message: "Uploaded", id: doc._id, document: doc });
+
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router.get("/api/download/:id", optionalAuth, async (req, res) => {
+  try {
+    const { key, turnstileToken } = req.query;
+    const isAdmin = req.user?.isAdmin || false;
+    const isPremium = req.user?.isPremium || false;
+
+    if (!isAdmin && !isPremium) {
+      if (turnstileToken) {
+        const isValid = await verifyTurnstile(turnstileToken);
+        if (!isValid) {
+          return res.status(403).json({ 
+            message: 'Verification failed',
+            requiresTurnstile: true 
+          });
+        }
+      } else {
+        return res.status(403).json({ 
+          message: 'Turnstile verification required',
+          requiresTurnstile: true 
+        });
+      }
+    }
+    
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Not found" });
+    if (doc.type !== "file") {
+      return res.status(400).json({ message: "Cannot download this item type" });
+    }
+
+    const userId = req.user ? String(req.user.id) : null;
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
+
+    if (!accessCheck.hasAccess) {
+      return res.status(403).json({ 
+        message: accessCheck.reason,
+        details: accessCheck.lockedItem || accessCheck.privateItem
+      });
+    }
+
+    if (key) {
+      const link = doc.privateAccessLinks.find(l => l.linkId === key);
+      if (link && link.isActive) {
+        link.accessCount += 1;
+        await doc.save();
+      }
+    }
+
+    res.json({ downloadUrl: doc.url, filename: doc.originalName });
+
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
+  try {
+    const item = await Document.findById(req.params.id);
+    if (!item) return res.status(404).json({ message: "Not found" });
+
+    if (item.type === "folder") {
+      const children = await Document.countDocuments({ parent: item._id });
+      if (children > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete folder with contents. Delete or move contents first." 
+        });
+      }
+    } else if (item.type === "file" && item.driveFileId) {
+      try {
+        await drive.files.delete({
+          fileId: item.driveFileId
+        });
+      } catch (driveErr) {
+        console.error("Drive deletion error:", driveErr);
+      }
+    }
+
+    await Document.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Deleted successfully" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 async function deleteRecursive(folderId) {
   const children = await Document.find({ parent: folderId });
   
   for (const child of children) {
     if (child.type === "folder") {
       await deleteRecursive(child._id);
-    } else if (child.type === "file") {
+    } else if (child.type === "file" && child.driveFileId) {
       try {
-        await bucket.file(child.gcsPath).delete();
-      } catch (gcsErr) {
-        console.error("GCS deletion error:", gcsErr);
+        await drive.files.delete({
+          fileId: child.driveFileId
+        });
+      } catch (driveErr) {
+        console.error("Drive deletion error:", driveErr);
       }
     }
-    
     
     await Document.findByIdAndDelete(child._id);
   }
   
   await Document.findByIdAndDelete(folderId);
 }
-
-
 
 
 router.get("/api/folder/tree", async (req, res) => {
