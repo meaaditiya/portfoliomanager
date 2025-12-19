@@ -889,10 +889,10 @@ const AudioBlogSection = ({ audioBlog }) => {
             )}
           </div>
         </div>
-        <div className="audio-actions">
+        <div className="content-image-actions">
           <button
             type="button"
-            className="btn3 btn-edit1"
+            className="img-edt-btn"
             onClick={() => handleEditAudio()}
             title="Edit audio metadata"
           >
@@ -900,7 +900,7 @@ const AudioBlogSection = ({ audioBlog }) => {
           </button>
           <button
             type="button"
-            className="btn3 btn-delete1"
+            className="img-remv-btn"
             onClick={() => handleRemoveAudio()}
             title="Remove audio blog"
           >
@@ -1264,6 +1264,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
                   {video.autoplay ? 'Autoplay: On' : 'Autoplay: Off'}, {video.muted ? 'Muted: On' : 'Muted: Off'}
                 </span>
               </div>
+              <div className='content-image-actions'>
               <button
                 type="button"
                 className="img-remv-btn"
@@ -1272,6 +1273,7 @@ const ContentImagesSection = ({ contentImages, content }) => {
               >
                 Remove
               </button>
+              </div>
             </div>
           ))}
         </div>
@@ -2051,14 +2053,14 @@ const ContentImagesSection = ({ contentImages, content }) => {
       <div className="modal-footer">
         <button
           type="button"
-          className="btn btn-secondary"
+          className="btn img-remv-btn"
           onClick={() => setEditAudioModal(prev => ({ ...prev, isOpen: false }))}
         >
           Cancel
         </button>
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn img-edt-btn"
           onClick={handleUpdateAudio}
           disabled={uploadingAudio}
         >
@@ -2300,14 +2302,14 @@ const ContentImagesSection = ({ contentImages, content }) => {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="btn btn-secondary"
+                  className="btn img-remv-btn"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`btn btn-primary ${loading ? 'btn-loading' : ''}`}
+                  className={`btn img-edt-btn ${loading ? 'btn-loading' : ''}`}
                 >
                   {loading && <span className="spinner"></span>}
                   {selectedBlog ? 'Update Blog Post' : 'Create Blog Post'}

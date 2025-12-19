@@ -1146,3 +1146,200 @@
     min-height: 34px;
   }
 }
+/* Audio Form Input CSS Corrections */
+
+/* File Input Styling */
+.form-group input[type="file"] {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+  font-family: inherit !important;
+  transition: border-color 0.2s ease !important;
+  cursor: pointer !important;
+}
+
+.form-group input[type="file"]:focus {
+  outline: none !important;
+  border-color: var(--color-gold) !important;
+}
+
+/* Number Input Styling */
+.form-group input[type="number"] {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+  font-family: inherit !important;
+  transition: border-color 0.2s ease !important;
+}
+
+.form-group input[type="number"]:focus {
+  outline: none !important;
+  border-color: var(--color-gold) !important;
+}
+
+/* Select Dropdown Styling */
+.form-group select {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+  font-family: inherit !important;
+  transition: border-color 0.2s ease !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 20px !important;
+  padding-right: 32px !important;
+}
+
+.form-group select:focus {
+  outline: none !important;
+  border-color: var(--color-gold) !important;
+}
+
+.form-group select option {
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  padding: 8px !important;
+}
+
+/* Checkbox Styling */
+.form-group input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  cursor: pointer !important;
+  accent-color: var(--color-gold) !important;
+  margin-right: 6px !important;
+  vertical-align: middle !important;
+}
+
+.form-group label input[type="checkbox"] {
+  margin-right: 8px !important;
+}
+
+/* File Info Display */
+.file-info {
+  margin-top: 8px !important;
+  padding: 10px 12px !important;
+  background-color: var(--color-gray-100) !important;
+  border: 1px solid var(--color-gray-400) !important;
+  border-radius: 2px !important;
+  font-size: 13px !important;
+  color: var(--color-black) !important;
+}
+
+.file-info p {
+  margin: 4px 0 !important;
+  font-size: 13px !important;
+  color: var(--color-black) !important;
+}
+
+/* Modal Form Group Overrides */
+.modal-body .form-group input[type="text"],
+.modal-body .form-group input[type="url"],
+.modal-body .form-group input[type="email"],
+.modal-body .form-group input[type="number"],
+.modal-body .form-group input[type="file"],
+.modal-body .form-group select,
+.modal-body .form-group textarea {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+  font-family: inherit !important;
+}
+
+.modal-body .form-group input:focus,
+.modal-body .form-group select:focus,
+.modal-body .form-group textarea:focus {
+  outline: none !important;
+  border-color: var(--color-gold) !important;
+}
+
+/* Audio Modal Specific */
+#audioFile,
+#editAudioFile {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  cursor: pointer !important;
+}
+
+#audioDuration,
+#editAudioDuration,
+#audioSampleRate,
+#editAudioSampleRate,
+#audioChannels,
+#editAudioChannels,
+#audioLanguage,
+#editAudioLanguage {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+}
+
+#audioBitrate,
+#editAudioBitrate,
+#audioNarrator,
+#editAudioNarrator {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--color-gray-500) !important;
+  background-color: var(--color-white) !important;
+  color: var(--color-black) !important;
+  font-size: 14px !important;
+  border-radius: 2px !important;
+}
+
+/* Label Styling in Modal */
+.modal-body .form-group label {
+  display: block !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  color: var(--color-black) !important;
+  margin-bottom: 8px !important;
+}
+
+/* Checkbox Label Styling */
+.form-group label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  font-weight: 600 !important;
+  color: var(--color-black) !important;
+}
+
+.form-group label input[type="checkbox"] {
+  margin: 0 !important;
+}
+
+/* Helper Text in Forms */
+.form-group .helper-text {
+  font-size: 12px !important;
+  color: var(--color-gray-600) !important;
+  margin-top: 4px !important;
+  display: block !important;
+}
