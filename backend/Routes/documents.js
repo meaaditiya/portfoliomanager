@@ -1080,10 +1080,9 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
     }
 
     const fileMetadata = {
-  name: file.originalname,
-  parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
-};
-
+      name: file.originalname,
+      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+    };
 
     const media = {
       mimeType: file.mimetype,
@@ -1093,7 +1092,7 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
     const driveResponse = await drive.files.create({
       requestBody: fileMetadata,
       media: media,
-     fields: 'id, mimeType, size, webViewLink, webContentLink'
+      fields: 'id, mimeType, size, webViewLink, webContentLink' // Request both links
     });
 
     const driveFileId = driveResponse.data.id;
@@ -1106,8 +1105,8 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
       }
     });
 
-  const publicUrl = driveResponse.data.webContentLink;
-
+    const viewUrl = driveResponse.data.webViewLink;
+    const downloadUrl = driveResponse.data.webContentLink;
 
     const embedding = await generateQueryEmbedding(file.originalname);
 
@@ -1117,7 +1116,8 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: parseInt(driveResponse.data.size) || file.size,
-      url: publicUrl,
+      url: viewUrl, 
+      downloadUrl: downloadUrl, 
       driveFileId: driveFileId,
       storageProvider: "drive",
       embedding,
@@ -1134,7 +1134,7 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
 });
 router.get("/api/download/:id", optionalAuth, async (req, res) => {
   try {
-    const { key, turnstileToken } = req.query;
+    const { key, turnstileToken, forceDownload } = req.query;
     const isAdmin = req.user?.isAdmin || false;
     const isPremium = req.user?.isPremium || false;
 
@@ -1179,7 +1179,12 @@ router.get("/api/download/:id", optionalAuth, async (req, res) => {
       }
     }
 
-    res.json({ downloadUrl: doc.url, filename: doc.originalName });
+   
+    res.json({ 
+      viewUrl: doc.url, 
+      downloadUrl: doc.downloadUrl || doc.url,
+      filename: doc.originalName 
+    });
 
   } catch (err) {
     console.error('Download error:', err);

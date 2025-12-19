@@ -22,7 +22,7 @@ storageProvider: {
   
   
   url: String,
-  
+  downloadUrl: String,
   
   jsonData: { type: mongoose.Schema.Types.Mixed, default: null },
   sheetNames: [String],
