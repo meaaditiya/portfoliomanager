@@ -3,7 +3,7 @@ const { google } = require("googleapis");
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID2,
   process.env.GOOGLE_CLIENT_SECRET2,
-  process.env.GOOGLE_REDIRECT_URI2 // same one you used
+  process.env.GOOGLE_REDIRECT_URI2 
 );
 
 oauth2Client.setCredentials({
