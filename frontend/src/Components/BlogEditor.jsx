@@ -2089,18 +2089,18 @@ const ContentImagesSection = ({ contentImages, content }) => {
               </div>
               
               <div className="form-group">
-                <label htmlFor="summary">Summary (max 200 characters) *</label>
+                <label htmlFor="summary">Summary (max 500 characters) *</label>
                 <textarea
                   id="summary"
                   name="summary"
                   value={formData.summary}
                   onChange={handleInputChange}
                   required
-                  maxLength={200}
+                  maxLength={500}
                   rows={3}
                   placeholder="Brief summary of the blog post"
                 ></textarea>
-                <span className="character-count">{formData.summary.length}/200 characters</span>
+                <span className="character-count">{formData.summary.length}/500 characters</span>
               </div>
               
               <div className="form-group">
