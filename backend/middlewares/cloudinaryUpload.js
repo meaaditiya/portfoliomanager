@@ -27,18 +27,18 @@ const storage = new CloudinaryStorage({
       folder = 'uploads/documents';
       resourceType = 'raw';
       
-      // Extract extension and create proper public_id WITHOUT extension
-      const fileExt = path.extname(file.originalname).toLowerCase().substring(1); // Remove the dot
+      
+      const fileExt = path.extname(file.originalname).toLowerCase().substring(1); 
       const fileName = path.parse(file.originalname).name;
       const sanitizedName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
       
       const params = {
         folder: folder,
         resource_type: resourceType,
-        type: 'upload', // Important: set type to upload
+        type: 'upload', 
         access_mode: 'public',
-        public_id: `${sanitizedName}_${Date.now()}`, // NO extension here
-        format: fileExt, // Set format separately
+        public_id: `${sanitizedName}_${Date.now()}`, 
+        format: fileExt, 
       };
       
       return params;
