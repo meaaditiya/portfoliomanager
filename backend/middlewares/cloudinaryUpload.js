@@ -29,11 +29,10 @@ const storage = new CloudinaryStorage({
       const ext = path.extname(file.originalname).substring(1).toLowerCase();
       format = ext;
     } else if(isAudio){
-       folder = 'uploads/audio';
-  resourceType = 'video'; 
-  allowedFormats = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'webm', 'm4a', 'wma', 'aiff'];
-    }
-    else {
+      folder = 'uploads/audio';
+      resourceType = 'video'; 
+      allowedFormats = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'webm', 'm4a', 'wma', 'aiff'];
+    } else {
       folder = 'uploads/images';
       resourceType = 'image';
       allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'tiff', 'ico', 'heic', 'heif'];
@@ -42,6 +41,8 @@ const storage = new CloudinaryStorage({
     return {
       folder: folder,
       resource_type: resourceType,
+      type: 'upload',                    
+      access_mode: 'public',             
       allowed_formats: allowedFormats.length > 0 ? allowedFormats : undefined,
       format: format,
       transformation: isThumbnail ? [{ width: 640, height: 360, crop: 'limit' }] : undefined
