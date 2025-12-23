@@ -987,4 +987,41 @@ router.post('/api/admin/subscription-lists/:listId/subscribers', authenticateTok
     });
   }
 });
+
+router.post('/api/public/check-subscription', async (req, res) => {
+  try {
+    const { email, listName } = req.body;
+    
+    if (!email || !listName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email and list name are required' 
+      });
+    }
+
+    const list = await SubscriptionList.findOne({ name: listName });
+    
+    if (!list) {
+      return res.json({ 
+        success: true, 
+        isSubscribed: false 
+      });
+    }
+
+    const isSubscribed = list.subscribers.some(sub => sub.email === email.trim());
+    
+    res.json({
+      success: true,
+      isSubscribed
+    });
+    
+  } catch (error) {
+    console.error('Check subscription error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to check subscription', 
+      error: error.message 
+    });
+  }
+});
 module.exports = router;
