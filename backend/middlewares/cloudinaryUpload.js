@@ -10,10 +10,10 @@ const storage = new CloudinaryStorage({
     const isThumbnail = file.fieldname === 'thumbnail';
     const isDocument = file.fieldname === 'document';
     const isAudio = file.mimetype.startsWith('audio/');
+    
     let folder = 'uploads';
     let resourceType = 'auto';
     let allowedFormats = [];
-    let format = undefined;
     
     if (isThumbnail) {
       folder = 'uploads/thumbnails';
@@ -26,9 +26,23 @@ const storage = new CloudinaryStorage({
     } else if (isDocument) {
       folder = 'uploads/documents';
       resourceType = 'raw';
-      const ext = path.extname(file.originalname).substring(1).toLowerCase();
-      format = ext;
-    } else if(isAudio){
+      
+      // Extract extension and create proper public_id WITHOUT extension
+      const fileExt = path.extname(file.originalname).toLowerCase().substring(1); // Remove the dot
+      const fileName = path.parse(file.originalname).name;
+      const sanitizedName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      
+      const params = {
+        folder: folder,
+        resource_type: resourceType,
+        type: 'upload', // Important: set type to upload
+        access_mode: 'public',
+        public_id: `${sanitizedName}_${Date.now()}`, // NO extension here
+        format: fileExt, // Set format separately
+      };
+      
+      return params;
+    } else if (isAudio) {
       folder = 'uploads/audio';
       resourceType = 'video'; 
       allowedFormats = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'webm', 'm4a', 'wma', 'aiff'];
@@ -38,15 +52,22 @@ const storage = new CloudinaryStorage({
       allowedFormats = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp', 'tiff', 'ico', 'heic', 'heif'];
     }
     
-    return {
+    const params = {
       folder: folder,
       resource_type: resourceType,
-      type: 'upload',                    
-      access_mode: 'public',             
-      allowed_formats: allowedFormats.length > 0 ? allowedFormats : undefined,
-      format: format,
-      transformation: isThumbnail ? [{ width: 640, height: 360, crop: 'limit' }] : undefined
+      type: 'upload',
+      access_mode: 'public',
     };
+    
+    if (!isDocument && allowedFormats.length > 0) {
+      params.allowed_formats = allowedFormats;
+    }
+    
+    if (isThumbnail) {
+      params.transformation = [{ width: 640, height: 360, crop: 'limit' }];
+    }
+    
+    return params;
   },
 });
 
