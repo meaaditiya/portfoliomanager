@@ -63,6 +63,7 @@ const AnnouncementAdmin = () => {
     fetchAnnouncements();
   }, []);
 
+
   const fetchAnnouncements = async () => {
     try {
       setLoading(true);
@@ -587,91 +588,91 @@ const handleFileChange = (e) => {
     }, 0);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    const formDataToSend = new FormData();
-    formDataToSend.append('title', formData.title);
-    formDataToSend.append('titleColor', formData.titleColor);
-    formDataToSend.append('caption', formData.caption);
-    formDataToSend.append('captionFormat', formData.captionFormat);
-    
-    // Clean up media arrays
-    const cleanedImages = cleanupCaptionImages(formData.caption, formData.captionImages);
-    const cleanedVideos = cleanupCaptionVideos(formData.caption, formData.captionVideos);
-    
-    formDataToSend.append('captionImages', JSON.stringify(cleanedImages));
-    formDataToSend.append('captionVideos', JSON.stringify(cleanedVideos));
-    
-    formDataToSend.append('linkUrl', formData.linkUrl);
-    formDataToSend.append('linkName', formData.linkName);
-    formDataToSend.append('linkOpenInNewTab', formData.linkOpenInNewTab);
-    formDataToSend.append('priority', formData.priority);
-    
-    if (editMode) {
-      formDataToSend.append('isActive', formData.isActive);
-      formDataToSend.append('removeImage', formData.removeImage);
-      formDataToSend.append('removeDocument', formData.removeDocument);
-      formDataToSend.append('removeExpiry', formData.removeExpiry);
-    }
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  const formDataToSend = new FormData();
+  formDataToSend.append('title', formData.title);
+  formDataToSend.append('titleColor', formData.titleColor);
+  formDataToSend.append('caption', formData.caption);
+  formDataToSend.append('captionFormat', formData.captionFormat);
+  
+  // Clean up media arrays
+  const cleanedImages = cleanupCaptionImages(formData.caption, formData.captionImages);
+  const cleanedVideos = cleanupCaptionVideos(formData.caption, formData.captionVideos);
+  
+  formDataToSend.append('captionImages', JSON.stringify(cleanedImages));
+  formDataToSend.append('captionVideos', JSON.stringify(cleanedVideos));
+  
+  formDataToSend.append('linkUrl', formData.linkUrl);
+  formDataToSend.append('linkName', formData.linkName);
+  formDataToSend.append('linkOpenInNewTab', formData.linkOpenInNewTab);
+  formDataToSend.append('priority', formData.priority);
+  
+  if (editMode) {
+    formDataToSend.append('isActive', formData.isActive);
+    formDataToSend.append('removeImage', formData.removeImage);
+    formDataToSend.append('removeDocument', formData.removeDocument);
+    formDataToSend.append('removeExpiry', formData.removeExpiry);
+  }
 
-    if (formData.expiryType !== 'none' && !formData.removeExpiry) {
-      formDataToSend.append('expiryType', formData.expiryType);
-      if (formData.expiryType === 'duration' && formData.expiryValue) {
-        formDataToSend.append('expiryValue', formData.expiryValue);
-      } else if (formData.expiryType === 'custom' && formData.expiresAt) {
-        const localDate = new Date(formData.expiresAt);
-        formDataToSend.append('expiresAt', localDate.toISOString());
-      }
+  if (formData.expiryType !== 'none' && !formData.removeExpiry) {
+    formDataToSend.append('expiryType', formData.expiryType);
+    if (formData.expiryType === 'duration' && formData.expiryValue) {
+      formDataToSend.append('expiryValue', formData.expiryValue);
+    } else if (formData.expiryType === 'custom' && formData.expiresAt) {
+      const localDate = new Date(formData.expiresAt);
+      formDataToSend.append('expiresAt', localDate.toISOString());
     }
-    
-    if (formData.image) {
-      formDataToSend.append('image', formData.image);
-    }
-    
-    if (formData.document) {
-      formDataToSend.append('document', formData.document);
-    }
+  }
+  
+  if (formData.image) {
+    formDataToSend.append('image', formData.image);
+  }
+  
+  if (formData.document) {
+    formDataToSend.append('document', formData.document);
+  }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const url = editMode 
-        ? `${API_BASE}/admin/announcement/${currentAnnouncement._id}`
-        : `${API_BASE}/admin/announcement`;
-      
-      const method = editMode ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: formDataToSend
-      });
+  try {
+    setLoading(true);
+    setError(null);
+    
+    const url = editMode 
+      ? `${API_BASE}/admin/announcement/${currentAnnouncement._id}`
+      : `${API_BASE}/admin/announcement`;
+    
+    const method = editMode ? 'PUT' : 'POST';
+    
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // DO NOT SET Content-Type - let browser set it with boundary
+      },
+      body: formDataToSend  // Send FormData directly, not as JSON
+    });
 
-      const data = await response.json();
+    const data = await response.json();
+    
+    if (response.ok) {
+      setSuccessMessage(data.message);
+      fetchAnnouncements();
       
-      if (response.ok) {
-        setSuccessMessage(data.message);
-        fetchAnnouncements();
-        
-        setTimeout(() => {
-          setSuccessMessage('');
-          closeModal();
-        }, 3000);
-      } else {
-        setError(data.error || 'Operation failed');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Operation failed');
-    } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setSuccessMessage('');
+        closeModal();
+      }, 3000);
+    } else {
+      setError(data.error || 'Operation failed');
     }
-  };
+  } catch (error) {
+    console.error('Error:', error);
+    setError('Operation failed');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleEdit = (announcement) => {
     setCurrentAnnouncement(announcement);
