@@ -1283,7 +1283,7 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
     };
     
     const modelWithConfig = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: generationConfig
     });
     
@@ -2261,7 +2261,7 @@ Requirements:
 
 Example format: ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text().trim();
