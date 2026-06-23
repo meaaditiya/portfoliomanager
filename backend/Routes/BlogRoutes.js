@@ -1484,7 +1484,7 @@ router.post('/api/blogs/:id/auto-summary', async (req, res) => {
     };
     
     const modelWithConfig = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: generationConfig
     });
     
@@ -1583,13 +1583,13 @@ router.get('/api/gemini/health', async (req, res) => {
     validateApiKey();
     
     
-    const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const testModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const testResult = await testModel.generateContent("Say 'API is working' in exactly 3 words.");
     const testResponse = await testResult.response;
     
     res.json({
       status: 'healthy',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       apiKeyConfigured: true,
       testResponse: testResponse.text().trim(),
       timestamp: new Date().toISOString()
