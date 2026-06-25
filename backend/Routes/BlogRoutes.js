@@ -1233,8 +1233,6 @@ router.get('/api/blogs/:id/videos', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-
 router.post('/api/blogs/:id/generate-summary', async (req, res) => {
   try {
     
@@ -1259,27 +1257,36 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
     }
     
     
-    const prompt = `Please create a comprehensive summary of the following blog post. The summary should:
-    - Be approximately ${wordLimit} words long
-    - Capture the main points and key insights
-    - Be engaging and well-structured with clear paragraphs
-    - Maintain the tone and style of the original content
-    - Be suitable for readers who want a quick overview
-    - Focus on the most important information and actionable insights
-    - Generate different answer every time  but same meaining 
-    Blog Title: "${blog.title}"
-    
-    Blog Content:
-    ${plainTextContent}
-    
-    Please provide only the summary without any additional commentary, formatting, or meta-text.`;
+const prompt = `Create a high-quality summary of the following blog post.
+
+Requirements:
+- Length must be between ${Math.floor(wordLimit * 0.8)} and ${Math.ceil(wordLimit * 1.2)} words
+- Cover all major ideas, insights, and important takeaways
+- Preserve the original meaning, tone, and intent
+- Be written in clear, natural, engaging language
+- Use complete sentences and well-structured paragraphs
+- Focus on information that provides value to the reader
+- Each generation should use different wording while keeping the same meaning
+- Do not cut off mid-sentence
+- Do not stop before the summary is complete
+- The final sentence must be complete and meaningful
+-break lines for proper structure of the text.
+-add author information if available.
+Blog Title:
+"${blog.title}"
+"${blog.author.name}"
+Blog Content:
+${plainTextContent}
+Also add in last that this is an AI generted summary and may not be 100% accurate, click on (i) icon to know more about AI generated summary.
+Return ONLY the summary text.
+Do not include headings, labels, markdown, introductions, explanations, or meta-commentary.`;
     
     
     const generationConfig = {
       temperature: temperature,
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: Math.ceil(wordLimit * 1.5), 
+      maxOutputTokens: 2048,
     };
     
     const modelWithConfig = genAI.getGenerativeModel({ 
@@ -1374,8 +1381,6 @@ router.post('/api/blogs/:id/generate-summary', async (req, res) => {
     });
   }
 });
-
-
 router.put('/api/blogs/:id/update-summary', async (req, res) => {
   try {
     const { id } = req.params;
