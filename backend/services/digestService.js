@@ -66,8 +66,8 @@ async function sendDigest({ period = 'weekly', triggeredBy = 'cron' }) {
 
   const issueNumber = await getNextIssueNumber();
   const subject = period === 'weekly'
-    ? `📬 ${blogs.length} new posts this week — The 1% Better Dev`
-    : `📬 Monthly digest: ${blogs.length} posts from the blog`;
+    ? `${blogs.length} new posts this week — Don't miss out!`
+    : `Monthly digest: ${blogs.length} posts from the blog`;
 
   let successCount = 0;
   let failCount = 0;
