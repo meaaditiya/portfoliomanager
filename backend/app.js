@@ -36,6 +36,8 @@ const DocumentRoutes = require("./Routes/documents.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const PrivacyPolicyRoutes = require("./Routes/PrivacyPolicy.js");
+const digestRoutes = require('./Routes/Digest.js');
+const { initDigestCron } = require('./cron/digestCron');
 
 const app = express();
 const server = http.createServer(app);
@@ -125,7 +127,7 @@ async function initializeApp() {
     console.log('Connecting to database...');
     await connectDB();
     console.log('Database connected successfully');
-
+    initDigestCron();
     app.use('/public', express.static(path.join(__dirname, 'public')));
 
     app.get('/health', (req, res) => {
@@ -163,6 +165,7 @@ async function initializeApp() {
     app.use(DocumentRoutes);
     app.use(FeaturedProjects);
     app.use(PrivacyPolicyRoutes);
+    app.use(digestRoutes);
     console.log('Routes configured');
 
     console.log('Setting up visitor socket...');
