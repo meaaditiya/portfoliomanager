@@ -24,8 +24,9 @@ async function getNewBlogsSince(date) {
 
 async function sendDigest({ period = 'weekly', triggeredBy = 'cron' }) {
   const now = new Date();
- 
-const since = new Date('2020-01-01'); 
+  const since = period === 'weekly'
+    ? new Date(now - 7 * 24 * 60 * 60 * 1000)
+    : new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   const blogs = await getNewBlogsSince(since);
 
