@@ -8,7 +8,7 @@ async function moderateContent(content, userName) {
   
   try {
     console.log('🤖 Creating Gemini model...');
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
     console.log('📤 Sending request to Gemini...');
     const prompt = `You are a strict content moderator for a professional blog platform. Analyze the following comment for ANY violations of community guidelines.

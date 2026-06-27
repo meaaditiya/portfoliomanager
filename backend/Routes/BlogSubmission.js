@@ -240,7 +240,7 @@ router.post('/api/blog-submissions/:identifier/generate-summary', async (req, re
     };
     
     const modelWithConfig = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: generationConfig
     });
     
