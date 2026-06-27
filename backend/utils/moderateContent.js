@@ -25,7 +25,7 @@ Community Guidelines (VERY STRICT):
 - Must be respectful
 - If content does not contain abusive language then approve it or if does not violate any of the above guidelines, approve it. If it violates any of the above guidelines, reject it.
 - Don't reject any comment for relevence or opinion, only for violations of the above guidelines, whether it is constructive or not only respectful is enough.
-
+- If it is just a gibberish and des not make any sense, reject it and mark it as low severity. If it is a serious violation of the above guidelines, mark it as high or critical severity. If it is a minor violation, mark it as low or medium severity.
 User Name: "${userName}"
 Comment Content: "${content}"
 
