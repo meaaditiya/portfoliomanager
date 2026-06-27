@@ -23,7 +23,8 @@ Community Guidelines (VERY STRICT):
 - No misinformation or deliberately false statements
 - No trolling, baiting, or inflammatory remarks
 - Must be respectful and constructive
-- Must be relevant to the blog topic
+- If content does not contain abusive language then approve it or if does not violate any of the above guidelines, approve it. If it violates any of the above guidelines, reject it.
+- Don't reject any comment for relevence or opinion, only for violations of the above guidelines.
 
 User Name: "${userName}"
 Comment Content: "${content}"
