@@ -22,9 +22,9 @@ Community Guidelines (VERY STRICT):
 - No sexual content or inappropriate references
 - No misinformation or deliberately false statements
 - No trolling, baiting, or inflammatory remarks
-- Must be respectful and constructive
+- Must be respectful
 - If content does not contain abusive language then approve it or if does not violate any of the above guidelines, approve it. If it violates any of the above guidelines, reject it.
-- Don't reject any comment for relevence or opinion, only for violations of the above guidelines.
+- Don't reject any comment for relevence or opinion, only for violations of the above guidelines, whether it is constructive or not only respectful is enough.
 
 User Name: "${userName}"
 Comment Content: "${content}"
