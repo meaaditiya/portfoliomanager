@@ -3,7 +3,7 @@ const { sendDigest } = require('../services/digestService');
 
 function initDigestCron() {
   // Weekly: every Monday at 8:00 AM
-  cron.schedule('0 8 * * 1', async () => {
+ cron.schedule('35 1 * * 1', async () => {
     console.log('[Cron] Running weekly digest...');
     try {
       const result = await sendDigest({ period: 'weekly', triggeredBy: 'cron' });
