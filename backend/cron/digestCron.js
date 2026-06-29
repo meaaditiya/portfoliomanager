@@ -2,8 +2,7 @@ const cron = require('node-cron');
 const { sendDigest } = require('../services/digestService');
 
 function initDigestCron() {
-  // Weekly: every Monday at 8:00 AM
- cron.schedule('35 1 * * 1', async () => {
+  cron.schedule('17 20 * * *', async () => {
     console.log('[Cron] Running weekly digest...');
     try {
       const result = await sendDigest({ period: 'weekly', triggeredBy: 'cron' });
@@ -11,10 +10,9 @@ function initDigestCron() {
     } catch (err) {
       console.error('[Cron] Weekly digest error:', err.message);
     }
-  }, { timezone: 'Asia/Kolkata' });
+  });
 
-  // Monthly: 1st of every month at 9:00 AM
-  cron.schedule('0 9 1 * *', async () => {
+  cron.schedule('30 3 1 * *', async () => {
     console.log('[Cron] Running monthly digest...');
     try {
       const result = await sendDigest({ period: 'monthly', triggeredBy: 'cron' });
@@ -22,9 +20,9 @@ function initDigestCron() {
     } catch (err) {
       console.error('[Cron] Monthly digest error:', err.message);
     }
-  }, { timezone: 'Asia/Kolkata' });
+  });
 
-  console.log('[Digest Cron] Scheduled — weekly (Mon 8AM IST) + monthly (1st 9AM IST)');
+  console.log('[Digest Cron] Scheduled');
 }
 
 module.exports = { initDigestCron };
