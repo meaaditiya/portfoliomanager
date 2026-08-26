@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart, Lock, Unlock, Shield, Link2, Copy } from 'lucide-react';
+import { Folder, LinkIcon, Star, CheckSquare, File, ExternalLink, Upload, FolderPlus, Trash2, Edit2, Download, Home, ChevronRight, Search, X, Move, FileSpreadsheet, ArrowLeft, Check, Circle, Heart, Lock, Unlock, Shield, Link2, Copy, Eye } from 'lucide-react';
 import './FileManager.css';
 
 export default function FileManager() {
@@ -48,7 +48,10 @@ export default function FileManager() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [headerValue, setHeaderValue] = useState('');
   const [copiedLinkId, setCopiedLinkId] = useState(null);
-
+const [showPreviewSettingsModal, setShowPreviewSettingsModal] = useState(false);
+const [previewSettingsItem, setPreviewSettingsItem] = useState(null);
+const [previewEnabledDraft, setPreviewEnabledDraft] = useState(false);
+const [previewPageCountDraft, setPreviewPageCountDraft] = useState(2);
   const CHECKMARK_TYPES = [
     { id: 'checkbox', label: 'Checkbox', icon: CheckSquare },
     { id: 'check', label: 'Check', icon: Check },
@@ -568,7 +571,33 @@ const downloadFile = async (item) => {
       showMessage('Error updating bookmark setting', 'error');
     }
   };
+const savePreviewSettings = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/admin/item/${previewSettingsItem._id}/preview-toggle`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        enabled: previewEnabledDraft,
+        pageCount: previewPageCountDraft
+      })
+    });
 
+    if (res.ok) {
+      showMessage('Preview settings updated');
+      setShowPreviewSettingsModal(false);
+      setPreviewSettingsItem(null);
+      loadFolder(currentFolder?._id);
+    } else {
+      const data = await res.json();
+      showMessage(data.message || 'Error updating preview settings', 'error');
+    }
+  } catch (err) {
+    showMessage('Error updating preview settings', 'error');
+  }
+};
   // Checkmark fields
   const saveCheckmarkFields = async () => {
     if (checkmarkFields.some(f => !f.fieldName || !f.fieldId)) {
@@ -1626,6 +1655,21 @@ return (
                    item.accessLevel === 'private' ? <Shield size={16} /> : 
                    <Unlock size={16} />}
                 </button>
+                                {item.type === 'file' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewSettingsItem(item);
+                      setPreviewEnabledDraft(item.previewEnabled || false);
+                      setPreviewPageCountDraft(item.previewPageCount || 2);
+                      setShowPreviewSettingsModal(true);
+                    }}
+                    className={`fm-icon-btn ${item.previewEnabled ? 'fm-icon-btn--active' : ''}`}
+                    title="Preview Settings"
+                  >
+                    <Eye size={16} />
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -2141,6 +2185,45 @@ Enable Bookmarking
       </div>
     </div>
   )}
+  {showPreviewSettingsModal && previewSettingsItem && (
+  <div className="fm-modal" onClick={() => setShowPreviewSettingsModal(false)}>
+    <div className="fm-modal__content" onClick={(e) => e.stopPropagation()}>
+      <h3>Preview Settings</h3>
+      <p className="fm-modal__item-name"><strong>{previewSettingsItem.name}</strong></p>
+
+      <label className="fm-form-label">
+        <input
+          type="checkbox"
+          checked={previewEnabledDraft}
+          onChange={(e) => setPreviewEnabledDraft(e.target.checked)}
+        />
+        Enable Preview
+      </label>
+
+      <label className="fm-form-label">Pages to show in preview:</label>
+      <select
+        value={previewPageCountDraft}
+        onChange={(e) => setPreviewPageCountDraft(Number(e.target.value))}
+        className="fm-input"
+        disabled={!previewEnabledDraft}
+      >
+        <option value={1}>1</option>
+        <option value={2}>2</option>
+        <option value={3}>3</option>
+        
+      </select>
+
+      <div className="fm-modal__actions">
+        <button onClick={() => setShowPreviewSettingsModal(false)} className="fm-cancel-btn">
+          Cancel
+        </button>
+        <button onClick={savePreviewSettings} className="fm-submit-btn">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 </div>
 );
 }
