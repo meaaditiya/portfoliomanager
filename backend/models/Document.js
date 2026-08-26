@@ -67,7 +67,8 @@ storageProvider: {
     default: 'public'
   },
   
-  
+    previewEnabled: { type: Boolean, default: false },
+  previewPageCount: { type: Number, default: 2, min: 1, max: 5 },
   
   
   

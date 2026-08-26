@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer")();
 const XLSX = require("xlsx"); 
+const { PDFDocument } = require("pdf-lib");
 const jwt = require('jsonwebtoken');
 const authenticateToken = require("../middlewares/authMiddleware");
 const bucket = require("../services/driveService");
@@ -218,6 +219,15 @@ const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = 
 
   return { hasAccess: true };
 };
+async function buildPreviewPdf(fileBuffer, pageCount) {
+  const srcDoc = await PDFDocument.load(fileBuffer);
+  const n = Math.min(pageCount, srcDoc.getPageCount());
+  const previewDoc = await PDFDocument.create();
+  const copiedPages = await previewDoc.copyPages(srcDoc, [...Array(n).keys()]);
+  copiedPages.forEach(p => previewDoc.addPage(p));
+  const bytes = await previewDoc.save();
+  return Buffer.from(bytes);
+}
 router.post("/api/admin/excel/upload", authenticateToken, multer.single("file"), async (req, res) => {
   try {
     const file = req.file;
@@ -553,6 +563,51 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
   }
 });
 
+router.get("/api/preview/:id", optionalAuth, async (req, res) => {
+  try {
+    const { key } = req.query;
+    const doc = await Document.findById(req.params.id)
+      .select("previewEnabled previewPageCount type mimeType driveFileId");
+
+    if (!doc) return res.status(404).json({ message: "Not found" });
+    if (doc.type !== "file" || !doc.mimeType?.includes("pdf")) {
+      return res.status(400).json({ message: "Preview not supported for this file type" });
+    }
+    if (!doc.previewEnabled) {
+      return res.status(403).json({ message: "Preview not enabled for this document" });
+    }
+
+    const userId = req.user ? String(req.user.id) : null;
+    const isAdmin = req.user?.isAdmin || false;
+    const isPremium = req.user?.isPremium || false;
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
+
+    if (!accessCheck.hasAccess) {
+      return res.status(403).json({ message: accessCheck.reason });
+    }
+
+    if (!doc.driveFileId) {
+      return res.status(400).json({ message: "Preview source unavailable" });
+    }
+
+    const driveRes = await drive.files.get(
+      { fileId: doc.driveFileId, alt: "media" },
+      { responseType: "arraybuffer" }
+    );
+    const originalBuffer = Buffer.from(driveRes.data);
+    const previewBuffer = await buildPreviewPdf(originalBuffer, doc.previewPageCount || 2);
+    originalBuffer.fill(0);
+
+    res.set("Content-Type", "application/pdf");
+    res.set("Content-Disposition", 'inline; filename="preview.pdf"');
+    res.set("Cache-Control", "no-store");
+    return res.send(previewBuffer);
+
+  } catch (err) {
+    console.error("Preview error:", err);
+    return res.status(500).json({ message: "Failed to generate preview" });
+  }
+});
 
 router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
@@ -593,7 +648,7 @@ const isPremium = req.user?.isPremium || false;
         ? item.bookmarks.some(b => String(b.userId) === String(req.user.id))
         : false;
 
-      if (!itemAccessCheck.hasAccess) {
+           if (!itemAccessCheck.hasAccess) {
         return {
           _id: itemObj._id,
           name: itemObj.name,
@@ -603,11 +658,13 @@ const isPremium = req.user?.isPremium || false;
           createdAt: itemObj.createdAt,
           hasAccess: false,
           canRequestAccess: true,
-          accessDeniedReason: itemAccessCheck.reason
+          accessDeniedReason: itemAccessCheck.reason,
+          previewEnabled: item.previewEnabled || false,
+          previewPageCount: item.previewPageCount || 2
         };
       }
 
-      return {
+         return {
         _id: itemObj._id,
         name: itemObj.name,
         originalName: itemObj.originalName,
@@ -624,7 +681,9 @@ const isPremium = req.user?.isPremium || false;
         isBookmarked,
         hasAccess: true,
         accessLevel: item.accessLevel,
-        bookmarkCount: item.bookmarks?.length || 0
+        bookmarkCount: item.bookmarks?.length || 0,
+        previewEnabled: item.previewEnabled || false,
+        previewPageCount: item.previewPageCount || 2
       };
     }));
 
@@ -851,7 +910,9 @@ router.get("/api/search", optionalAuth, async (req, res) => {
           hasAccess: false,
           canRequestAccess: true,
           relevanceScore: item.fusedScore,
-          accessDeniedReason: accessCheck.reason
+          accessDeniedReason: accessCheck.reason,
+          previewEnabled: doc.previewEnabled || false, 
+          previewPageCount: doc.previewPageCount || 2,
         };
       }
 
@@ -873,7 +934,9 @@ router.get("/api/search", optionalAuth, async (req, res) => {
         accessLevel: doc.accessLevel,
         relevanceScore: item.fusedScore,
         vectorScore: item.vectorSim,
-        textScore: item.textScore
+        textScore: item.textScore,
+        previewEnabled: doc.previewEnabled || false, 
+          previewPageCount: doc.previewPageCount || 2,
       };
     }));
 
@@ -1356,7 +1419,44 @@ router.patch("/api/admin/item/:id/bookmark-toggle", authenticateToken, async (re
   }
 });
 
+router.patch("/api/admin/item/:id/preview-toggle", authenticateToken, async (req, res) => {
+  try {
+    const { enabled, pageCount } = req.body;
 
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: "enabled field must be boolean" });
+    }
+    if (pageCount !== undefined && (typeof pageCount !== 'number' || pageCount < 1 || pageCount > 3)) {
+      return res.status(400).json({ message: "pageCount must be a number between 1 and 3" });
+    }
+
+    const doc = await Document.findById(req.params.id);
+    if (!doc) return res.status(404).json({ message: "Item not found" });
+    if (doc.type !== "file") {
+      return res.status(400).json({ message: "Preview is only supported for files" });
+    }
+
+    doc.previewEnabled = enabled;
+    if (pageCount !== undefined) {
+      doc.previewPageCount = pageCount;
+    }
+
+    await doc.save();
+
+    res.json({
+      message: `Preview ${enabled ? 'enabled' : 'disabled'}`,
+      item: {
+        id: doc._id,
+        name: doc.name,
+        previewEnabled: doc.previewEnabled,
+        previewPageCount: doc.previewPageCount
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 
