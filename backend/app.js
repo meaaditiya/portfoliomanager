@@ -37,6 +37,7 @@ const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const PrivacyPolicyRoutes = require("./Routes/PrivacyPolicy.js");
 const digestRoutes = require('./Routes/Digest.js');
+const AboutDetailsRoutes = require("./Routes/AboutDetails.js");
 const { initDigestCron } = require('./cron/digestCron');
 
 const app = express();
@@ -166,6 +167,7 @@ async function initializeApp() {
     app.use(FeaturedProjects);
     app.use(PrivacyPolicyRoutes);
     app.use(digestRoutes);
+    app.use(AboutDetailsRoutes);
     console.log('Routes configured');
 
     console.log('Setting up visitor socket...');
