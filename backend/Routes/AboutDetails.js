@@ -168,7 +168,12 @@ router.put(
   '/api/admin/about/skills/:skillId',
   authenticateToken,
   cloudinaryUpload.single('logo'),
+  [body('name').optional().trim().notEmpty().withMessage('Skill name cannot be empty')],
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
     try {
       const doc = await getOrCreateAboutDoc();
       const skill = doc.skills.id(req.params.skillId);
@@ -180,6 +185,9 @@ router.put(
       if (req.file) {
         if (skill.logo?.publicId) await deleteCloudinaryAsset(skill.logo.publicId);
         skill.logo = { url: req.file.path, publicId: req.file.filename };
+      } else if (req.body.removeLogo === 'true') {
+        if (skill.logo?.publicId) await deleteCloudinaryAsset(skill.logo.publicId);
+        skill.logo = undefined;
       }
 
       await doc.save();
@@ -249,7 +257,16 @@ router.put(
   '/api/admin/about/experience/:expId',
   authenticateToken,
   cloudinaryUpload.single('companyLogo'),
+  [
+    body('role').optional().trim().notEmpty().withMessage('Role cannot be empty'),
+    body('company').optional().trim().notEmpty().withMessage('Company cannot be empty'),
+    body('startDate').optional().trim().notEmpty().withMessage('Start date cannot be empty')
+  ],
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
     try {
       const doc = await getOrCreateAboutDoc();
       const exp = doc.experience.id(req.params.expId);
@@ -262,6 +279,9 @@ router.put(
       if (req.file) {
         if (exp.companyLogo?.publicId) await deleteCloudinaryAsset(exp.companyLogo.publicId);
         exp.companyLogo = { url: req.file.path, publicId: req.file.filename };
+      } else if (req.body.removeLogo === 'true') {
+        if (exp.companyLogo?.publicId) await deleteCloudinaryAsset(exp.companyLogo.publicId);
+        exp.companyLogo = undefined;
       }
 
       await doc.save();
@@ -331,7 +351,16 @@ router.put(
   '/api/admin/about/education/:eduId',
   authenticateToken,
   cloudinaryUpload.single('schoolLogo'),
+  [
+    body('degree').optional().trim().notEmpty().withMessage('Degree cannot be empty'),
+    body('school').optional().trim().notEmpty().withMessage('School cannot be empty'),
+    body('duration').optional().trim().notEmpty().withMessage('Duration cannot be empty')
+  ],
   async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
     try {
       const doc = await getOrCreateAboutDoc();
       const edu = doc.education.id(req.params.eduId);
@@ -344,6 +373,9 @@ router.put(
       if (req.file) {
         if (edu.schoolLogo?.publicId) await deleteCloudinaryAsset(edu.schoolLogo.publicId);
         edu.schoolLogo = { url: req.file.path, publicId: req.file.filename };
+      } else if (req.body.removeLogo === 'true') {
+        if (edu.schoolLogo?.publicId) await deleteCloudinaryAsset(edu.schoolLogo.publicId);
+        edu.schoolLogo = undefined;
       }
 
       await doc.save();
