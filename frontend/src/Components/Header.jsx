@@ -46,7 +46,8 @@ const AdminHeader = ({ activeSection, setActiveSection, onLogout }) => {
     {name: 'Blog Submissions' , path: '/blogsubmissions'},
     {name: 'Documents' , path: '/document'},
     {name: 'Featured Projects', path: '/featured-projects'},
-    {name: 'Policy Terms' , path: '/policy'}
+    {name: 'Policy Terms' , path: '/policy'},
+    {name: 'About Details', path: '/adminabout'}
   ];
 
   const handleLogout = async () => {

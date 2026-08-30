@@ -24,6 +24,7 @@ import Document from './Components/Document';
 import FeaturedProjects from './Components/FeaturedProjects';
 import ManageUsers from './Components/manageUsers';
 import PrivacyPolicy from './Components/PolicyAdmin';
+import AdminAbout from './Components/Adminabout';
 function AppContent() {
   const [activeSection, setActiveSection] = useState('/adminpost'); 
   const [redirectMessage, setRedirectMessage] = useState(null);
@@ -97,6 +98,7 @@ function AppContent() {
           <Route path="/featured-projects" element={<FeaturedProjects/>}/>
           <Route path="/manage-users" element={<ManageUsers/>}/>
           <Route path="/policy" element={<PrivacyPolicy/>}/>
+          <Route path="/adminabout" element={<AdminAbout/>}/>
         </Routes>
       </main>
     </div>
