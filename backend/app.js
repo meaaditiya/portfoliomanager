@@ -87,7 +87,8 @@ async function initializeApp() {
             'http://192.168.1.33:5174',
             'http://192.168.1.33:5173',
             'https://aaditiyatyagi.vercel.app',
-            'https://aaditiyatyagipreprod.onrender.com'
+            'https://aaditiyatyagipreprod.onrender.com',
+            'https://aaditiyatyagi.in'
           ];
           if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
