@@ -10,6 +10,7 @@ const allowedOrigins = [
   'http://192.168.1.33:5174',
   'http://192.168.1.33:5173',
   'https://aaditiyatyagi.vercel.app'
+  'https://aaditiyatyagipreprod.onrender.com'
 ];
 
 const corsMiddleware = cors({
