@@ -11,7 +11,8 @@ const allowedOrigins = [
   'http://192.168.1.33:5173',
   'https://aaditiyatyagi.vercel.app',
   'https://aaditiyatyagipreprod.onrender.com',
-  'https://aaditiyatyagi.in'
+  'https://aaditiyatyagi.in',
+  'https://blogs.aaditiyatyagi.in'
 ];
 
 const corsMiddleware = cors({
