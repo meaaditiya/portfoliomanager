@@ -9,6 +9,35 @@ const UserAuthMiddleware = require("../middlewares/UserAuthMiddleware");
 const sendEmail = require("../utils/email");
 const getReplyEmailTemplate2 = require("../EmailTemplates/getReplyTemplate2");
 const authenticateToken = require("../middlewares/authMiddleware.js")
+
+
+const ALLOWED_CLIENT_ORIGINS = [
+  'https://aaditiyatyagi.in',
+  'https://blogs.aaditiyatyagi.in',
+  'http://localhost:5173'
+];
+
+function getSafeOrigin(origin) {
+  if (origin && ALLOWED_CLIENT_ORIGINS.includes(origin)) {
+    return origin;
+  }
+  return process.env.CLIENT_URL || 'http://localhost:3000';
+}
+
+function encodeState(origin) {
+  return Buffer.from(JSON.stringify({ origin })).toString('base64');
+}
+
+function decodeState(state) {
+  try {
+    const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+    return getSafeOrigin(decoded.origin);
+  } catch (e) {
+    return process.env.CLIENT_URL || 'http://localhost:3000';
+  }
+}
+// ---------------------------------------------------------------------
+
 router.post('/user/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -368,35 +397,40 @@ router.put('/user/update-name', UserAuthMiddleware, async (req, res) => {
   }
 });
 
-router.get('/google',
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
-  })
-);
+// ---- CHANGED: Google OAuth initiate route ----
+router.get('/google', (req, res, next) => {
+  const clientOrigin = getSafeOrigin(req.query.origin);
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    state: encodeState(clientOrigin)
+  })(req, res, next);
+});
 
-router.get('/google/callback',
-  passport.authenticate('google', { 
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=google_auth_failed`,
-    session: false 
-  }),
-  async (req, res) => {
+// ---- CHANGED: Google OAuth callback route ----
+router.get('/google/callback', (req, res, next) => {
+  const clientOrigin = decodeState(req.query.state);
+
+  passport.authenticate('google', { session: false }, async (err, user) => {
+    if (err || !user) {
+      console.error('Google callback error:', err);
+      return res.redirect(`${clientOrigin}/auth?error=google_auth_failed`);
+    }
+
     try {
-      if (req.user.profilePicture) {
-        await User.findByIdAndUpdate(req.user._id, {
-          profilePicture: req.user.profilePicture
+      if (user.profilePicture) {
+        await User.findByIdAndUpdate(user._id, {
+          profilePicture: user.profilePicture
         });
       }
 
       const token = jwt.sign(
         {
-          user_id: req.user._id,
-          email: req.user.email,
-          name: req.user.name,
-          isPremium: req.user.isPremium 
-          
+          user_id: user._id,
+          email: user.email,
+          name: user.name,
+          isPremium: user.isPremium
         },
         process.env.JWT_SECRET || 'your_jwt_secret',
-
         { expiresIn: '24h' }
       );
 
@@ -409,13 +443,14 @@ router.get('/google/callback',
         path: '/'
       });
 
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&google_login=success`);
+      res.redirect(`${clientOrigin}/auth?token=${token}&google_login=success`);
     } catch (error) {
       console.error('Google callback error:', error);
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=auth_failed`);
+      res.redirect(`${clientOrigin}/auth?error=auth_failed`);
     }
-  }
-);
+  })(req, res, next);
+});
+
 router.get('/admin/users', authenticateToken, async (req, res) => {
   try {
     if (!req.isAdmin) {
@@ -551,29 +586,39 @@ router.delete('/admin/users/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-router.get('/auth/github',
-  passport.authenticate('github', { scope: ['user:email'] })
-);
 
-router.get('/auth/github/callback',
+// ---- CHANGED: GitHub OAuth initiate route ----
+router.get('/auth/github', (req, res, next) => {
+  const clientOrigin = getSafeOrigin(req.query.origin);
   passport.authenticate('github', {
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=github_auth_failed`,
-    session: false
-  }),
-  async (req, res) => {
+    scope: ['user:email'],
+    state: encodeState(clientOrigin)
+  })(req, res, next);
+});
+
+// ---- CHANGED: GitHub OAuth callback route ----
+router.get('/auth/github/callback', (req, res, next) => {
+  const clientOrigin = decodeState(req.query.state);
+
+  passport.authenticate('github', { session: false }, async (err, user) => {
+    if (err || !user) {
+      console.error('GitHub callback error:', err);
+      return res.redirect(`${clientOrigin}/auth?error=github_auth_failed`);
+    }
+
     try {
-      if (req.user.profilePicture) {
-        await User.findByIdAndUpdate(req.user._id, {
-          profilePicture: req.user.profilePicture
+      if (user.profilePicture) {
+        await User.findByIdAndUpdate(user._id, {
+          profilePicture: user.profilePicture
         });
       }
 
       const token = jwt.sign(
         {
-          user_id: req.user._id,
-          email: req.user.email,
-          name: req.user.name,
-          isPremium: req.user.isPremium
+          user_id: user._id,
+          email: user.email,
+          name: user.name,
+          isPremium: user.isPremium
         },
         process.env.JWT_SECRET || 'your_jwt_secret',
         { expiresIn: '24h' }
@@ -588,38 +633,45 @@ router.get('/auth/github/callback',
         path: '/'
       });
 
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&github_login=success`);
+      res.redirect(`${clientOrigin}/auth?token=${token}&github_login=success`);
     } catch (error) {
-      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=auth_failed`);
+      console.error('GitHub callback error:', error);
+      res.redirect(`${clientOrigin}/auth?error=auth_failed`);
     }
-  }
-);
+  })(req, res, next);
+});
 
-router.get(
-  '/auth/discord',
-  passport.authenticate('discord')
-);
-
-router.get(
-  '/auth/discord/callback',
+// ---- CHANGED: Discord OAuth initiate route ----
+router.get('/auth/discord', (req, res, next) => {
+  const clientOrigin = getSafeOrigin(req.query.origin);
   passport.authenticate('discord', {
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=discord_auth_failed`,
-    session: false
-  }),
-  async (req, res) => {
+    state: encodeState(clientOrigin)
+  })(req, res, next);
+});
+
+// ---- CHANGED: Discord OAuth callback route ----
+router.get('/auth/discord/callback', (req, res, next) => {
+  const clientOrigin = decodeState(req.query.state);
+
+  passport.authenticate('discord', { session: false }, async (err, user) => {
+    if (err || !user) {
+      console.error('Discord callback error:', err);
+      return res.redirect(`${clientOrigin}/auth?error=discord_auth_failed`);
+    }
+
     try {
-      if (req.user.profilePicture) {
-        await User.findByIdAndUpdate(req.user._id, {
-          profilePicture: req.user.profilePicture
+      if (user.profilePicture) {
+        await User.findByIdAndUpdate(user._id, {
+          profilePicture: user.profilePicture
         });
       }
 
       const token = jwt.sign(
         {
-          user_id: req.user._id,
-          email: req.user.email,
-          name: req.user.name,
-          isPremium: req.user.isPremium
+          user_id: user._id,
+          email: user.email,
+          name: user.name,
+          isPremium: user.isPremium
         },
         process.env.JWT_SECRET || 'your_jwt_secret',
         { expiresIn: '24h' }
@@ -635,13 +687,15 @@ router.get(
       });
 
       res.redirect(
-        `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?token=${token}&discord_login=success`
+        `${clientOrigin}/auth?token=${token}&discord_login=success`
       );
     } catch (error) {
+      console.error('Discord callback error:', error);
       res.redirect(
-        `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth?error=auth_failed`
+        `${clientOrigin}/auth?error=auth_failed`
       );
     }
-  }
-);
+  })(req, res, next);
+});
+
 module.exports = router;
