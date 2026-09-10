@@ -36,7 +36,7 @@ function decodeState(state) {
     return process.env.CLIENT_URL || 'http://localhost:3000';
   }
 }
-// ---------------------------------------------------------------------
+
 
 router.post('/user/register', async (req, res) => {
   try {

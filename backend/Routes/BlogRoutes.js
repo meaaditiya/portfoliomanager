@@ -2567,7 +2567,7 @@ router.get('/api/search/analytics', async (req, res) => {
 // 1. POST - Create Author Comment
 router.post(
   '/api/blogs/:blogId/author-comment',
-  authenticateToken, 
+  authenticateToken,
   [
     body('content').trim().notEmpty().withMessage('Comment content is required')
       .isLength({ max: 1000 }).withMessage('Comment cannot exceed 1000 characters')
@@ -2587,30 +2587,41 @@ router.post(
         return res.status(404).json({ message: 'Blog not found' });
       }
 
+      const admin = await Admin.findById(req.user.admin_id);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin not found' });
+      }
+
       const newComment = new Comment({
         blog: blogId,
-        user: { 
-          name: req.user.name || 'Aaditiya Tyagi', 
-          email: req.user.email,
-          userId: req.user.admin_id
+        user: {
+          name: admin.name,
+          email: admin.email,
+          userId: admin._id
         },
         content,
         isAuthorComment: true,
-        authorAdminId: req.user.admin_id, 
+        authorAdminId: admin._id,
         status: 'approved'
       });
 
       await newComment.save();
-      
-      await Blog.findByIdAndUpdate(blogId, { $inc: { commentsCount: 1 } });
 
-      res.status(201).json({ 
+      await Blog.findByIdAndUpdate(
+        blogId,
+        { $inc: { commentsCount: 1 } }
+      );
+
+      res.status(201).json({
         message: 'Author comment added successfully',
         comment: newComment
       });
     } catch (error) {
       console.error('Error adding author comment:', error);
-      res.status(500).json({ message: 'Server error', error: error.message });
+      res.status(500).json({
+        message: 'Server error',
+        error: error.message
+      });
     }
   }
 );
