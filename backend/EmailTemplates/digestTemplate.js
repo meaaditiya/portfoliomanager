@@ -1,7 +1,6 @@
-const getDigestTemplate = ({ issueNumber, period, blogs, unsubscribeUrl, siteUrl = 'https://aaditiya.dev' }) => {
-  const periodLabel = period === 'weekly' ? 'Weekly Digest' : 'Monthly Digest';
+const getDigestTemplate = ({ issueNumber, period, blogs, unsubscribeUrl, siteUrl = 'https://aaditiyatyagi.in' }) => {
+  const periodLabel = 'Checkout newly added blogs on aaditiyatyagi.in';
   const blogCount = blogs.length;
-  const weekLabel = getWeekLabel(period);
 
   const blogRows = blogs.map((blog, i) => {
     const tag = blog.tags?.[0] || '';
@@ -54,7 +53,7 @@ const getDigestTemplate = ({ issueNumber, period, blogs, unsubscribeUrl, siteUrl
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
-  <title>${periodLabel} — The 1% Better Dev</title>
+  <title>${periodLabel}</title>
   <style>
     body, table, td { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table { border-collapse:collapse !important; }
@@ -76,18 +75,9 @@ const getDigestTemplate = ({ issueNumber, period, blogs, unsubscribeUrl, siteUrl
 
           <!-- HEADER -->
           <tr>
-            <td class="px" style="padding:36px 40px 24px;border-bottom:1px solid #ececec;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td valign="middle">
-                    <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;">The 1% Better Dev</p>
-                    <p style="margin:0;font-size:21px;font-weight:700;color:#111111;">${periodLabel}</p>
-                  </td>
-                  <td valign="middle" align="right" style="font-size:12px;color:#9ca3af;white-space:nowrap;">
-                    ${blogCount} new post${blogCount !== 1 ? 's' : ''}<br />${weekLabel}
-                  </td>
-                </tr>
-              </table>
+            <td class="px" style="padding:40px 40px 24px;border-bottom:1px solid #ececec;">
+              <p style="margin:0 0 8px;font-size:21px;font-weight:700;color:#111111;line-height:1.4;">${periodLabel}</p>
+              <p style="margin:0;font-size:13px;color:#9ca3af;">${blogCount} new post${blogCount !== 1 ? 's' : ''} this ${period === 'weekly' ? 'week' : 'month'}</p>
             </td>
           </tr>
 
@@ -120,25 +110,19 @@ const getDigestTemplate = ({ issueNumber, period, blogs, unsubscribeUrl, siteUrl
 
           <!-- FOOTER -->
           <tr>
-            <td class="px" style="padding:24px 40px;border-top:1px solid #ececec;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <p style="margin:0 0 8px;font-size:12px;color:#9ca3af;line-height:1.6;">You're receiving this because you subscribed to The 1% Better Dev.</p>
-                    <p style="margin:0 0 12px;font-size:12px;">
-                      <a href="${unsubscribeUrl}" style="color:#6b7280;text-decoration:underline;">Unsubscribe</a>
-                      &nbsp;&middot;&nbsp;
-                      <a href="${siteUrl}" style="color:#6b7280;text-decoration:underline;">Visit site</a>
-                    </p>
-                    <p style="margin:0 0 12px;font-size:12px;">
-                      <a href="https://x.com/aaditiya__tyagi" style="color:#6b7280;text-decoration:none;margin-right:10px;">X</a>
-                      <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" style="color:#6b7280;text-decoration:none;margin-right:10px;">LinkedIn</a>
-                      <a href="https://github.com/meaaditiya" style="color:#6b7280;text-decoration:none;">GitHub</a>
-                    </p>
-                    <p style="margin:0;font-size:11px;color:#c1c5cb;">© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
-                  </td>
-                </tr>
-              </table>
+            <td class="px" align="center" style="padding:28px 40px;border-top:1px solid #ececec;text-align:center;">
+              <p style="margin:0 0 10px;font-size:12px;color:#9ca3af;line-height:1.6;">You're receiving this because you subscribed on aaditiyatyagi.in.</p>
+              <p style="margin:0 0 14px;font-size:12px;">
+                <a href="${unsubscribeUrl}" style="color:#6b7280;text-decoration:underline;">Unsubscribe</a>
+                &nbsp;&middot;&nbsp;
+                <a href="${siteUrl}" style="color:#6b7280;text-decoration:underline;">Visit site</a>
+              </p>
+              <p style="margin:0 0 14px;font-size:12px;">
+                <a href="https://x.com/aaditiya__tyagi" style="color:#6b7280;text-decoration:none;margin:0 8px;">X</a>
+                <a href="https://www.linkedin.com/in/aaditiya-tyagi-babb26290/" style="color:#6b7280;text-decoration:none;margin:0 8px;">LinkedIn</a>
+                <a href="https://github.com/meaaditiya" style="color:#6b7280;text-decoration:none;margin:0 8px;">GitHub</a>
+              </p>
+              <p style="margin:0;font-size:11px;color:#c1c5cb;">© ${new Date().getFullYear()} Aaditiya Tyagi. All rights reserved.</p>
             </td>
           </tr>
 
