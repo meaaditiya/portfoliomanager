@@ -15,6 +15,7 @@ const moderateContent = require("../utils/moderateContent");
 const { body, validationResult } = require('express-validator');
 const  Comment = require('../models/comment');
 const  CommentReaction = require('../models/commentreaction');
+const  Admin = require('../models/admin');
 const Reaction = require("../models/reaction");
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFingerprintFromRequest } = require("../utils/GenerateFingerprint");
