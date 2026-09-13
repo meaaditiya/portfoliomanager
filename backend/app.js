@@ -38,6 +38,7 @@ const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const PrivacyPolicyRoutes = require("./Routes/PrivacyPolicy.js");
 const digestRoutes = require('./Routes/Digest.js');
 const AboutDetailsRoutes = require("./Routes/AboutDetails.js");
+const ReferralJobRoutes = require("./Routes/Referjobroutes.js");
 const { initDigestCron } = require('./cron/digestCron');
 
 const app = express();
