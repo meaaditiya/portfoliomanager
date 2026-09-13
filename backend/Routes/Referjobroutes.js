@@ -6,7 +6,12 @@ const authenticateToken = require('../middlewares/authMiddleware');
 const cloudinaryUpload = require('../middlewares/cloudinaryUpload');
 const cloudinaryUploadDocument = require('../middlewares/cloudinaryUploadDocument');
 const cloudinary = require('../Config/cloudinarystorage');
-const { ReferralPosting, JobPosting, Application, StatusOption } = require('../models/Referjobschema');
+const { ReferralPosting, JobPosting, Application, StatusOption } = require('../models/referJobSchema');
+const Admin = require('../models/admin');
+const sendEmail = require('../utils/email');
+const getApplicationConfirmationTemplate = require('../EmailTemplates/getApplicationConfirmationTemplate');
+const getAdminApplicationNotificationTemplate = require('../EmailTemplates/getAdminApplicationNotificationTemplate');
+const getApplicationStatusUpdateTemplate = require('../EmailTemplates/getApplicationStatusUpdateTemplate');
 
 const deleteCloudinaryAsset = async (publicId, resourceType = 'image') => {
   try {
@@ -113,6 +118,18 @@ router.post(
         return res.status(404).json({ success: false, message: 'Posting not found or inactive' });
       }
 
+      const existingApplication = await Application.findOne({
+        postingId: posting._id,
+        applicantEmail: applicantEmail.trim().toLowerCase()
+      });
+
+      if (existingApplication) {
+        return res.status(400).json({
+          success: false,
+          message: 'You have already applied to this posting with this email. Please use a different email to apply again.'
+        });
+      }
+
       let rawAnswers = req.body.answers;
       if (typeof rawAnswers === 'string') {
         rawAnswers = JSON.parse(rawAnswers);
@@ -144,7 +161,7 @@ router.post(
           roleTitle: applicationType === 'job' ? posting.title : posting.roleTitle
         },
         applicantName,
-        applicantEmail,
+        applicantEmail: applicantEmail.trim().toLowerCase(),
         applicantPhone,
         answers,
         ipAddress: req.ip
@@ -159,6 +176,31 @@ router.post(
       }
 
       await application.save();
+
+      try {
+        const confirmationTemplate = getApplicationConfirmationTemplate(
+          application.applicantName,
+          application.postingSnapshot.roleTitle,
+          application.postingSnapshot.companyName,
+          application.applicationId
+        );
+        await sendEmail(application.applicantEmail, 'Application Received Successfully', confirmationTemplate);
+
+        const admin = await Admin.findOne();
+        if (admin) {
+          const adminTemplate = getAdminApplicationNotificationTemplate(
+            application.applicantName,
+            application.applicantEmail,
+            application.postingSnapshot.roleTitle,
+            application.postingSnapshot.companyName,
+            application.applicationId,
+            application.applicationType
+          );
+          await sendEmail(admin.email, '🔔 New ' + (application.applicationType === 'referral' ? 'Referral' : 'Job') + ' Application from ' + application.applicantName, adminTemplate);
+        }
+      } catch (emailError) {
+        console.error('Error sending application emails:', emailError);
+      }
 
       res.status(201).json({
         success: true,
@@ -599,6 +641,21 @@ router.put(
       application._statusUpdatedBy = req.user.email || req.user.id;
 
       await application.save();
+
+      try {
+        const statusTemplate = getApplicationStatusUpdateTemplate(
+          application.applicantName,
+          application.postingSnapshot.roleTitle,
+          application.postingSnapshot.companyName,
+          application.applicationId,
+          application.currentStatus.label,
+          application.currentStatus.note
+        );
+        await sendEmail(application.applicantEmail, 'Update on Your Application - ' + application.currentStatus.label, statusTemplate);
+      } catch (emailError) {
+        console.error('Error sending status update email:', emailError);
+      }
+
       res.json({ success: true, message: 'Application status updated successfully', application });
     } catch (error) {
       console.error('Error updating application status:', error);
