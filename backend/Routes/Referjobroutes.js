@@ -6,11 +6,11 @@ const authenticateToken = require('../middlewares/authMiddleware');
 const cloudinaryUpload = require('../middlewares/cloudinaryUpload');
 const cloudinaryUploadDocument = require('../middlewares/cloudinaryUploadDocument');
 const cloudinary = require('../Config/cloudinarystorage');
-const { ReferralPosting, JobPosting, Application, StatusOption } = require('../models/referJobSchema');
+const { ReferralPosting, JobPosting, Application, StatusOption } = require('../models/Referjobschema.js');
 const Admin = require('../models/admin');
 const sendEmail = require('../utils/email');
 const getApplicationConfirmationTemplate = require('../EmailTemplates/getApplicationConfirmationTemplate');
-const getAdminApplicationNotificationTemplate = require('../EmailTemplates/getAdminApplicationNotificationTemplate');
+const getAdminApplicationNotificationTemplate = require('../EmailTemplates/getAdminApplicationNotificationTemplate.js');
 const getApplicationStatusUpdateTemplate = require('../EmailTemplates/getApplicationStatusUpdateTemplate');
 
 const deleteCloudinaryAsset = async (publicId, resourceType = 'image') => {
