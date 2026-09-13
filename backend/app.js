@@ -171,7 +171,7 @@ async function initializeApp() {
     app.use(PrivacyPolicyRoutes);
     app.use(digestRoutes);
     app.use(AboutDetailsRoutes);
-    app.use(ReferralJobRoutes);S
+    app.use(ReferralJobRoutes);
     console.log('Routes configured');
 
     console.log('Setting up visitor socket...');
