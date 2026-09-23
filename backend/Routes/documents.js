@@ -16,208 +16,38 @@ const crypto = require('crypto');
 const https = require('https');
 const BlacklistedToken = require("../models/blacklistedtoken");
 const drive = require("../services/driveService");
+const { checkTurnstile } = require('../utils/turnstileVerify');
+const { canRead } = require('../policies/documentPolicy');
+const { getWithAncestors, invalidateAncestorCache } = require('../repositories/documentRepo');
+
 const verifyTurnstile = async (token) => {
-  return new Promise((resolve, reject) => {
-    const postData = new URLSearchParams({
-      secret: process.env.TURNSTILE_SECRET_KEY,
-      response: token
-    }).toString();
-
-    const options = {
-      hostname: 'challenges.cloudflare.com',
-      port: 443,
-      path: '/turnstile/v0/siteverify',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-
-      res.on('end', () => {
-        try {
-          const response = JSON.parse(data);
-          console.log('Turnstile verification response:', response);
-          resolve(response.success === true);
-        } catch (error) {
-          console.error('Error parsing Turnstile response:', error);
-          resolve(false);
-        }
-      });
-    });
-
-    req.on('error', (error) => {
-      console.error('Turnstile request error:', error);
-      resolve(false);
-    });
-
-    req.write(postData);
-    req.end();
-  });
+  const { verifyWithCloudflare } = require('../utils/turnstileVerify');
+  return verifyWithCloudflare(token);
 };
-const verifyTurnstileToken = async (req, res, next) => {
-  const turnstileToken = req.headers['x-turnstile-token'] || req.body.turnstileToken || req.query.turnstileToken;
-  
-  if (!turnstileToken) {
-    return res.status(403).json({ 
-      message: 'Turnstile verification required',
-      requiresTurnstile: true 
-    });
-  }
 
-  const isValid = await verifyTurnstile(turnstileToken);
-  
-  if (!isValid) {
-    return res.status(403).json({ 
-      message: 'Turnstile verification failed',
-      requiresTurnstile: true 
-    });
-  }
+const optionalAuth = require('../middlewares/optionalAuthenticate');
 
-  next();
-};
-const optionalAuth = async (req, res, next) => {
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-  
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-      
-      const blacklisted = await BlacklistedToken.findOne({ token });
-      if (blacklisted) {
-        req.user = { 
-          isAuthenticated: false,
-          isAdmin: false,
-          isPremium: false
-        };
-        return next();
-      }
-      
-      // Check if this is an admin token
-      const isAdminToken = !!decoded.admin_id || decoded.role === 'admin';
-      
-      if (isAdminToken) {
-        // Admin token - don't look up in User collection
-        req.user = {
-          id: String(decoded.admin_id),
-          _id: String(decoded.admin_id),
-          email: decoded.email,
-          name: decoded.name,
-          isAdmin: true,
-          isPremium: true, // Admins always count as premium
-          isAuthenticated: true,
-          type: 'admin'
-        };
-      } else {
-        // Regular user token - look up in User collection
-        const userId = decoded.user_id;
-        
-        if (userId) {
-          const user = await User.findById(userId);
-          
-          if (user) {
-            req.user = {
-              id: String(userId),
-              _id: String(userId),
-              email: user.email,
-              name: user.name,
-              isAdmin: false,
-              isPremium: user.isPremium || false,
-              isAuthenticated: true,
-              type: 'user'
-            };
-          } else {
-            req.user = { 
-              isAuthenticated: false,
-              isAdmin: false,
-              isPremium: false
-            };
-          }
-        } else {
-          req.user = { 
-            isAuthenticated: false,
-            isAdmin: false,
-            isPremium: false
-          };
-        }
-      }
-    } catch (err) {
-      console.error('Token verification failed:', err.message);
-      req.user = { 
-        isAuthenticated: false,
-        isAdmin: false,
-        isPremium: false
-      };
-    }
-  } else {
-    req.user = { 
-      isAuthenticated: false,
-      isAdmin: false,
-      isPremium: false
-    };
-  }
-  
-  next();
-};
+// Kept for the ~15 call sites below (folder listing, item view, search, excel
+// data, request-access) so they all resolve access through the one policy
+// module instead of each re-implementing the ancestor walk.
 const checkFullPathAccess = async (documentId, userId, linkId = null, isAdmin = false, isPremium = false) => {
-  if (isAdmin || isPremium) {
-    return { hasAccess: true };
-  }
+  const { ancestors } = await getWithAncestors(documentId);
+  if (!ancestors.length) return { hasAccess: false, reason: 'Document not found' };
 
-  const doc = await Document.findById(documentId);
-  if (!doc) return { hasAccess: false, reason: 'Document not found' };
+  const decision = canRead(
+    { id: userId, isAdmin, isPremium },
+    ancestors,
+    { linkId, now: new Date() }
+  );
 
-  const path = [];
-  let current = doc;
-  
-  while (current) {
-    path.unshift(current);
-    if (current.parent) {
-      current = await Document.findById(current.parent);
-    } else {
-      current = null;
-    }
-  }
+  if (decision.allow) return { hasAccess: true };
 
-  for (const ancestor of path) {
-    if (ancestor.accessLevel === 'locked') {
-      return { hasAccess: false, reason: 'Parent folder is locked', lockedItem: ancestor.name };
-    }
-
-    if (ancestor.accessLevel === 'private') {
-      let ancestorHasAccess = false;
-
-      if (linkId) {
-        const link = ancestor.privateAccessLinks.find(l => 
-          l.linkId === linkId && 
-          l.isActive && 
-          (!l.expiresAt || l.expiresAt > new Date()) &&
-          (!l.maxAccessCount || l.accessCount < l.maxAccessCount)
-        );
-        if (link) ancestorHasAccess = true;
-      }
-
-      if (!ancestorHasAccess && userId) {
-        const granted = ancestor.grantedUsers.find(g => 
-          g.userId.toString() === userId.toString()
-        );
-        if (granted) ancestorHasAccess = true;
-      }
-
-      if (!ancestorHasAccess) {
-        return { hasAccess: false, reason: 'Parent folder is private', privateItem: ancestor.name };
-      }
-    }
-  }
-
-  return { hasAccess: true };
+  return {
+    hasAccess: false,
+    reason: decision.reason === 'locked' ? 'Parent folder is locked' : 'Parent folder is private',
+    lockedItem: decision.reason === 'locked' ? decision.at : undefined,
+    privateItem: decision.reason === 'private' ? decision.at : undefined
+  };
 };
 async function buildPreviewPdf(fileBuffer, pageCount) {
   const srcDoc = await PDFDocument.load(fileBuffer);
@@ -487,21 +317,14 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
     const isAdmin = req.user?.isAdmin || false;
     const isPremium = req.user?.isPremium || false;
     if (!isAdmin && !isPremium) {
-      const turnstileToken = req.headers['x-turnstile-token'] || req.body.turnstileToken || req.query.turnstileToken;
-      
-      if (!turnstileToken) {
-        return res.status(403).json({ 
+      // Cached per-fingerprint for 10 minutes, so one solved challenge covers
+      // this and every other document/excel/download call in that window
+      // instead of forcing a fresh captcha per file.
+      const turnstileResult = await checkTurnstile(req);
+      if (!turnstileResult.ok) {
+        return res.status(403).json({
           message: 'Turnstile verification required',
-          requiresTurnstile: true 
-        });
-      }
-
-      const isValid = await verifyTurnstile(turnstileToken);
-      
-      if (!isValid) {
-        return res.status(403).json({ 
-          message: 'Turnstile verification failed',
-          requiresTurnstile: true 
+          requiresTurnstile: true
         });
       }
     }
@@ -563,51 +386,7 @@ router.get("/api/excel/:id/data", optionalAuth, async (req, res) => {
   }
 });
 
-router.get("/api/preview/:id", optionalAuth, async (req, res) => {
-  try {
-    const { key } = req.query;
-    const doc = await Document.findById(req.params.id)
-      .select("previewEnabled previewPageCount type mimeType driveFileId");
-
-    if (!doc) return res.status(404).json({ message: "Not found" });
-    if (doc.type !== "file" || !doc.mimeType?.includes("pdf")) {
-      return res.status(400).json({ message: "Preview not supported for this file type" });
-    }
-    if (!doc.previewEnabled) {
-      return res.status(403).json({ message: "Preview not enabled for this document" });
-    }
-
-    const userId = req.user ? String(req.user.id) : null;
-    const isAdmin = req.user?.isAdmin || false;
-    const isPremium = req.user?.isPremium || false;
-    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
-
-    if (!accessCheck.hasAccess) {
-      return res.status(403).json({ message: accessCheck.reason });
-    }
-
-    if (!doc.driveFileId) {
-      return res.status(400).json({ message: "Preview source unavailable" });
-    }
-
-    const driveRes = await drive.files.get(
-      { fileId: doc.driveFileId, alt: "media" },
-      { responseType: "arraybuffer" }
-    );
-    const originalBuffer = Buffer.from(driveRes.data);
-    const previewBuffer = await buildPreviewPdf(originalBuffer, doc.previewPageCount || 2);
-    originalBuffer.fill(0);
-
-    res.set("Content-Type", "application/pdf");
-    res.set("Content-Disposition", 'inline; filename="preview.pdf"');
-    res.set("Cache-Control", "no-store");
-    return res.send(previewBuffer);
-
-  } catch (err) {
-    console.error("Preview error:", err);
-    return res.status(500).json({ message: "Failed to generate preview" });
-  }
-});
+// /api/preview/:id moved to routes/documentSecure.routes.js
 
 router.get("/api/folder/contents", optionalAuth, async (req, res) => {
   try {
@@ -1050,6 +829,7 @@ router.patch("/api/admin/item/:id/move", authenticateToken, async (req, res) => 
 
     item.parent = newParentId || null;
     await item.save();
+    await invalidateAncestorCache(String(item._id));
 
     if (item.type === "folder") {
       await updateChildrenPaths(item._id);
@@ -1142,35 +922,17 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
       if (parent.type !== "folder") return res.status(400).json({ message: "Parent must be a folder" });
     }
 
-    const fileMetadata = {
+    const uploaded = await drive.uploadFile({
       name: file.originalname,
-      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
-    };
-
-    const media = {
       mimeType: file.mimetype,
-      body: require('stream').Readable.from(file.buffer)
-    };
-
-    const driveResponse = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, mimeType, size, webViewLink, webContentLink' // Request both links
+      buffer: file.buffer,
+      parentFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID
     });
 
-    const driveFileId = driveResponse.data.id;
-
-    await drive.permissions.create({
-      fileId: driveFileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      }
-    });
-
-    const viewUrl = driveResponse.data.webViewLink;
-    const downloadUrl = driveResponse.data.webContentLink;
-
+    // Deliberately no drive.permissions.create() call. The file's only
+    // reader is this server's own Drive identity — clients never receive
+    // a storage URL, only a short-lived grant issued through
+    // /api/documents/:id/access, redeemed at /api/documents/:id/content.
     const embedding = await generateQueryEmbedding(file.originalname);
 
     const doc = await Document.create({
@@ -1178,10 +940,8 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
       type: "file",
       originalName: file.originalname,
       mimeType: file.mimetype,
-      size: parseInt(driveResponse.data.size) || file.size,
-      url: viewUrl, 
-      downloadUrl: downloadUrl, 
-      driveFileId: driveFileId,
+      size: uploaded.size || file.size,
+      driveFileId: uploaded.driveFileId,
       storageProvider: "drive",
       embedding,
       parent: parentId || null,
@@ -1195,65 +955,10 @@ router.post("/api/admin/document/upload", authenticateToken, multer.single("file
     res.status(500).json({ error: err.message });
   }
 });
-router.get("/api/download/:id", optionalAuth, async (req, res) => {
-  try {
-    const { key, turnstileToken, forceDownload } = req.query;
-    const isAdmin = req.user?.isAdmin || false;
-    const isPremium = req.user?.isPremium || false;
-
-    if (!isAdmin && !isPremium) {
-      if (turnstileToken) {
-        const isValid = await verifyTurnstile(turnstileToken);
-        if (!isValid) {
-          return res.status(403).json({ 
-            message: 'Verification failed',
-            requiresTurnstile: true 
-          });
-        }
-      } else {
-        return res.status(403).json({ 
-          message: 'Turnstile verification required',
-          requiresTurnstile: true 
-        });
-      }
-    }
-    
-    const doc = await Document.findById(req.params.id);
-    if (!doc) return res.status(404).json({ message: "Not found" });
-    if (doc.type !== "file") {
-      return res.status(400).json({ message: "Cannot download this item type" });
-    }
-
-    const userId = req.user ? String(req.user.id) : null;
-    const accessCheck = await checkFullPathAccess(req.params.id, userId, key, isAdmin, isPremium);
-
-    if (!accessCheck.hasAccess) {
-      return res.status(403).json({ 
-        message: accessCheck.reason,
-        details: accessCheck.lockedItem || accessCheck.privateItem
-      });
-    }
-
-    if (key) {
-      const link = doc.privateAccessLinks.find(l => l.linkId === key);
-      if (link && link.isActive) {
-        link.accessCount += 1;
-        await doc.save();
-      }
-    }
-
-   
-    res.json({ 
-      viewUrl: doc.url, 
-      downloadUrl: doc.downloadUrl || doc.url,
-      filename: doc.originalName 
-    });
-
-  } catch (err) {
-    console.error('Download error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
+// /api/download/:id replaced by the two-call, last-byte-controlled flow:
+//   GET /api/documents/:id/access   -> { grant }
+//   GET /api/documents/:id/content  -> streamed bytes, Authorization: Grant <token>
+// See routes/documentSecure.routes.js
 
 router.delete("/api/admin/item/:id", authenticateToken, async (req, res) => {
   try {
@@ -1987,6 +1692,7 @@ router.patch("/api/admin/access/:id/level", authenticateToken, async (req, res) 
     }
     
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     res.json({ 
       message: `Access level set to ${accessLevel}`,
@@ -2033,6 +1739,7 @@ router.post("/api/admin/access/:id/generate-link", authenticateToken, async (req
     });
 
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     const accessUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/access/${doc._id}?key=${linkId}`;
 
@@ -2060,6 +1767,7 @@ router.delete("/api/admin/access/:id/link/:linkId", authenticateToken, async (re
 
     link.isActive = false;
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     res.json({ message: "Access link revoked" });
 
@@ -2098,6 +1806,7 @@ router.post("/api/admin/access/:id/grant-user", authenticateToken, async (req, r
     });
 
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     // Send notification email to user
     const message = `You have been granted access to "${doc.name}".`;
@@ -2136,6 +1845,7 @@ router.delete("/api/admin/access/:id/revoke-user/:userId", authenticateToken, as
     );
 
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     res.json({ message: "User access revoked" });
 
@@ -2202,6 +1912,7 @@ router.post("/api/admin/access-requests/:requestId/approve", authenticateToken, 
     });
 
     await doc.save();
+    await invalidateAncestorCache(String(doc._id));
 
     const accessUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/access/${doc._id}?key=${linkId}`;
 
@@ -2439,16 +2150,22 @@ router.get("/api/user/my-access-requests", async (req, res) => {
   }
 });
 
-router.get("/api/user/check-access/:id", async (req, res) => {
+router.get("/api/user/check-access/:id", optionalAuth, async (req, res) => {
   try {
-    const { linkId, userId } = req.query;
-    
+    const { linkId } = req.query;
+
     const doc = await Document.findById(req.params.id)
       .select('name type size accessLevel inheritParentAccess');
-    
+
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
-    const accessCheck = await checkFullPathAccess(req.params.id, userId, linkId);
+    // Identity comes from the verified token (optionalAuth), never the query
+    // string — a caller can no longer probe another user's access by passing
+    // ?userId=<someone else>.
+    const userId = req.user?.id || null;
+    const isAdmin = req.user?.isAdmin || false;
+    const isPremium = req.user?.isPremium || false;
+    const accessCheck = await checkFullPathAccess(req.params.id, userId, linkId, isAdmin, isPremium);
 
     res.json({
       hasAccess: accessCheck.hasAccess,

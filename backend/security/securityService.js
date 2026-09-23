@@ -453,7 +453,12 @@ process.on('SIGTERM', async () => {
   }
 });
 
+function getRedisClient() {
+  return isRedisConnected ? redisClient : null;
+}
+
 module.exports = {
   initializeSecurity,
+  getRedisClient,
   logger
 };

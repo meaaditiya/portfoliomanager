@@ -33,6 +33,7 @@ const StreamRoutes = require("./Routes/Streams.js");
 const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
 const DocumentRoutes = require("./Routes/documents.js");
+const DocumentSecureRoutes = require("./routes/documentSecure.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const PrivacyPolicyRoutes = require("./Routes/PrivacyPolicy.js");
@@ -166,6 +167,7 @@ async function initializeApp() {
     app.use(SocialMediaEmbed);
     app.use(CommunityPostRoutes);
     app.use('/api/visitors', visitorRoutes);
+    app.use(DocumentSecureRoutes);
     app.use(DocumentRoutes);
     app.use(FeaturedProjects);
     app.use(PrivacyPolicyRoutes);
@@ -253,6 +255,7 @@ initializeApp().catch((error) => {
   console.error('❌ Fatal error during initialization:', error);
   console.error('Error stack:', error.stack);
   process.exit(1);
+  
 });
 
 module.exports = { app, server };
