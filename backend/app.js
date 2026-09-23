@@ -33,7 +33,7 @@ const StreamRoutes = require("./Routes/Streams.js");
 const visitorRoutes = require("./Routes/Visitor.js");
 const embeddingRoutes = require("./Routes/embeddingRoutes.js");
 const DocumentRoutes = require("./Routes/documents.js");
-const DocumentSecureRoutes = require("./routes/documentSecure.js");
+const DocumentSecureRoutes = require("./Routes/documentSecure.js");
 const userAuth = require("./Routes/UserAuthenticationRoutes.js");
 const FeaturedProjects = require("./Routes/FeaturedProjects.js");
 const PrivacyPolicyRoutes = require("./Routes/PrivacyPolicy.js");
@@ -255,7 +255,7 @@ initializeApp().catch((error) => {
   console.error('❌ Fatal error during initialization:', error);
   console.error('Error stack:', error.stack);
   process.exit(1);
-  
+
 });
 
 module.exports = { app, server };
