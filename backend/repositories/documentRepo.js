@@ -1,4 +1,4 @@
-const Document = require('../models/Document');
+const { Document } = require('../models/Document');
 const { getRedisClient } = require('../security/securityService');
 
 const ANCESTOR_CACHE_TTL_SECONDS = 30;

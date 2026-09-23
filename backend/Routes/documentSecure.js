@@ -1,7 +1,7 @@
 const express = require('express');
 const { PDFDocument } = require('pdf-lib');
 const drive = require('../services/driveService');
-const Document = require('../models/Document');
+const { Document } = require('../models/Document');
 const DocumentAccessLog = require('../models/DocumentAccessLog');
 const optionalAuthenticate = require('../middlewares/optionalAuthenticate');
 const documentAccessLimiter = require('../middlewares/documentAccessLimiter');
