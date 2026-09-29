@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const XLSX = require('xlsx');
+const mongoose = require('mongoose');
 const authenticateToken = require('../middlewares/authMiddleware');
 const cloudinaryUpload = require('../middlewares/cloudinaryUpload');
 const cloudinaryUploadDocument = require('../middlewares/cloudinaryUploadDocument');
@@ -30,17 +31,35 @@ const buildQuestionsFromBody = (rawQuestions) => {
   if (!rawQuestions) return [];
   let parsed = rawQuestions;
   if (typeof rawQuestions === 'string') {
-    parsed = JSON.parse(rawQuestions);
+    try {
+      parsed = JSON.parse(rawQuestions);
+    } catch {
+      const err = new Error('Questions must be valid JSON');
+      err.statusCode = 400;
+      throw err;
+    }
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.map((q, index) => ({
-    questionText: q.questionText,
-    type: q.type || 'text',
-    options: Array.isArray(q.options) ? q.options : [],
-    placeholder: q.placeholder || '',
-    required: !!q.required,
-    order: q.order ?? index
-  }));
+
+  return parsed
+    .map((q, index) => {
+      const text = String(q.questionText ?? q.question ?? q.text ?? q.label ?? '').trim();
+      if (!text) return null;
+
+      const out = {
+        questionText: text,
+        type: q.type || 'text',
+        options: Array.isArray(q.options)
+          ? q.options.map((o) => String(o).trim()).filter(Boolean)
+          : [],
+        placeholder: q.placeholder || '',
+        required: q.required === true || q.required === 'true',
+        order: q.order ?? index
+      };
+      if (q._id && mongoose.Types.ObjectId.isValid(q._id)) out._id = q._id;
+      return out;
+    })
+    .filter(Boolean);
 };
 
 const generateUniqueApplicationId = async (type) => {
@@ -136,18 +155,27 @@ router.post(
       }
       if (!Array.isArray(rawAnswers)) rawAnswers = [];
 
-      const answers = posting.questions.map((question) => {
-        const submitted = rawAnswers.find((a) => a.questionId === String(question._id));
-        if (question.required && (submitted === undefined || submitted.answer === undefined || submitted.answer === '')) {
-          throw new Error(`Answer required for: ${question.questionText}`);
-        }
-        return {
-          questionId: question._id,
-          questionText: question.questionText,
-          questionType: question.type,
-          answer: submitted ? submitted.answer : ''
-        };
-      });
+    const isEmptyAnswer = (v) =>
+  v === undefined ||
+  v === null ||
+  (typeof v === 'string' && v.trim() === '') ||
+  (Array.isArray(v) && v.length === 0);
+
+const answers = posting.questions.map((question) => {
+  const submitted = rawAnswers.find((a) => String(a.questionId) === String(question._id));
+  const value = submitted ? submitted.answer : undefined;
+
+  if (question.required && isEmptyAnswer(value)) {
+    throw new Error(`Answer required for: ${question.questionText}`);
+  }
+
+  return {
+    questionId: question._id,
+    questionText: question.questionText,
+    questionType: question.type,
+    answer: value ?? ''
+  };
+});
 
       const applicationId = await generateUniqueApplicationId(applicationType);
 

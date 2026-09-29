@@ -19,7 +19,7 @@ const AnswerSchema = new mongoose.Schema({
   questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
   questionText: { type: String, required: true },
   questionType: { type: String, required: true },
-  answer: { type: mongoose.Schema.Types.Mixed, required: true }
+  answer: { type: mongoose.Schema.Types.Mixed, default: '' }
 }, { _id: false });
 
 const StatusLogSchema = new mongoose.Schema({
@@ -91,7 +91,7 @@ const ApplicationSchema = new mongoose.Schema({
     roleTitle: String
   },
   applicantName: { type: String, required: true, trim: true },
-  applicantEmail: { type: String, required: true, trim: true },
+  applicantEmail: { type: String, required: true, trim: true, lowercase: true },
   applicantPhone: { type: String, trim: true },
   resume: {
     url: String,
