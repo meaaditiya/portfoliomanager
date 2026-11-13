@@ -40,7 +40,7 @@ const digestRoutes = require('./Routes/Digest.js');
 const AboutDetailsRoutes = require("./Routes/AboutDetails.js");
 const ReferralJobRoutes = require("./Routes/Referjobroutes.js");
 const { initDigestCron } = require('./cron/digestCron');
-
+const bookmarkRoutes = require('./Routes/bookmarkRoutes.js');
 const app = express();
 const server = http.createServer(app);
 
@@ -172,6 +172,7 @@ async function initializeApp() {
     app.use(digestRoutes);
     app.use(AboutDetailsRoutes);
     app.use(ReferralJobRoutes);
+    app.use(bookmarkRoutes);
     console.log('Routes configured');
 
     console.log('Setting up visitor socket...');
