@@ -81,14 +81,23 @@ const StatusOptionSchema = new mongoose.Schema({
   order: { type: Number, default: 0 }
 }, { timestamps: true });
 
+const isNotCustom = function () {
+  return this.applicationType !== 'custom';
+};
+
 const ApplicationSchema = new mongoose.Schema({
   applicationId: { type: String, required: true, unique: true, index: true },
-  applicationType: { type: String, enum: ['referral', 'job'], required: true },
-  postingModel: { type: String, enum: ['ReferralPosting', 'JobPosting'], required: true },
-  postingId: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'postingModel' },
+  applicationType: { type: String, enum: ['referral', 'job', 'custom'], required: true },
+  postingModel: { type: String, enum: ['ReferralPosting', 'JobPosting'], required: isNotCustom },
+  postingId: { type: mongoose.Schema.Types.ObjectId, required: isNotCustom, refPath: 'postingModel' },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   postingSnapshot: {
     companyName: String,
     roleTitle: String
+  },
+  customDetails: {
+    description: { type: String, trim: true },
+    jobLink: { type: String, trim: true }
   },
   applicantName: { type: String, required: true, trim: true },
   applicantEmail: { type: String, required: true, trim: true, lowercase: true },
@@ -99,6 +108,14 @@ const ApplicationSchema = new mongoose.Schema({
     originalName: String
   },
   answers: [AnswerSchema],
+  followUp: {
+    status: { type: String, enum: ['none', 'pending', 'answered'], default: 'none' },
+    message: { type: String, trim: true },
+    requestedAt: Date,
+    respondedAt: Date,
+    questions: [QuestionSchema],
+    answers: [AnswerSchema]
+  },
   currentStatus: {
     label: { type: String, default: 'Applied' },
     color: { type: String, default: '#3b82f6' },
@@ -110,6 +127,7 @@ const ApplicationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 ApplicationSchema.index({ postingId: 1, applicantEmail: 1 });
+ApplicationSchema.index({ user: 1, createdAt: -1 });
 
 ApplicationSchema.pre('save', function (next) {
   if (this.isNew || this.isModified('currentStatus')) {
@@ -125,7 +143,7 @@ ApplicationSchema.pre('save', function (next) {
 });
 
 ApplicationSchema.statics.generateApplicationId = function (type) {
-  const prefix = type === 'job' ? 'JOB' : 'REF';
+  const prefix = type === 'job' ? 'JOB' : type === 'custom' ? 'CUS' : 'REF';
   const code = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
   return `${prefix}-${code}`;
 };

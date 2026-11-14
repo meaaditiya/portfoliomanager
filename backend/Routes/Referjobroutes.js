@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
 const authenticateToken = require('../middlewares/authMiddleware');
+const { requireUser, optionalUser } = require('../middlewares/applicantAuth');
 const cloudinaryUpload = require('../middlewares/cloudinaryUpload');
 const cloudinaryUploadDocument = require('../middlewares/cloudinaryUploadDocument');
 const cloudinary = require('../Config/cloudinarystorage');
@@ -13,6 +14,8 @@ const sendEmail = require('../utils/email');
 const getApplicationConfirmationTemplate = require('../EmailTemplates/getApplicationConfirmationTemplate');
 const getAdminApplicationNotificationTemplate = require('../EmailTemplates/getAdminApplicationNotificationTemplate.js');
 const getApplicationStatusUpdateTemplate = require('../EmailTemplates/getApplicationStatusUpdateTemplate');
+const getApplicationMoreInfoTemplate = require('../EmailTemplates/getApplicationMoreInfoTemplate');
+const getAdminFollowUpResponseTemplate = require('../EmailTemplates/getAdminFollowUpResponseTemplate');
 
 const deleteCloudinaryAsset = async (publicId, resourceType = 'image') => {
   try {
@@ -22,6 +25,16 @@ const deleteCloudinaryAsset = async (publicId, resourceType = 'image') => {
   } catch (error) {
     console.error('Error deleting from Cloudinary:', error);
   }
+};
+
+const cleanupUploads = async (files) => {
+  await Promise.all((files || []).map((file) => deleteCloudinaryAsset(file.filename, 'raw')));
+};
+
+const httpError = (statusCode, message) => {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
 };
 
 const modelFor = (type) => (type === 'job' ? JobPosting : ReferralPosting);
@@ -72,6 +85,79 @@ const generateUniqueApplicationId = async (type) => {
   return id;
 };
 
+const isEmptyAnswer = (v) =>
+  v === undefined ||
+  v === null ||
+  (typeof v === 'string' && v.trim() === '') ||
+  (Array.isArray(v) && v.length === 0);
+
+const parseRawAnswers = (raw) => {
+  let parsed = raw;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw httpError(400, 'Answers must be valid JSON');
+    }
+  }
+  return Array.isArray(parsed) ? parsed : [];
+};
+
+const mapFilesByField = (files) => {
+  const map = {};
+  (files || []).forEach((file) => {
+    map[file.fieldname] = file;
+  });
+  return map;
+};
+
+const fileToAnswer = (file) => ({
+  url: file.path,
+  publicId: file.filename,
+  originalName: file.originalname
+});
+
+const buildAnswers = (questions, rawAnswers, fileMap) =>
+  questions.map((question) => {
+    if (question.type === 'file') {
+      const file = fileMap[`answerFile_${question._id}`];
+      if (!file && question.required) {
+        throw httpError(400, `File required for: ${question.questionText}`);
+      }
+      return {
+        questionId: question._id,
+        questionText: question.questionText,
+        questionType: question.type,
+        answer: file ? fileToAnswer(file) : ''
+      };
+    }
+
+    const submitted = rawAnswers.find((a) => String(a.questionId) === String(question._id));
+    const value = submitted ? submitted.answer : undefined;
+
+    if (question.required && isEmptyAnswer(value)) {
+      throw httpError(400, `Answer required for: ${question.questionText}`);
+    }
+
+    return {
+      questionId: question._id,
+      questionText: question.questionText,
+      questionType: question.type,
+      answer: value ?? ''
+    };
+  });
+
+const formatAnswerForExport = (answer) => {
+  if (Array.isArray(answer)) return answer.join(', ');
+  if (answer && typeof answer === 'object') return answer.url || '';
+  return answer ?? '';
+};
+
+const collectAssetIds = (application) =>
+  [...(application.answers || []), ...(application.followUp?.answers || [])]
+    .filter((a) => a.questionType === 'file' && a.answer && a.answer.publicId)
+    .map((a) => a.answer.publicId);
+
 router.get('/api/public/referral-postings', async (req, res) => {
   try {
     const postings = await ReferralPosting.find({ isActive: true }).sort({ order: 1, createdAt: -1 });
@@ -116,7 +202,8 @@ router.get('/api/public/job-postings/:id', async (req, res) => {
 
 router.post(
   '/api/public/applications',
-  cloudinaryUploadDocument.single('resume'),
+  optionalUser,
+  cloudinaryUploadDocument.any(),
   [
     body('applicationType').isIn(['referral', 'job']).withMessage('Valid application type is required'),
     body('postingId').trim().notEmpty().withMessage('Posting id is required'),
@@ -124,8 +211,10 @@ router.post(
     body('applicantEmail').trim().isEmail().withMessage('Valid email is required')
   ],
   async (req, res) => {
+    const files = req.files || [];
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await cleanupUploads(files);
       return res.status(400).json({ success: false, errors: errors.array() });
     }
     try {
@@ -134,7 +223,7 @@ router.post(
       const posting = await PostingModel.findById(postingId);
 
       if (!posting || !posting.isActive) {
-        return res.status(404).json({ success: false, message: 'Posting not found or inactive' });
+        throw httpError(404, 'Posting not found or inactive');
       }
 
       const existingApplication = await Application.findOne({
@@ -143,39 +232,12 @@ router.post(
       });
 
       if (existingApplication) {
-        return res.status(400).json({
-          success: false,
-          message: 'You have already applied to this posting with this email. Please use a different email to apply again.'
-        });
+        throw httpError(400, 'You have already applied to this posting with this email. Please use a different email to apply again.');
       }
 
-      let rawAnswers = req.body.answers;
-      if (typeof rawAnswers === 'string') {
-        rawAnswers = JSON.parse(rawAnswers);
-      }
-      if (!Array.isArray(rawAnswers)) rawAnswers = [];
-
-    const isEmptyAnswer = (v) =>
-  v === undefined ||
-  v === null ||
-  (typeof v === 'string' && v.trim() === '') ||
-  (Array.isArray(v) && v.length === 0);
-
-const answers = posting.questions.map((question) => {
-  const submitted = rawAnswers.find((a) => String(a.questionId) === String(question._id));
-  const value = submitted ? submitted.answer : undefined;
-
-  if (question.required && isEmptyAnswer(value)) {
-    throw new Error(`Answer required for: ${question.questionText}`);
-  }
-
-  return {
-    questionId: question._id,
-    questionText: question.questionText,
-    questionType: question.type,
-    answer: value ?? ''
-  };
-});
+      const rawAnswers = parseRawAnswers(req.body.answers);
+      const fileMap = mapFilesByField(files);
+      const answers = buildAnswers(posting.questions, rawAnswers, fileMap);
 
       const applicationId = await generateUniqueApplicationId(applicationType);
 
@@ -184,6 +246,7 @@ const answers = posting.questions.map((question) => {
         applicationType,
         postingModel: modelNameFor(applicationType),
         postingId: posting._id,
+        user: req.user ? req.user.user_id : undefined,
         postingSnapshot: {
           companyName: applicationType === 'job' ? posting.company : posting.companyName,
           roleTitle: applicationType === 'job' ? posting.title : posting.roleTitle
@@ -195,11 +258,11 @@ const answers = posting.questions.map((question) => {
         ipAddress: req.ip
       });
 
-      if (req.file) {
+      if (fileMap.resume) {
         application.resume = {
-          url: req.file.path,
-          publicId: req.file.filename,
-          originalName: req.file.originalname
+          url: fileMap.resume.path,
+          publicId: fileMap.resume.filename,
+          originalName: fileMap.resume.originalname
         };
       }
 
@@ -237,7 +300,184 @@ const answers = posting.questions.map((question) => {
       });
     } catch (error) {
       console.error('Error submitting application:', error);
-      res.status(400).json({ success: false, message: error.message || 'Failed to submit application' });
+      await cleanupUploads(files);
+      res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to submit application' });
+    }
+  }
+);
+
+router.post(
+  '/api/user/applications/custom',
+  requireUser,
+  cloudinaryUploadDocument.single('resume'),
+  [
+    body('applicantName').trim().notEmpty().withMessage('Name is required'),
+    body('applicantEmail').trim().isEmail().withMessage('Valid email is required'),
+    body('customCompany').trim().notEmpty().withMessage('Company is required'),
+    body('customRole').trim().notEmpty().withMessage('Role is required'),
+    body('customDescription').trim().notEmpty().withMessage('Description is required')
+  ],
+  async (req, res) => {
+    const files = req.file ? [req.file] : [];
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await cleanupUploads(files);
+      return res.status(400).json({ success: false, message: errors.array()[0].msg, errors: errors.array() });
+    }
+    try {
+      if (!req.file) {
+        throw httpError(400, 'Resume is required');
+      }
+
+      const { applicantName, applicantEmail, applicantPhone, customCompany, customRole, customDescription, customJobLink } = req.body;
+      const applicationId = await generateUniqueApplicationId('custom');
+
+      const application = new Application({
+        applicationId,
+        applicationType: 'custom',
+        user: req.user.user_id,
+        postingSnapshot: {
+          companyName: customCompany.trim(),
+          roleTitle: customRole.trim()
+        },
+        customDetails: {
+          description: customDescription.trim(),
+          jobLink: customJobLink ? customJobLink.trim() : ''
+        },
+        applicantName,
+        applicantEmail: applicantEmail.trim().toLowerCase(),
+        applicantPhone,
+        answers: [],
+        resume: {
+          url: req.file.path,
+          publicId: req.file.filename,
+          originalName: req.file.originalname
+        },
+        ipAddress: req.ip
+      });
+
+      await application.save();
+
+      try {
+        const confirmationTemplate = getApplicationConfirmationTemplate(
+          application.applicantName,
+          application.postingSnapshot.roleTitle,
+          application.postingSnapshot.companyName,
+          application.applicationId
+        );
+        await sendEmail(application.applicantEmail, 'Application Received Successfully', confirmationTemplate);
+
+        const admin = await Admin.findOne();
+        if (admin) {
+          const adminTemplate = getAdminApplicationNotificationTemplate(
+            application.applicantName,
+            application.applicantEmail,
+            application.postingSnapshot.roleTitle,
+            application.postingSnapshot.companyName,
+            application.applicationId,
+            'referral'
+          );
+          await sendEmail(admin.email, '🔔 New Custom Referral Request from ' + application.applicantName, adminTemplate);
+        }
+      } catch (emailError) {
+        console.error('Error sending custom application emails:', emailError);
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Request submitted successfully',
+        applicationId: application.applicationId
+      });
+    } catch (error) {
+      console.error('Error submitting custom application:', error);
+      await cleanupUploads(files);
+      res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to submit request' });
+    }
+  }
+);
+
+router.get('/api/user/applications', requireUser, async (req, res) => {
+  try {
+    const applications = await Application.find({ user: req.user.user_id })
+      .sort({ createdAt: -1 })
+      .select('applicationId applicationType postingSnapshot customDetails currentStatus statusHistory followUp createdAt')
+      .lean();
+
+    const sanitized = applications.map((application) => ({
+      ...application,
+      statusHistory: (application.statusHistory || []).map(({ updatedBy, ...entry }) => entry)
+    }));
+
+    res.json({ success: true, applications: sanitized });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+});
+
+router.post(
+  '/api/user/applications/:applicationId/followup',
+  requireUser,
+  cloudinaryUploadDocument.any(),
+  async (req, res) => {
+    const files = req.files || [];
+    try {
+      const application = await Application.findOne({
+        applicationId: req.params.applicationId,
+        user: req.user.user_id
+      });
+
+      if (!application) {
+        throw httpError(404, 'Application not found');
+      }
+
+      const answeredIds = new Set((application.followUp.answers || []).map((a) => String(a.questionId)));
+      const pendingQuestions = (application.followUp.questions || []).filter((q) => !answeredIds.has(String(q._id)));
+
+      if (pendingQuestions.length === 0) {
+        throw httpError(400, 'There are no pending questions for this application');
+      }
+
+      const rawAnswers = parseRawAnswers(req.body.answers);
+      const fileMap = mapFilesByField(files);
+      const newAnswers = buildAnswers(pendingQuestions, rawAnswers, fileMap);
+
+      application.followUp.answers.push(...newAnswers);
+      application.followUp.status = 'answered';
+      application.followUp.respondedAt = new Date();
+      application.currentStatus = {
+        label: 'Information Submitted',
+        color: '#3b82f6',
+        note: 'Applicant has submitted the additional information',
+        updatedAt: new Date()
+      };
+      application._statusUpdatedBy = 'applicant';
+
+      await application.save();
+
+      try {
+        const admin = await Admin.findOne();
+        if (admin) {
+          const adminTemplate = getAdminFollowUpResponseTemplate(
+            application.applicantName,
+            application.applicantEmail,
+            application.postingSnapshot.roleTitle,
+            application.postingSnapshot.companyName,
+            application.applicationId
+          );
+          await sendEmail(admin.email, '📝 Additional information received from ' + application.applicantName, adminTemplate);
+        }
+      } catch (emailError) {
+        console.error('Error sending follow-up response email:', emailError);
+      }
+
+      const result = application.toObject();
+      result.statusHistory = (result.statusHistory || []).map(({ updatedBy, ...entry }) => entry);
+
+      res.json({ success: true, message: 'Information submitted successfully', application: result });
+    } catch (error) {
+      console.error('Error submitting follow-up:', error);
+      await cleanupUploads(files);
+      res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to submit information' });
     }
   }
 );
@@ -245,11 +485,14 @@ const answers = posting.questions.map((question) => {
 router.get('/api/public/applications/status/:applicationId', async (req, res) => {
   try {
     const application = await Application.findOne({ applicationId: req.params.applicationId })
-      .select('applicationId applicationType postingSnapshot applicantName currentStatus statusHistory createdAt');
+      .select('applicationId applicationType postingSnapshot applicantName currentStatus statusHistory createdAt')
+      .lean();
 
     if (!application) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
+
+    application.statusHistory = (application.statusHistory || []).map(({ updatedBy, ...entry }) => entry);
 
     res.json({ success: true, application });
   } catch (error) {
@@ -609,14 +852,19 @@ router.get('/api/admin/applications/export', authenticateToken, async (req, res)
         'Email': app.applicantEmail,
         'Phone': app.applicantPhone || '',
         'Resume': app.resume?.url || '',
+        'Description': app.customDetails?.description || '',
+        'Job Link': app.customDetails?.jobLink || '',
         'Status': app.currentStatus?.label || '',
         'Status Note': app.currentStatus?.note || '',
         'Submitted At': app.createdAt ? new Date(app.createdAt).toLocaleString() : ''
       };
 
       app.answers.forEach((answer) => {
-        const value = Array.isArray(answer.answer) ? answer.answer.join(', ') : answer.answer;
-        base[answer.questionText] = value;
+        base[answer.questionText] = formatAnswerForExport(answer.answer);
+      });
+
+      (app.followUp?.answers || []).forEach((answer) => {
+        base[`Follow-up: ${answer.questionText}`] = formatAnswerForExport(answer.answer);
       });
 
       return base;
@@ -692,12 +940,63 @@ router.put(
   }
 );
 
+router.put('/api/admin/applications/:id/followup', authenticateToken, async (req, res) => {
+  try {
+    const application = await Application.findById(req.params.id);
+    if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
+
+    if (application.applicationType !== 'custom') {
+      return res.status(400).json({ success: false, message: 'Additional questions can only be requested for custom requests' });
+    }
+
+    const newQuestions = buildQuestionsFromBody(req.body.questions);
+    if (newQuestions.length === 0) {
+      return res.status(400).json({ success: false, message: 'Add at least one question' });
+    }
+
+    const message = req.body.message ? String(req.body.message).trim() : '';
+
+    application.followUp.questions.push(...newQuestions);
+    application.followUp.status = 'pending';
+    application.followUp.message = message;
+    application.followUp.requestedAt = new Date();
+    application.currentStatus = {
+      label: 'More Information Needed',
+      color: '#f59e0b',
+      note: message || 'Additional information has been requested',
+      updatedAt: new Date()
+    };
+    application._statusUpdatedBy = req.user.email || req.user.id;
+
+    await application.save();
+
+    try {
+      const template = getApplicationMoreInfoTemplate(
+        application.applicantName,
+        application.postingSnapshot.roleTitle,
+        application.postingSnapshot.companyName,
+        application.applicationId,
+        message
+      );
+      await sendEmail(application.applicantEmail, 'More information needed for your application', template);
+    } catch (emailError) {
+      console.error('Error sending more-info email:', emailError);
+    }
+
+    res.json({ success: true, message: 'Additional questions sent to applicant', application });
+  } catch (error) {
+    console.error('Error requesting more information:', error);
+    res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
 router.delete('/api/admin/applications/:id', authenticateToken, async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);
     if (!application) return res.status(404).json({ success: false, message: 'Application not found' });
 
     if (application.resume?.publicId) await deleteCloudinaryAsset(application.resume.publicId, 'raw');
+    await Promise.all(collectAssetIds(application).map((publicId) => deleteCloudinaryAsset(publicId, 'raw')));
     await application.deleteOne();
     res.json({ success: true, message: 'Application deleted successfully' });
   } catch (error) {

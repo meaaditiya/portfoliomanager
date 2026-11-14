@@ -17,6 +17,22 @@ const authHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
 });
 
+const renderAnswerValue = (answer) => {
+  if (Array.isArray(answer)) return answer.join(', ') || '—';
+  if (answer && typeof answer === 'object') {
+    if (answer.url) {
+      return (
+        <a href={answer.url} target="_blank" rel="noreferrer" className="rjbAdm-answer-file-link">
+          {answer.originalName || 'View file'}
+        </a>
+      );
+    }
+    return '—';
+  }
+  if (answer === '' || answer === null || answer === undefined) return '—';
+  return String(answer);
+};
+
 function QuestionBuilder({ questions, setQuestions }) {
   const updateQuestion = (id, patch) => {
     setQuestions(questions.map((q) => (q.tempId === id || q._id === id ? { ...q, ...patch } : q)));
@@ -537,6 +553,16 @@ function ApplicationsManager() {
     }
   };
 
+  const requestInfo = async (id, message, questions) => {
+    const res = await axios.put(
+      `${API_BASE}/api/admin/applications/${id}/followup`,
+      { message, questions },
+      authHeaders()
+    );
+    setSelected(res.data.application);
+    fetchApplications(pagination.page);
+  };
+
   return (
     <div className="rjbAdm-panel-body">
       <div className="rjbAdm-apps-filters">
@@ -548,6 +574,7 @@ function ApplicationsManager() {
           <option value="">All types</option>
           <option value="referral">Refer me</option>
           <option value="job">Job posting</option>
+          <option value="custom">Custom request</option>
         </select>
         <select
           className="rjbAdm-apps-filter-select"
@@ -594,7 +621,15 @@ function ApplicationsManager() {
                     <br />
                     <span className="rjbAdm-cell-subtext">{app.applicantEmail}</span>
                   </td>
-                  <td>{app.postingSnapshot?.roleTitle} — {app.postingSnapshot?.companyName}</td>
+                  <td>
+                    {app.postingSnapshot?.roleTitle} — {app.postingSnapshot?.companyName}
+                    {app.applicationType === 'custom' && (
+                      <>
+                        <br />
+                        <span className="rjbAdm-type-tag">Custom request</span>
+                      </>
+                    )}
+                  </td>
                   <td>
                     <span
                       className="rjbAdm-status-badge"
@@ -636,16 +671,42 @@ function ApplicationsManager() {
           statusOptions={statusOptions}
           onClose={() => setSelected(null)}
           onUpdateStatus={updateStatus}
+          onRequestInfo={requestInfo}
         />
       )}
     </div>
   );
 }
 
-function ApplicationDetailModal({ application, statusOptions, onClose, onUpdateStatus }) {
+function ApplicationDetailModal({ application, statusOptions, onClose, onUpdateStatus, onRequestInfo }) {
   const [label, setLabel] = useState(application.currentStatus?.label || '');
   const [color, setColor] = useState(application.currentStatus?.color || '#6b7280');
   const [note, setNote] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [infoQuestions, setInfoQuestions] = useState([]);
+  const [infoSending, setInfoSending] = useState(false);
+  const [infoError, setInfoError] = useState('');
+
+  const followUpQuestions = application.followUp?.questions || [];
+  const followUpAnswers = application.followUp?.answers || [];
+
+  const sendInfoRequest = async () => {
+    setInfoSending(true);
+    setInfoError('');
+    try {
+      await onRequestInfo(
+        application._id,
+        infoMessage,
+        infoQuestions.map(({ tempId, ...q }) => q)
+      );
+      setInfoMessage('');
+      setInfoQuestions([]);
+    } catch (err) {
+      setInfoError(err.response?.data?.message || 'Failed to send request');
+    } finally {
+      setInfoSending(false);
+    }
+  };
 
   return (
     <div className="rjbAdm-modal-overlay">
@@ -673,15 +734,73 @@ function ApplicationDetailModal({ application, statusOptions, onClose, onUpdateS
             )}
           </div>
 
-          <div className="rjbAdm-modal-section">
-            <p className="rjbAdm-modal-section-title">Answers</p>
-            {application.answers.map((a, i) => (
-              <div key={i} className="rjbAdm-modal-answer">
-                <p className="rjbAdm-modal-answer-question">{a.questionText}</p>
-                <p className="rjbAdm-modal-answer-value">{Array.isArray(a.answer) ? a.answer.join(', ') : String(a.answer)}</p>
-              </div>
-            ))}
-          </div>
+          {application.applicationType === 'custom' && (
+            <div className="rjbAdm-modal-section">
+              <p className="rjbAdm-modal-section-title">Request details</p>
+              <p className="rjbAdm-modal-description">{application.customDetails?.description || '—'}</p>
+              {application.customDetails?.jobLink && (
+                <a
+                  href={application.customDetails.jobLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rjbAdm-answer-file-link"
+                >
+                  Job link
+                </a>
+              )}
+            </div>
+          )}
+
+          {application.answers?.length > 0 && (
+            <div className="rjbAdm-modal-section">
+              <p className="rjbAdm-modal-section-title">Answers</p>
+              {application.answers.map((a, i) => (
+                <div key={i} className="rjbAdm-modal-answer">
+                  <p className="rjbAdm-modal-answer-question">{a.questionText}</p>
+                  <p className="rjbAdm-modal-answer-value">{renderAnswerValue(a.answer)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {application.applicationType === 'custom' && (
+            <div className="rjbAdm-modal-section">
+              <p className="rjbAdm-modal-section-title">Additional information</p>
+
+              {followUpQuestions.length === 0 ? (
+                <p className="rjbAdm-history-item">No additional questions requested yet.</p>
+              ) : (
+                followUpQuestions.map((q) => {
+                  const found = followUpAnswers.find((a) => String(a.questionId) === String(q._id));
+                  return (
+                    <div key={q._id} className="rjbAdm-modal-answer">
+                      <p className="rjbAdm-modal-answer-question">{q.questionText}</p>
+                      <p className="rjbAdm-modal-answer-value">
+                        {found ? renderAnswerValue(found.answer) : <span className="rjbAdm-followup-pending">Awaiting response</span>}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+
+              <p className="rjbAdm-modal-section-title">Request more information</p>
+              <textarea
+                className="rjbAdm-form-textarea"
+                placeholder="Message to applicant (optional)"
+                value={infoMessage}
+                onChange={(e) => setInfoMessage(e.target.value)}
+              />
+              <QuestionBuilder questions={infoQuestions} setQuestions={setInfoQuestions} />
+              {infoError && <p className="rjbAdm-form-error">{infoError}</p>}
+              <button
+                onClick={sendInfoRequest}
+                disabled={infoSending || infoQuestions.length === 0}
+                className="rjbAdm-btn-primary"
+              >
+                {infoSending ? 'Sending...' : 'Send questions by email'}
+              </button>
+            </div>
+          )}
 
           <div className="rjbAdm-modal-section">
             <p className="rjbAdm-modal-section-title">Update status</p>

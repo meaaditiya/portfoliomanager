@@ -845,3 +845,43 @@
     width: 100%;
   }
 }
+.rjbAdm-answer-file-link {
+  color: var(--rjbAdm-primary-accent);
+  font-size: 0.875rem;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.rjbAdm-answer-file-link:hover {
+  color: var(--rjbAdm-primary-accent-hover);
+  text-decoration: underline;
+}
+
+.rjbAdm-modal-description {
+  font-size: 0.875rem;
+  color: var(--rjbAdm-primary-text);
+  white-space: pre-wrap;
+}
+
+.rjbAdm-type-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--rjbAdm-spacing-xs);
+  padding: 2px var(--rjbAdm-spacing-sm);
+  border-radius: var(--rjbAdm-radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--rjbAdm-primary-accent-light);
+  color: var(--rjbAdm-primary-accent);
+}
+
+.rjbAdm-followup-pending {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--rjbAdm-spacing-sm);
+  border-radius: var(--rjbAdm-radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--rjbAdm-warning-light);
+  color: var(--rjbAdm-warning-color);
+}
